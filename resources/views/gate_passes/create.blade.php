@@ -1,0 +1,174 @@
+@extends('layouts.app')
+
+@section('title', 'Gate Pass | New')
+
+@section('content')
+<div class="row">
+  <div class="col">
+    <form action="{{ route('gate_passes.store') }}" method="POST" onkeydown="return event.key != 'Enter';">
+      @csrf
+      <section class="card">
+        <header class="card-header">
+          <h2 class="card-title">New Gate Pass</h2>
+        </header>
+
+        <div class="card-body">
+
+          @if($errors->any())
+            <div class="alert alert-danger">
+              <ul class="mb-0">
+                @foreach($errors->all() as $error)
+                  <li>{{ $error }}</li>
+                @endforeach
+              </ul>
+            </div>
+          @endif
+
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label>From Location <span class="text-danger">*</span></label>
+              <select name="from_location_id" id="from_location" class="form-control select2-js" required>
+                <option value="">Select Location</option>
+                @foreach ($locations as $loc)
+                  <option value="{{ $loc->id }}">
+                    {{ $loc->name }} @if($loc->vendor) ({{ $loc->vendor->name }}) @endif
+                  </option>
+                @endforeach
+              </select>
+            </div>
+
+            <div class="col-md-4 mb-3">
+              <label>To Location <span class="text-danger">*</span></label>
+              <select name="to_location_id" class="form-control select2-js" required>
+                <option value="">Select Location</option>
+                @foreach ($locations as $loc)
+                  <option value="{{ $loc->id }}">
+                    {{ $loc->name }} @if($loc->vendor) ({{ $loc->vendor->name }}) @endif
+                  </option>
+                @endforeach
+              </select>
+            </div>
+
+            <div class="col-md-4 mb-3">
+              <label>Date <span class="text-danger">*</span></label>
+              <input type="date" name="entry_date" class="form-control" value="{{ date('Y-m-d') }}" required>
+            </div>
+
+            <div class="col-md-12 mb-3">
+              <label>Remarks</label>
+              <textarea name="remarks" class="form-control" rows="2" placeholder="e.g. sent for weaving job"></textarea>
+            </div>
+          </div>
+
+          <div class="alert alert-info py-2" id="selectLocationMsg">
+            Select a "From Location" to see available stock.
+          </div>
+
+          <div class="table-responsive mb-3" id="itemsSection" style="display:none">
+            <table class="table table-bordered" id="itemsTable">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Available</th>
+                  <th>Quantity to Move</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="itemsBody"></tbody>
+            </table>
+            <button type="button" class="btn btn-outline-primary" id="addRowBtn">
+              <i class="fas fa-plus"></i> Add Product
+            </button>
+          </div>
+        </div>
+
+        <footer class="card-footer text-end">
+          <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Save Gate Pass</button>
+        </footer>
+      </section>
+    </form>
+  </div>
+</div>
+
+<script>
+  let availableItems = [];
+  let rowIndex = 0;
+
+  $(document).ready(function () {
+    $('.select2-js').select2({ width: '100%' });
+  });
+
+  $('#from_location').on('change', function () {
+    const locationId = $(this).val();
+    $('#itemsBody').empty();
+    rowIndex = 0;
+
+    if (!locationId) {
+      $('#itemsSection').hide();
+      $('#selectLocationMsg').show().text('Select a "From Location" to see available stock.');
+      return;
+    }
+
+    fetch(`/gate-passes/available-at?location_id=${locationId}`)
+      .then(res => res.json())
+      .then(data => {
+        availableItems = data;
+
+        if (data.length === 0) {
+          $('#itemsSection').hide();
+          $('#selectLocationMsg').show().text('No stock available at this location.');
+          return;
+        }
+
+        $('#selectLocationMsg').hide();
+        $('#itemsSection').show();
+        addRow();
+      });
+  });
+
+  function productOptionsHtml(selectedId) {
+    let html = '<option value="">Select Product</option>';
+    availableItems.forEach(item => {
+      const sel = item.product_id == selectedId ? 'selected' : '';
+      html += `<option value="${item.product_id}" data-available="${item.available}" ${sel}>
+                 ${item.product_name} (available: ${item.available})
+               </option>`;
+    });
+    return html;
+  }
+
+  function addRow() {
+    const idx = rowIndex++;
+    const row = $(`
+      <tr class="item-row">
+        <td>
+          <select name="items[${idx}][product_id]" class="form-control select2-js product-select" required>
+            ${productOptionsHtml()}
+          </select>
+        </td>
+        <td class="available-cell">—</td>
+        <td><input type="number" name="items[${idx}][quantity]" class="form-control qty-input" step="any" min="0.001" value="0"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger remove-row">&times;</button></td>
+      </tr>
+    `);
+    $('#itemsBody').append(row);
+    row.find('.select2-js').select2({ width: '100%' });
+  }
+
+  $('#addRowBtn').on('click', addRow);
+
+  $(document).on('change', '.product-select', function () {
+    const selected = $(this).find('option:selected');
+    const available = parseFloat(selected.data('available')) || 0;
+    const row = $(this).closest('tr');
+    row.find('.available-cell').text(available);
+    row.find('.qty-input').attr('max', available);
+  });
+
+  $(document).on('click', '.remove-row', function () {
+    if ($('.item-row').length > 1) {
+      $(this).closest('tr').remove();
+    }
+  });
+</script>
+@endsection
