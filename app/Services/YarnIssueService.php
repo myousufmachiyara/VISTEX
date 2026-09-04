@@ -2,13 +2,13 @@
 
 namespace App\Services;
 
-use App\Models\ConversionPurchaseOrder;
+use App\Models\PurchaseOrder;
 use App\Models\YarnIssue;
 use App\Models\YarnIssueItem;
-use App\Models\YarnInProcessLedger;
-use App\Models\Location;
 use App\Models\LocationStockLedger;
+use App\Models\Location;
 use App\Models\Product;
+use App\Models\YarnInProcessLedger;
 use Illuminate\Support\Facades\DB;
 
 class YarnIssueService
@@ -24,48 +24,48 @@ class YarnIssueService
     {
         return DB::transaction(function () use ($data, $items, $userId) {
 
-            $cpo = ConversionPurchaseOrder::findOrFail($data['cpo_id']);
-            $defaultLocationId = Location::where('vendor_id', null)->where('is_default', true)->value('id')
-                ?? Location::whereNull('vendor_id')->value('id');
+            $po = \App\Models\PurchaseOrder::findOrFail($data['purchase_order_id']);
 
-            if (!$defaultLocationId) {
-                throw new \Exception('No default warehouse location configured.');
+            if ($po->type !== 'weaving') {
+                throw new \Exception('Yarn can only be issued against a Weaving-type Purchase Order.');
             }
+            if (!in_array($po->status, ['Approved', 'PartiallyReceived'])) {
+                throw new \Exception('This Purchase Order is not in a state that allows yarn issuance.');
+            }
+
+            $defaultLocationId = \App\Models\Location::whereNull('vendor_id')->value('id');
 
             $items = array_values(array_filter($items, fn($i) => (float) ($i['quantity'] ?? 0) > 0));
             if (empty($items)) {
                 throw new \Exception('Enter a quantity for at least one yarn.');
             }
 
-            // Hard block: total ever issued (existing + this) cannot exceed CPO's required yarn weight
-            $alreadyIssued = $cpo->yarn_issued_total;
+            $alreadyIssued = (float) $po->yarn_issued_total;
             $thisIssueTotal = array_sum(array_column($items, 'quantity'));
-            $required = (float) $cpo->total_yarn_weight_consumed;
+            $required = (float) $po->total_yarn_weight_consumed;
 
             if ($required > 0 && ($alreadyIssued + $thisIssueTotal) > $required + 0.001) {
                 $remaining = round($required - $alreadyIssued, 3);
-                throw new \Exception(
-                    "Cannot issue {$thisIssueTotal} — CPO {$cpo->cpo_no} allows only " . round($remaining, 3) . " more yarn."
-                );
+                throw new \Exception("Cannot issue {$thisIssueTotal} — PO {$po->order_no} allows only {$remaining} more yarn.");
             }
 
-            $issue = YarnIssue::create([
-                'issue_no'    => $this->numberService->next('yarn_issue', 'yarn_issues', 'issue_no', 'YI'),
-                'cpo_id'      => $cpo->id,
-                'issue_date'  => $data['issue_date'],
-                'remarks'     => $data['remarks'] ?? null,
-                'attachments' => $data['attachments'] ?? null,
-                'created_by'  => $userId,
-                'updated_by'  => $userId,
+            $issue = \App\Models\YarnIssue::create([
+                'issue_no'          => $this->numberService->next('yarn_issue', 'yarn_issues', 'issue_no', 'YI'),
+                'purchase_order_id' => $po->id,
+                'issue_date'        => $data['issue_date'],
+                'remarks'           => $data['remarks'] ?? null,
+                'attachments'       => $data['attachments'] ?? null,
+                'created_by'        => $userId,
+                'updated_by'        => $userId,
             ]);
 
             $totalAmount = 0;
 
             foreach ($items as $item) {
                 $qty = (float) $item['quantity'];
-                $product = Product::findOrFail($item['product_id']);
+                $product = \App\Models\Product::findOrFail($item['product_id']);
 
-                $available = LocationStockLedger::balance($defaultLocationId, $product->id, 'fresh');
+                $available = \App\Models\LocationStockLedger::balance($defaultLocationId, $product->id, 'fresh');
                 if ($qty > $available + 0.001) {
                     throw new \Exception("Insufficient stock of {$product->name} — available: " . round($available, 3) . ", requested: {$qty}.");
                 }
@@ -74,7 +74,7 @@ class YarnIssueService
                 $amount = round($qty * $rate, 2);
                 $totalAmount += $amount;
 
-                YarnIssueItem::create([
+                \App\Models\YarnIssueItem::create([
                     'yarn_issue_id' => $issue->id,
                     'product_id'    => $product->id,
                     'quantity'      => $qty,
@@ -82,35 +82,26 @@ class YarnIssueService
                     'amount'        => $amount,
                 ]);
 
-                // Leaves our warehouse
-                LocationStockLedger::create([
-                    'doc_no'          => $issue->issue_no,
-                    'location_id'     => $defaultLocationId,
-                    'product_id'      => $product->id,
-                    'status'          => 'fresh',
-                    'quantity'        => -$qty,
-                    'amount'          => -$amount,
-                    'reference_type'  => 'YarnIssue',
-                    'reference_id'    => $issue->id,
-                    'entry_date'      => $data['issue_date'],
+                \App\Models\LocationStockLedger::create([
+                    'doc_no' => $issue->issue_no, 'location_id' => $defaultLocationId, 'product_id' => $product->id,
+                    'status' => 'fresh', 'quantity' => -$qty, 'amount' => -$amount,
+                    'reference_type' => 'YarnIssue', 'reference_id' => $issue->id, 'entry_date' => $data['issue_date'],
                 ]);
 
-                // Now sits "in process" at the weaving mill
-                YarnInProcessLedger::create([
-                    'cpo_id'          => $cpo->id,
-                    'vendor_id'       => $cpo->vendor_id,
-                    'product_id'      => $product->id,
-                    'quantity'        => $qty,
-                    'amount'          => $amount,
-                    'reference_type'  => 'YarnIssue',
-                    'reference_id'    => $issue->id,
-                    'entry_date'      => $data['issue_date'],
+                \App\Models\YarnInProcessLedger::create([
+                    'purchase_order_id' => $po->id, 'vendor_id' => $po->vendor_id, 'product_id' => $product->id,
+                    'quantity' => $qty, 'amount' => $amount,
+                    'reference_type' => 'YarnIssue', 'reference_id' => $issue->id, 'entry_date' => $data['issue_date'],
                 ]);
             }
 
-            $this->postVoucher($issue, $cpo, $totalAmount, $userId);
+            $this->postVoucher($issue, $po, $totalAmount, $userId);
+            // First yarn issue against this PO moves it from Approved -> Issued
+            if ($po->status === 'Approved') {
+                $po->update(['status' => 'Issued']);
+            }
 
-            return $issue->load('items.product', 'cpo.vendor');
+            return $issue->load('items.product', 'purchaseOrder.vendor');
         });
     }
 
@@ -131,15 +122,13 @@ class YarnIssueService
     }
 
     // Dr Yarn in Process (asset) / Cr Stock in Hand — Yarn
-    private function postVoucher(YarnIssue $issue, ConversionPurchaseOrder $cpo, float $totalAmount, ?int $userId): void
+    private function postVoucher(YarnIssue $issue, PurchaseOrder $po, float $totalAmount, ?int $userId): void
     {
-        if ($totalAmount <= 0) return;
-
         $yipAccountId = $this->mappingService->accountId('yarn_in_process');
         $stockAccountId = $this->mappingService->accountId('stock_in_hand');
 
         if (!$yipAccountId || !$stockAccountId) {
-            throw new \Exception('Yarn in Process or Stock in Hand mapping is not configured — check Account Mappings.');
+            throw new \Exception('Required account mappings (yarn_in_process, stock_in_hand) are missing.');
         }
 
         $lines = [
@@ -149,9 +138,9 @@ class YarnIssueService
 
         $this->voucherService->post(
             'system',
-            $issue->issue_date instanceof \Carbon\Carbon ? $issue->issue_date->format('Y-m-d') : $issue->issue_date,
+            $issue->issue_date->format('Y-m-d'),
             $lines,
-            "Yarn Issue {$issue->issue_no} — {$cpo->cpo_no} to {$cpo->vendor->name}",
+            "Yarn Issue {$issue->issue_no} — {$po->order_no}",
             'YarnIssue',
             $issue->id,
             $userId

@@ -53,21 +53,19 @@ class ConversionPurchaseOrderController extends Controller
     public function calculate(Request $request)
     {
         $request->validate([
-            'warp_count'             => 'required|numeric|min:0.01',
-            'weft_count'             => 'required|numeric|min:0.01',
-            'reed_count'             => 'required|numeric|min:0.01',
-            'pick'                   => 'required|numeric|min:0.01',
-            'width'                  => 'required|numeric|min:0.01',
-            'total_meters_required'  => 'required|numeric|min:0.001',
-            'rate_per_pick'          => 'required|numeric|min:0',
-            'sizing_lbs'             => 'nullable|numeric|min:0',
-            'warp_conversion_pct'    => 'nullable|numeric|min:0',
-            'gst_applicable'         => 'nullable|boolean',
-            'gst_rate'               => 'nullable|numeric|min:0|max:100',
+            'warp_count' => 'required|numeric|min:0.01', 'weft_count' => 'required|numeric|min:0.01',
+            'reed_count' => 'required|numeric|min:0.01', 'pick' => 'required|numeric|min:0.01',
+            'width' => 'required|numeric|min:0.01', 'total_meters_required' => 'required|numeric|min:0.001',
+            'rate_per_pick' => 'required|numeric|min:0', 'sizing_lbs' => 'nullable|numeric|min:0',
+            'warp_conversion_pct' => 'nullable|numeric|min:0',
+            'warp_shrinkage_pct' => 'nullable|numeric|min:0|max:100',
+            'weft_shrinkage_pct' => 'nullable|numeric|min:0|max:100',
+            'gst_applicable' => 'nullable|boolean', 'gst_rate' => 'nullable|numeric|min:0|max:100',
         ]);
 
-        $calc = $this->formulaService->calculate($request->all());
-        $calc = $this->formulaService->withGst($calc, $request->boolean('gst_applicable'), (float) $request->gst_rate);
+        $formulaService = app(\App\Services\CpoFormulaService::class);
+        $calc = $formulaService->calculate($request->all());
+        $calc = $formulaService->withGst($calc, $request->boolean('gst_applicable'), (float) $request->gst_rate);
 
         return response()->json($calc);
     }

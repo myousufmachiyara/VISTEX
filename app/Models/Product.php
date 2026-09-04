@@ -41,15 +41,12 @@ class Product extends Model
         return $this->attributes['attributes'] ?? ($this->getAttribute('attributes') ?? []);
     }
 
-    // app/Models/Product.php — add this method
-    public function weightedAverageCost(int $locationId = null): float
+    public function weightedAverageCost(?int $locationId = null): float
     {
         $query = \App\Models\LocationStockLedger::where('product_id', $this->id)->where('status', 'fresh');
         if ($locationId) $query->where('location_id', $locationId);
-
         $qty = (float) (clone $query)->sum('quantity');
         $amt = (float) (clone $query)->sum('amount');
-
         return $qty > 0.001 ? round($amt / $qty, 4) : 0;
     }
 }

@@ -13,11 +13,11 @@
 
         <div class="row">
           <div class="col-md-5 mb-3">
-            <label>Conversion PO <span class="text-danger">*</span></label>
-            <select name="cpo_id" id="cpo_select" class="form-control select2-js" required>
-              <option value="">Select CPO</option>
+            <label>Weaving PO <span class="text-danger">*</span></label>
+            <select name="purchase_order_id" id="po_select" class="form-control select2-js" required>
+              <option value="">Select PO</option>
               @foreach ($cpos as $cpo)
-                <option value="{{ $cpo->id }}">{{ $cpo->cpo_no }} — {{ $cpo->vendor->name ?? '' }} — {{ $cpo->item_name }}</option>
+                <option value="{{ $cpo->id }}">{{ $cpo->order_no }} — {{ $cpo->vendor->name ?? '' }} — {{ $cpo->item_name }}</option>
               @endforeach
             </select>
           </div>
@@ -26,8 +26,8 @@
           <div class="col-md-12 mb-3"><label>Remarks</label><textarea name="remarks" class="form-control" rows="1"></textarea></div>
         </div>
 
-        <div class="alert alert-info py-2" id="cpoInfo" style="display:none"></div>
-        <div class="alert alert-secondary py-2" id="loadingMsg">Select a CPO to see yarn requirement and stock.</div>
+        <div class="alert alert-info py-2" id="poInfo" style="display:none"></div>
+        <div class="alert alert-secondary py-2" id="loadingMsg">Select a PO to see yarn requirement and stock.</div>
 
         <div class="table-responsive mb-3" id="itemsSection" style="display:none">
           <table class="table table-bordered"><thead><tr><th>Yarn</th><th>Available in Warehouse</th><th>Quantity to Issue</th></tr></thead>
@@ -43,19 +43,38 @@
 <script>
   $(document).ready(function () { $('.select2-js').select2({ width: '100%' }); });
 
-  $('#cpo_select').on('change', function () {
-    const cpoId = $(this).val();
+  $('#po_select').on('change', function () {
+    const poId = $(this).val();
     $('#itemsBody').empty();
-    if (!cpoId) { $('#itemsSection, #cpoInfo').hide(); $('#loadingMsg').show(); return; }
+    if (!poId) { $('#itemsSection, #poInfo').hide(); $('#loadingMsg').show(); return; }
 
-    fetch(`/yarn-issues/cpo-details/${cpoId}`).then(r => r.json()).then(data => {
+    fetch(`/yarn-issues/cpo-details/${poId}`).then(r => r.json()).then(data => {
       $('#loadingMsg').hide();
-      $('#cpoInfo').show().html(
-        `Total Required: <strong>${data.total_required}</strong> | Already Issued: <strong>${data.already_issued}</strong> | ` +
-        `Remaining Allowed: <strong class="text-success">${data.remaining_allowed}</strong>`
+      $('#poInfo').show().html(
+        `Total Yarn Required: <strong>${data.total_yarn_required}</strong> | Already Issued: <strong>${data.already_issued}</strong> | ` +
+        `Remaining Allowed: <strong class="text-success">${data.outstanding}</strong>`
       );
       $('#itemsSection').show();
-      data.items.forEach((item, idx) => {
+
+      // Build item rows from warp + weft yarn data returned by the controller.
+      // If warp and weft are the SAME product, only show one row (avoid
+      // asking the user to split quantity across two identical rows).
+      const items = [];
+      items.push({
+        product_id: data.warp_product_id,
+        product_name: data.warp_product_name,
+        available: data.warp_available,
+      });
+
+      if (data.weft_product_id !== data.warp_product_id) {
+        items.push({
+          product_id: data.weft_product_id,
+          product_name: data.weft_product_name,
+          available: data.weft_available,
+        });
+      }
+
+      items.forEach((item, idx) => {
         $('#itemsBody').append(`
           <tr>
             <td>${item.product_name}<input type="hidden" name="items[${idx}][product_id]" value="${item.product_id}"></td>

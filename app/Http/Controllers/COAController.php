@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ChartOfAccounts;
 use App\Models\SubHeadOfAccounts;
+use App\Models\HeadOfAccounts;
 use App\Imports\ChartOfAccountsImport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -13,10 +14,24 @@ class COAController extends Controller
 {
     public function index()
     {
-        $accounts = ChartOfAccounts::with('subHead.head')->orderBy('account_code')->get();
-        $subHeads = SubHeadOfAccounts::with('head')->orderBy('name')->get();
+        $heads = HeadOfAccounts::with(['subHeads' => function ($q) {
+            $q->orderBy('name');
+        }, 'subHeads.accounts' => function ($q) {
+            $q->orderBy('account_code');
+        }])->orderBy('id')->get();
 
-        return view('accounts.coa', compact('accounts', 'subHeads'));
+        // Compute running balance per account once here, so the view stays dumb
+        foreach ($heads as $head) {
+            foreach ($head->subHeads as $subHead) {
+                foreach ($subHead->accounts as $account) {
+                    $account->computed_balance = $account->balance; // uses the model's getBalanceAttribute()
+                }
+            }
+        }
+
+        $subHeads = SubHeadOfAccounts::orderBy('name')->get(); // still needed for the filter dropdown + modals
+
+        return view('accounts.coa', compact('heads', 'subHeads'));
     }
 
     public function store(Request $request)

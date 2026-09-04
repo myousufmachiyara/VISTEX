@@ -49,10 +49,13 @@
                 </span>
               </td>
               <td>
+                <a href="{{ route('purchase_orders.show', $order->id) }}" target="_blank" class="btn btn-sm btn-outline-warning me-1">Show</a>
                 <a href="{{ route('purchase_orders.print', $order->id) }}" target="_blank" class="btn btn-sm btn-outline-success me-1">Print</a>
-                @if(in_array($order->status, ['Pending','PartiallyReceived']))
-                  <a href="{{ route('purchase_receivings.create', ['purchase_order_id' => $order->id]) }}" class="btn btn-sm btn-success me-1">Receive</a>
-                @endif
+                @can('challans.create')
+                  @if(in_array($order->status, ['Approved','Issued']))
+                    <a href="{{ route('challans.create') }}?purchase_order_id={{ $order->id }}" class="btn btn-sm btn-outline-success me-1">Log Challan</a>
+                  @endif
+                @endcan
                 @can('purchase_orders.edit')
                 @if($order->canBeEditedBy(auth()->user()) && $order->status === 'Pending')
                 <a href="{{ route('purchase_orders.edit', $order->id) }}" class="btn btn-sm btn-outline-primary me-1">Edit</a>

@@ -17,25 +17,26 @@ class CpoFormulaService
         $ratePerPick  = (float) $inputs['rate_per_pick'];
         $sizingLbs    = (float) ($inputs['sizing_lbs'] ?? 0);
         $warpConvPct  = (float) ($inputs['warp_conversion_pct'] ?? 0);
+        $warpShrinkagePct = (float) ($inputs['warp_shrinkage_pct'] ?? 0);
+        $weftShrinkagePct = (float) ($inputs['weft_shrinkage_pct'] ?? 0);
 
         $reedSpace = $width;
 
         $gsm = (($reedCount * 25.4) / $warpCount) + (($pick * 25.4) / $weftCount);
 
-        $warpConsumption = ((($reedCount * $width * 1.0936) / 840) / $warpCount) + $warpConvPct;
+        $warpConsumptionBase = ((($reedCount * $width * 1.0936) / 840) / $warpCount) + $warpConvPct;
+        $weftConsumptionBase = (((($reedCount * ($width / $reedCount)) * $pick * 1.0936) / 840) / $weftCount) * 0.02;
 
-        $weftConsumption = (((($reedCount * ($width / $reedCount)) * $pick * 1.0936) / 840) / $weftCount) * 0.02;
+        // Option A — shrinkage inflates consumption directly
+        $warpConsumption = $warpConsumptionBase * (1 + $warpShrinkagePct / 100);
+        $weftConsumption = $weftConsumptionBase * (1 + $weftShrinkagePct / 100);
 
         $totalGreigeQtyRequired = $warpConsumption + $weftConsumption;
-
-        $totalYarnWeightConsumed = $totalGreigeQtyRequired * $totalMeters;
+        $totalYarnWeightConsumed = ceil($totalGreigeQtyRequired * $totalMeters); // rounded UP, per point 15
 
         $ratePerMeter = $pick * $ratePerPick;
-
         $sizingPerMeter = $warpConsumption * $sizingLbs;
-
         $weavingRate = $ratePerMeter + $sizingPerMeter;
-
         $weavingCost = $weavingRate * $totalMeters;
 
         $itemName = sprintf('%sx%s/%s-%s-%s', $warpCount, $weftCount, $reedCount, $pick, $width);
@@ -46,7 +47,7 @@ class CpoFormulaService
             'warp_consumption'             => round($warpConsumption, 6),
             'weft_consumption'             => round($weftConsumption, 6),
             'total_greige_qty_required'    => round($totalGreigeQtyRequired, 6),
-            'total_yarn_weight_consumed'   => round($totalYarnWeightConsumed, 3),
+            'total_yarn_weight_consumed'   => $totalYarnWeightConsumed,
             'rate_per_meter'               => round($ratePerMeter, 4),
             'sizing_per_meter'             => round($sizingPerMeter, 4),
             'weaving_rate'                 => round($weavingRate, 4),

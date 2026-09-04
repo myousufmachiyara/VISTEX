@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -8,49 +7,63 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class PurchaseOrder extends Model
 {
     use SoftDeletes;
-
     protected $table = 'purchase_orders';
 
     protected $fillable = [
-        'order_no', 'revision_no', 'vendor_id', 'product_category_id',
+        'order_no', 'type', 'revision_no', 'vendor_id', 'product_category_id', 'service_type_id',
+        'job_id', 'program', 'fabric_specs',
         'from_location_id', 'drop_off_location_id',
         'order_date', 'expected_date',
+        'broker_id', 'broker_commission_type', 'broker_commission_value', 'broker_commission_amount',
+        'payment_term_type', 'payment_term_days', 'payment_term_note',
         'gst_applicable', 'tax_id', 'gst_rate',
         'subtotal', 'gst_amount', 'total_amount',
-        'status', 'locked_by', 'remarks', 'attachments',
-        'created_by', 'updated_by',
+        'status', 'approved_by', 'approved_at', 'rejection_reason', 'locked_by',
+        'warp_product_id', 'weft_product_id', 'greige_product_id',
+        'warp_count', 'weft_count', 'reed_count', 'pick', 'width', 'total_meters_required',
+        'rate_per_pick', 'sizing_lbs', 'warp_conversion_pct', 'warp_shrinkage_pct', 'weft_shrinkage_pct',
+        'gsm', 'warp_consumption', 'weft_consumption', 'total_greige_qty_required', 'total_yarn_weight_consumed',
+        'rate_per_meter', 'sizing_per_meter', 'weaving_rate', 'weaving_cost', 'item_name',
+        'is_final_receiving_done',
+        'forecast_id', 'remarks', 'attachments', 'created_by', 'updated_by',
     ];
 
     protected $casts = [
-        'order_date'      => 'date',
-        'expected_date'   => 'date',
-        'gst_applicable'  => 'boolean',
-        'gst_rate'        => 'decimal:2',
-        'subtotal'        => 'decimal:2',
-        'gst_amount'      => 'decimal:2',
-        'total_amount'    => 'decimal:2',
-        'revision_no'     => 'integer',
-        'attachments'     => 'array',
+        'order_date' => 'date', 'expected_date' => 'date', 'approved_at' => 'datetime',
+        'gst_applicable' => 'boolean', 'is_final_receiving_done' => 'boolean',
+        'attachments' => 'array', 'fabric_specs' => 'array',
     ];
+
+    public const TYPES = ['purchase' => 'Purchase', 'weaving' => 'Weaving', 'processing' => 'Processing'];
 
     public function vendor()          { return $this->belongsTo(Vendor::class, 'vendor_id'); }
     public function category()        { return $this->belongsTo(ProductCategory::class, 'product_category_id'); }
+    public function serviceType()     { return $this->belongsTo(ServiceType::class, 'service_type_id'); }
+    public function job()             { return $this->belongsTo(Job::class, 'job_id'); }
     public function fromLocation()    { return $this->belongsTo(Location::class, 'from_location_id'); }
     public function dropOffLocation() { return $this->belongsTo(Location::class, 'drop_off_location_id'); }
-    public function forecast()        { return $this->belongsTo(Forecast::class, 'forecast_id'); }
+    public function broker()          { return $this->belongsTo(Broker::class, 'broker_id'); }
     public function tax()             { return $this->belongsTo(TaxMaster::class, 'tax_id'); }
+    public function forecast()        { return $this->belongsTo(Forecast::class, 'forecast_id'); }
+    public function approver()        { return $this->belongsTo(User::class, 'approved_by'); }
     public function creator()         { return $this->belongsTo(User::class, 'locked_by'); }
     public function items()           { return $this->hasMany(PurchaseOrderItem::class, 'purchase_order_id'); }
+    public function terms()           { return $this->hasMany(PurchaseOrderTerm::class, 'purchase_order_id'); }
+    public function objections()      { return $this->hasMany(PurchaseOrderObjection::class, 'purchase_order_id'); }
+    public function openObjections()  { return $this->hasMany(PurchaseOrderObjection::class, 'purchase_order_id')->where('status', 'Open'); }
+    public function amendments()      { return $this->hasMany(PurchaseOrderAmendment::class, 'purchase_order_id')->orderByDesc('amendment_no'); }
 
-    // ── Visibility: superadmin sees all; others see only their own
-    // creations, POs at a location they manage, or POs in a category
-    // they're in-charge of.
+    public function warpProduct()   { return $this->belongsTo(Product::class, 'warp_product_id'); }
+    public function weftProduct()   { return $this->belongsTo(Product::class, 'weft_product_id'); }
+    public function greigeProduct() { return $this->belongsTo(Product::class, 'greige_product_id'); }
+
+    public function yarnIssues()        { return $this->hasMany(YarnIssue::class, 'purchase_order_id'); }
+    public function processingIssues()  { return $this->hasMany(ProcessingIssue::class, 'purchase_order_id'); }
+    public function receivings()        { return $this->hasMany(PurchaseReceiving::class, 'purchase_order_id'); }
+
     public function scopeVisibleTo($query, User $user)
     {
-        if ($user->hasRole('superadmin')) {
-            return $query;
-        }
-
+        if ($user->hasRole('superadmin')) return $query;
         return $query->where(function ($q) use ($user) {
             $q->where('locked_by', $user->id)
               ->orWhereHas('dropOffLocation', fn($q2) => $q2->where('in_charge_user_id', $user->id))
@@ -60,8 +73,10 @@ class PurchaseOrder extends Model
 
     public function canBeEditedBy(User $user): bool
     {
-        return $user->hasRole('superadmin') || $this->locked_by === $user->id;
+        return ($user->hasRole('superadmin') || $this->locked_by === $user->id) && $this->status === 'Pending';
     }
+
+    public function canBeApprovedBy(User $user): bool { return $user->hasRole('superadmin'); }
 
     public function isReceivableBy(User $user): bool
     {
@@ -69,24 +84,17 @@ class PurchaseOrder extends Model
         return $this->dropOffLocation && $this->dropOffLocation->in_charge_user_id === $user->id;
     }
 
-    public function canBeApprovedBy(User $user): bool
+    public function getYarnIssuedTotalAttribute(): float
     {
-        if ($user->hasRole('superadmin')) return true;
-
-        return CategoryIncharge::where('product_category_id', $this->product_category_id)
-            ->where('user_id', $user->id)
-            ->exists();
+        return (float) $this->yarnIssues()
+            ->join('yarn_issue_items', 'yarn_issues.id', '=', 'yarn_issue_items.yarn_issue_id')
+            ->sum('yarn_issue_items.quantity');
     }
 
-    public function getQuantityOrderedAttribute(): float
+    public function getEffective(string $field)
     {
-        return (float) $this->items->sum('quantity');
+        $latest = $this->amendments()->where('status', 'Approved')->first();
+        if ($latest && array_key_exists($field, $latest->new_values)) return $latest->new_values[$field];
+        return $this->{$field};
     }
-
-    public function getQuantityReceivedAttribute(): float
-    {
-        return (float) $this->items->sum('quantity_received');
-    }
-    public function objections()      { return $this->hasMany(PurchaseOrderObjection::class, 'purchase_order_id'); }
-    public function openObjections()  { return $this->hasMany(PurchaseOrderObjection::class, 'purchase_order_id')->where('status', 'Open'); }
 }

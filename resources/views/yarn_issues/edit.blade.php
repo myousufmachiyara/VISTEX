@@ -12,7 +12,7 @@
         @endif
 
         <div class="alert alert-info py-2">
-          CPO: <strong>{{ $issue->cpo->cpo_no }} — {{ $issue->cpo->vendor->name ?? '' }}</strong> (locked, cannot change)
+          PO: <strong>{{ $issue->purchaseOrder->order_no ?? '' }} — {{ $issue->purchaseOrder->vendor->name ?? '' }}</strong> (locked, cannot change)
         </div>
 
         <div class="row">

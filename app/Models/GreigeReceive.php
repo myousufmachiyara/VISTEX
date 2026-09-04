@@ -27,8 +27,7 @@ class GreigeReceive extends Model
         'total_amount'          => 'decimal:2',
         'attachments'           => 'array',
     ];
-
-    public function cpo()          { return $this->belongsTo(ConversionPurchaseOrder::class, 'cpo_id'); }
+    public function purchaseOrder() { return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id'); }
     public function yarnConsumed() { return $this->hasMany(GreigeReceiveYarnConsumed::class, 'greige_receive_id'); }
     public function outputs()      { return $this->hasMany(GreigeReceiveOutput::class, 'greige_receive_id'); }
     public function approver()     { return $this->belongsTo(User::class, 'approved_by'); }
