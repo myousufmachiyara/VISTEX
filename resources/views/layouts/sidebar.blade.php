@@ -87,19 +87,6 @@
         @endcan
 
         {{-- ═══════════════════════════════════════════════════════ --}}
-        {{-- SALES — Forecasting + Jobs                                 --}}
-        {{-- ═══════════════════════════════════════════════════════ --}}
-        @if(auth()->user()->canAny(['forecasts.index','jobs.index']))
-        <li class="nav-parent {{ request()->routeIs('forecasts.*','jobs.*') ? 'nav-expanded active' : '' }}">
-          <a class="nav-link" href="#"><i class="fa fa-chart-line"></i><span>Sales</span></a>
-          <ul class="nav nav-children">
-            @can('forecasts.index')<li class="{{ request()->routeIs('forecasts.*')?'active':'' }}"><a class="nav-link" href="{{ route('forecasts.index') }}">Forecasting</a></li>@endcan
-            @can('jobs.index')<li class="{{ request()->routeIs('jobs.*')?'active':'' }}"><a class="nav-link" href="{{ route('jobs.index') }}">Jobs / Customer Orders</a></li>@endcan
-          </ul>
-        </li>
-        @endif
-
-        {{-- ═══════════════════════════════════════════════════════ --}}
         {{-- PURCHASE — PO, Objections, Challans, Receiving, Return     --}}
         {{-- ═══════════════════════════════════════════════════════ --}}
         @if(auth()->user()->canAny(['purchase_orders.index','challans.index','purchase_receivings.index','purchase_returns.index']))
@@ -115,6 +102,7 @@
         </li>
         @endif
 
+        
         {{-- ═══════════════════════════════════════════════════════ --}}
         {{-- PRODUCTION — Yarn Issue, Stock Movement, Processing        --}}
         {{-- ═══════════════════════════════════════════════════════ --}}
@@ -125,6 +113,19 @@
             @can('yarn_issues.index')<li class="{{ request()->routeIs('yarn_issues.*')?'active':'' }}"><a class="nav-link" href="{{ route('yarn_issues.index') }}">Yarn Issue</a></li>@endcan
             @can('stock_movements.index')<li class="{{ request()->routeIs('stock_movements.*')?'active':'' }}"><a class="nav-link" href="{{ route('stock_movements.index') }}">Stock Movement</a></li>@endcan
             @can('processing_issues.index')<li class="{{ request()->routeIs('processing_issues.*')?'active':'' }}"><a class="nav-link" href="{{ route('processing_issues.index') }}">Processing Issue</a></li>@endcan
+          </ul>
+        </li>
+        @endif
+
+        {{-- ═══════════════════════════════════════════════════════ --}}
+        {{-- SALES — Forecasting + Jobs                                 --}}
+        {{-- ═══════════════════════════════════════════════════════ --}}
+        @if(auth()->user()->canAny(['forecasts.index','jobs.index']))
+        <li class="nav-parent {{ request()->routeIs('forecasts.*','jobs.*') ? 'nav-expanded active' : '' }}">
+          <a class="nav-link" href="#"><i class="fa fa-chart-line"></i><span>Sales</span></a>
+          <ul class="nav nav-children">
+            @can('forecasts.index')<li class="{{ request()->routeIs('forecasts.*')?'active':'' }}"><a class="nav-link" href="{{ route('forecasts.index') }}">Forecasting</a></li>@endcan
+            @can('jobs.index')<li class="{{ request()->routeIs('jobs.*')?'active':'' }}"><a class="nav-link" href="{{ route('jobs.index') }}">Jobs / Customer Orders</a></li>@endcan
           </ul>
         </li>
         @endif
