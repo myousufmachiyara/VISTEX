@@ -267,25 +267,73 @@ class PurchaseReceivingService
 
         $this->pdcService->createPending('vendor', $po->vendor_id, $amount, $dueDate, 'PurchaseReceiving', $receiving->id, $userId);
     }
-
     private function postVoucher(PurchaseReceiving $receiving, PurchaseOrder $po, array $stockTotalsByAccount, float $gstAmount, float $totalAmount, ?int $userId): void
     {
         $lines = [];
-        foreach ($stockTotalsByAccount as $accountId => $amount) $lines[] = ['account_id' => $accountId, 'debit' => $amount, 'credit' => 0];
 
-        if ($gstAmount > 0) {
-            $purchaseTaxAccountId = $this->mappingService->accountId('purchase_tax');
-            if ($purchaseTaxAccountId) $lines[] = ['account_id' => $purchaseTaxAccountId, 'debit' => $gstAmount, 'credit' => 0];
+        // Stock in — one line per distinct stock account touched by this receiving
+        foreach ($stockTotalsByAccount as $accountId => $amount) {
+            $lines[] = ['account_id' => $accountId, 'debit' => $amount, 'credit' => 0];
         }
 
+        // Input tax, if applicable
+        if ($gstAmount > 0) {
+            $purchaseTaxAccountId = $this->mappingService->accountId('purchase_tax');
+            if ($purchaseTaxAccountId) {
+                $lines[] = ['account_id' => $purchaseTaxAccountId, 'debit' => $gstAmount, 'credit' => 0];
+            }
+        }
+
+        // Broker commission — prorated to this receiving's share of the PO's
+        // total value. Posted as an expense (Dr) plus a payable tagged to the
+        // specific broker (Cr, via party_type/party_id — same mechanism that
+        // already gives Vendor/Customer their own running ledger balance,
+        // without needing a separate Chart of Accounts row per broker).
+        $brokerAmountThisReceiving = 0;
+        if ($po->broker_id && $po->broker_commission_amount > 0 && $po->subtotal > 0) {
+            $receivingSubtotal = (float) $receiving->items->sum('amount');
+            $brokerAmountThisReceiving = round($po->broker_commission_amount * ($receivingSubtotal / $po->subtotal), 2);
+
+            if ($brokerAmountThisReceiving > 0) {
+                $brokerExpenseAccountId = $this->mappingService->accountId('broker_commission');
+                $apAccountId = $this->mappingService->accountId('accounts_payable');
+
+                if (!$brokerExpenseAccountId || !$apAccountId) {
+                    throw new \Exception('Broker commission expense or Accounts Payable mapping is not configured.');
+                }
+
+                $lines[] = ['account_id' => $brokerExpenseAccountId, 'debit' => $brokerAmountThisReceiving, 'credit' => 0];
+                $lines[] = [
+                    'account_id' => $apAccountId, 'debit' => 0, 'credit' => $brokerAmountThisReceiving,
+                    'party_type' => 'broker', 'party_id' => $po->broker_id,
+                ];
+            }
+        }
+
+        // Vendor payable — the main line, always present
         $apAccountId = $this->mappingService->accountId('accounts_payable');
-        if (!$apAccountId) throw new \Exception('Accounts Payable mapping is not configured.');
-        $lines[] = ['account_id' => $apAccountId, 'debit' => 0, 'credit' => $totalAmount, 'party_type' => 'vendor', 'party_id' => $po->vendor_id];
+        if (!$apAccountId) {
+            throw new \Exception('Accounts Payable mapping is not configured.');
+        }
 
-        if (count($lines) < 2) return;
+        $lines[] = [
+            'account_id' => $apAccountId, 'debit' => 0, 'credit' => $totalAmount,
+            'party_type' => 'vendor', 'party_id' => $po->vendor_id,
+        ];
 
-        $this->voucherService->post('system', $receiving->receiving_date->format('Y-m-d'), $lines,
-            "Purchase Receiving {$receiving->receiving_no} — {$po->order_no}", 'PurchaseReceiving', $receiving->id, $userId);
+        if (count($lines) < 2) {
+            return;
+        }
+
+        $this->voucherService->post(
+            'system',
+            $receiving->receiving_date->format('Y-m-d'),
+            $lines,
+            "Purchase Receiving {$receiving->receiving_no} — {$po->order_no}",
+            'PurchaseReceiving',
+            $receiving->id,
+            $userId
+        );
     }
 
     private function refreshPoStatus(PurchaseOrder $po): void

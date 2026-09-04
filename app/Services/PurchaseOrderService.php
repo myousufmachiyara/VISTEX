@@ -211,9 +211,7 @@ class PurchaseOrderService
             'product_category_id' => $category->id, 'service_type_id' => $data['service_type_id'] ?? null,
             'from_location_id' => $data['from_location_id'] ?? null, 'drop_off_location_id' => $data['drop_off_location_id'],
             'order_date' => $data['order_date'], 'expected_date' => $data['expected_date'] ?? null,
-            'broker_id' => $data['broker_id'] ?? null, 'broker_commission_type' => $data['broker_commission_type'] ?? null,
-            'broker_commission_value' => $data['broker_commission_value'] ?? 0,
-            'payment_term_type' => $data['payment_term_type'] ?? 'cash',
+            'broker_id' => $data['broker_id'] ?? null, 'payment_term_type' => $data['payment_term_type'] ?? 'cash',
             'payment_term_days' => in_array($data['payment_term_type'] ?? 'cash', ['credit', 'pdc']) ? ($data['payment_term_days'] ?? null) : null,
             'payment_term_note' => ($data['payment_term_type'] ?? '') === 'other' ? ($data['payment_term_note'] ?? null) : null,
             'gst_applicable' => (bool) ($data['gst_applicable'] ?? false),
@@ -231,9 +229,7 @@ class PurchaseOrderService
             'service_type_id' => $data['service_type_id'] ?? null,
             'from_location_id' => $data['from_location_id'] ?? null, 'drop_off_location_id' => $data['drop_off_location_id'],
             'order_date' => $data['order_date'], 'expected_date' => $data['expected_date'] ?? null,
-            'broker_id' => $data['broker_id'] ?? null, 'broker_commission_type' => $data['broker_commission_type'] ?? null,
-            'broker_commission_value' => $data['broker_commission_value'] ?? 0,
-            'payment_term_type' => $data['payment_term_type'] ?? 'cash',
+            'broker_id' => $data['broker_id'] ?? null, 'payment_term_type' => $data['payment_term_type'] ?? 'cash',
             'payment_term_days' => in_array($data['payment_term_type'] ?? 'cash', ['credit', 'pdc']) ? ($data['payment_term_days'] ?? null) : null,
             'payment_term_note' => ($data['payment_term_type'] ?? '') === 'other' ? ($data['payment_term_note'] ?? null) : null,
             'gst_applicable' => (bool) ($data['gst_applicable'] ?? false),
@@ -252,12 +248,10 @@ class PurchaseOrderService
         return [$rate, $applicable ? round($subtotal * ($rate / 100), 2) : 0];
     }
 
-    private function calcBrokerAmount(array $data, float $baseAmount): float
+    private function calcBrokerAmount(array $data): float
     {
         if (empty($data['broker_id'])) return 0;
-        $type = $data['broker_commission_type'] ?? 'percentage';
-        $value = (float) ($data['broker_commission_value'] ?? 0);
-        return $type === 'percentage' ? round($baseAmount * ($value / 100), 2) : round($value, 2);
+        return round((float) ($data['broker_commission_amount'] ?? 0), 2);
     }
 
     public function approve(PurchaseOrder $order, int $approverId): PurchaseOrder

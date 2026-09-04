@@ -13,6 +13,28 @@ class BrokerController extends Controller
         $brokers = Broker::orderBy('name')->get();
         return view('brokers.index', compact('brokers'));
     }
+    // BrokerController — add this method
+
+    public function ledger($id)
+    {
+        $broker = Broker::findOrFail($id);
+
+        $entries = \App\Models\VoucherEntry::where('party_type', 'broker')->where('party_id', $id)
+            ->with('voucher')
+            ->join('vouchers', 'voucher_entries.voucher_id', '=', 'vouchers.id')
+            ->orderBy('vouchers.voucher_date')
+            ->select('voucher_entries.*', 'vouchers.voucher_date', 'vouchers.narration', 'vouchers.voucher_no')
+            ->get();
+
+        $balance = 0;
+        $entries = $entries->map(function ($e) use (&$balance) {
+            $balance += (float) $e->credit - (float) $e->debit;
+            $e->running_balance = $balance;
+            return $e;
+        });
+
+        return view('brokers.ledger', compact('broker', 'entries', 'balance'));
+}
 
     public function store(Request $request)
     {

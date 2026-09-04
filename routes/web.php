@@ -369,13 +369,26 @@ Route::middleware(['auth'])->group(function () {
     // OPERATIONAL 10 — PDC (POST DATED CHEQUES)
     // ════════════════════════════════════════════════════════════════
     Route::prefix('pdcs')->name('pdcs.')->group(function () {
-        Route::get('/',              [PdcController::class, 'index'])       ->name('index')  ->middleware('check.permission:pdcs.index');
-        Route::get('uncleared',      [PdcController::class, 'uncleared'])   ->name('uncleared')->middleware('check.permission:pdcs.index');
-        Route::get('{id}',           [PdcController::class, 'show'])        ->name('show')   ->middleware('check.permission:pdcs.index');
-        Route::post('{id}/created',  [PdcController::class, 'markCreated']) ->name('mark_created')->middleware('check.permission:pdcs.edit');
-        Route::post('{id}/signed',   [PdcController::class, 'markSigned'])  ->name('mark_signed') ->middleware('check.permission:pdcs.edit');
-        Route::post('{id}/issued',   [PdcController::class, 'markIssued'])  ->name('mark_issued') ->middleware('check.permission:pdcs.edit');
-        Route::post('{id}/cleared',  [PdcController::class, 'markCleared']) ->name('mark_cleared')->middleware('check.permission:pdcs.edit');
-        Route::post('{id}/bounced',  [PdcController::class, 'markBounced']) ->name('mark_bounced')->middleware('check.permission:pdcs.edit');
+        Route::get('/',                      [PdcController::class, 'index'])     ->name('index')  ->middleware('check.permission:pdcs.index');
+        Route::get('uncleared',              [PdcController::class, 'uncleared']) ->name('uncleared')->middleware('check.permission:pdcs.index');
+        Route::get('{id}',                   [PdcController::class, 'show'])      ->name('show')   ->middleware('check.permission:pdcs.index');
+        Route::post('{id}/cheques',          [PdcController::class, 'addCheque']) ->name('add_cheque')->middleware('check.permission:pdcs.edit');
+        Route::post('cheques/{id}/signed',   [PdcController::class, 'markSigned']) ->name('mark_signed') ->middleware('check.permission:pdcs.edit');
+        Route::post('cheques/{id}/issued',   [PdcController::class, 'markIssued']) ->name('mark_issued') ->middleware('check.permission:pdcs.edit');
+        Route::post('cheques/{id}/cleared',  [PdcController::class, 'markCleared'])->name('mark_cleared')->middleware('check.permission:pdcs.edit');
+        Route::post('cheques/{id}/bounced',  [PdcController::class, 'markBounced'])->name('mark_bounced')->middleware('check.permission:pdcs.edit');
+    });
+
+    Route::prefix('challans')->name('challans.')->group(function () {
+        Route::get('/',                    [ChallanController::class, 'index'])          ->name('index')  ->middleware('check.permission:challans.index');
+        Route::get('pending',              [ChallanController::class, 'pending'])        ->name('pending')->middleware('check.permission:challans.index');
+        Route::get('create',               [ChallanController::class, 'create'])         ->name('create') ->middleware('check.permission:challans.create');
+        Route::get('vendors-for-type',     [ChallanController::class, 'vendorsForType']) ->name('vendors_for_type')->middleware('check.permission:challans.index');
+        Route::get('pos-for-vendor',       [ChallanController::class, 'posForVendor'])   ->name('pos_for_vendor')  ->middleware('check.permission:challans.index');
+        Route::get('po-items/{poId}',      [ChallanController::class, 'poItems'])        ->name('po_items')->middleware('check.permission:challans.index');
+        Route::post('/',                    [ChallanController::class, 'store'])          ->name('store')  ->middleware('check.permission:challans.create');
+        Route::get('{id}',                 [ChallanController::class, 'show'])           ->name('show')   ->middleware('check.permission:challans.index');
+        Route::post('{id}/approve-direct', [ChallanController::class, 'approveDirect'])  ->name('approve_direct')->middleware('check.permission:challans.edit');
+        Route::post('{id}/reject-direct',  [ChallanController::class, 'rejectDirect'])   ->name('reject_direct') ->middleware('check.permission:challans.edit');
     });
 });

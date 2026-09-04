@@ -83,23 +83,16 @@
 
           {{-- Broker (yarn/greige only) --}}
           <div class="row" id="brokerSection" style="display:none">
-            <div class="col-md-3 mb-3">
+            <div class="col-md-4 mb-3">
               <label>Broker <span class="text-muted">(optional)</span></label>
               <select name="broker_id" id="broker_select" class="form-control select2-js">
                 <option value="">No Broker</option>
                 @foreach($brokers as $b)<option value="{{ $b->id }}">{{ $b->name }}</option>@endforeach
               </select>
             </div>
-            <div class="col-md-3 mb-3" id="brokerCommissionFields" style="display:none">
-              <label>Commission Type</label>
-              <select name="broker_commission_type" class="form-control">
-                <option value="percentage">Percentage (%)</option>
-                <option value="flat">Flat Amount</option>
-              </select>
-            </div>
-            <div class="col-md-3 mb-3" id="brokerValueField" style="display:none">
-              <label>Commission Value</label>
-              <input type="number" name="broker_commission_value" class="form-control" step="any" min="0" value="0">
+            <div class="col-md-4 mb-3" id="brokerAmountField" style="display:none">
+              <label>Broker Commission Amount</label>
+              <input type="number" name="broker_commission_amount" id="broker_commission_amount" class="form-control" step="any" min="0" value="0">
             </div>
           </div>
 
@@ -307,8 +300,8 @@
   });
 
   $('#broker_select').on('change', function () {
-    const has = !!$(this).val();
-    $('#brokerCommissionFields, #brokerValueField').toggle(has);
+    $('#brokerAmountField').toggle(!!$(this).val());
+    recalcPurchaseTotal();
   });
 
   $('#payment_term_type').on('change', function () {
@@ -390,7 +383,7 @@
 
     const brokerType = $('[name="broker_commission_type"]').val();
     const brokerVal = parseFloat($('[name="broker_commission_value"]').val()) || 0;
-    const brokerAmt = $('#broker_select').val() ? (brokerType === 'flat' ? brokerVal : subtotal * (brokerVal / 100)) : 0;
+    const brokerAmt = $('#broker_select').val() ? (parseFloat($('#broker_commission_amount').val()) || 0) : 0;
 
     $('#subtotalDisplay').text(subtotal.toFixed(2));
     $('#gstDisplay').text(gst.toFixed(2));
