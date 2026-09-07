@@ -234,7 +234,7 @@ class PurchaseOrderController extends Controller
         $pdf->SetXY(120, 20);
         $pdf->Cell(80, 6, $order->order_no, 0, 1, 'R');
 
-        $pdf->Ln(18);
+        $pdf->Ln(10);
 
         // ── Vendor (left) / Company (right) — single bordered boxes, not tables ──
         $vendorBox = '
