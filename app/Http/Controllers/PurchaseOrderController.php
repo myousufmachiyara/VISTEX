@@ -241,7 +241,7 @@ class PurchaseOrderController extends Controller
         <table cellpadding="6" cellspacing="0" width="100%">
         <tr>
             <td width="50%" style="border:1px solid #333; vertical-align:top;">
-            <b style="font-size:11px;">VENDOR</b><br><br>
+            <b style="font-size:11px;">SUPPLIER</b><br><br>
             <b>' . e($order->vendor->name ?? '-') . '</b><br>
             NTN: ' . e($order->vendor->ntn_number ?? '-') . '<br>
             STRN: ' . e($order->vendor->strn_number ?? '-') . '<br>
@@ -249,7 +249,7 @@ class PurchaseOrderController extends Controller
             </td>
             <td width="4%"></td>
             <td width="46%" style="border:1px solid #333; vertical-align:top;">
-            <b style="font-size:11px;">COMPANY</b><br><br>
+            <b style="font-size:11px;">BUYER</b><br><br>
             <b>VISTEX (Private) Limited</b><br>
             NTN: 1234567-8<br>
             STRN: 12-34-5678-901-23<br>
