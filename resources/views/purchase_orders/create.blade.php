@@ -53,7 +53,7 @@
         <div id="commonFields" style="display:none">
           <div class="row">
             <div class="col-md-3 mb-3">
-              <label>Vendor <span class="text-danger">*</span></label>
+              <label>Supplier <span class="text-danger">*</span></label>
               <select name="vendor_id" id="vendor_select" class="form-control select2-js" required>
                 <option value="">Select Vendor</option>
                 @foreach($vendors as $vendor)<option value="{{ $vendor->id }}">{{ $vendor->name }}</option>@endforeach
@@ -62,7 +62,7 @@
             <div class="col-md-3 mb-3">
               <label>From Location</label>
               <select name="from_location_id" id="from_location_select" class="form-control select2-js" disabled>
-                <option value="">Select vendor first</option>
+                <option value="">Select Supplier first</option>
               </select>
             </div>
             <div class="col-md-3 mb-3">
