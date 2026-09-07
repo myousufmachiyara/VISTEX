@@ -45,7 +45,7 @@ class CustomerController extends Controller
         DB::beginTransaction();
         try {
             $customer = Customer::create(array_merge($request->only([
-                'name', 'contact_person', 'phone', 'email', 'address', 'city',
+                'name', 'contact_person', 'phone', 'email', 'address', 'city', 'ntn_number',
                 'tax_id_number', 'payment_terms_type', 'payment_days', 'currency', 'notes',
             ]), [
                 'opening_balance'      => $request->opening_balance ?? 0,
@@ -87,7 +87,7 @@ class CustomerController extends Controller
             $customer = Customer::findOrFail($id);
 
             $customer->update(array_merge($request->only([
-                'name', 'contact_person', 'phone', 'email', 'address', 'city',
+                'name', 'contact_person', 'phone', 'email', 'address', 'city', 'ntn_number',
                 'tax_id_number', 'payment_terms_type', 'payment_days', 'currency', 'notes',
             ]), [
                 'opening_balance'      => $request->opening_balance ?? $customer->opening_balance,
