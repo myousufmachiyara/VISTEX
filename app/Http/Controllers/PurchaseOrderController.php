@@ -141,18 +141,32 @@ class PurchaseOrderController extends Controller
 
     public function update(Request $request, $id)
     {
-        $order = PurchaseOrder::findOrFail($id);
-        if (!$order->canBeEditedBy(auth()->user())) abort(403, 'Only the creator or a superadmin can edit a Pending PO.');
+    $order = PurchaseOrder::findOrFail($id);
+    if (!$order->canBeEditedBy(auth()->user())) abort(403, 'Only the creator or a superadmin can edit a Pending PO.');
 
-        $rules = $this->rules($order->type); unset($rules['type']);
-        $request->validate($rules);
+    $rules = $this->rules($order->type); unset($rules['type']);
+    $request->validate($rules);
 
-        try {
-            $this->service->update($order, $request->all(), $request->input('items', []), auth()->id());
-            return redirect()->route('purchase_orders.show', $order->id)->with('success', 'Purchase Order updated successfully.');
-        } catch (\Exception $e) {
-            return back()->withInput()->with('error', $e->getMessage());
+    try {
+        $attachments = $order->attachments ?? [];
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                $attachments[] = $file->store('purchase_order_attachments', 'public');
+            }
         }
+
+        $this->service->update(
+            $order,
+            array_merge($request->all(), ['attachments' => $attachments ?: null]),
+            $request->input('items', []),
+            auth()->id()
+        );
+
+        return redirect()->route('purchase_orders.show', $order->id)->with('success', 'Purchase Order updated successfully.');
+
+    } catch (\Exception $e) {
+        return back()->withInput()->with('error', $e->getMessage());
+    }
     }
 
     public function show($id)
