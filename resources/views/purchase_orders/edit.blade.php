@@ -285,25 +285,31 @@
 
   $(document).on('input', '.qty-input, .price-input', function () {
     const row = $(this).closest('tr');
-    const qty = parseFloat(row.find('.qty-input').val()) || 0;
-    const price = parseFloat(row.find('.price-input').val()) || 0;
+    const qty = unformatNumber(row.find('.qty-input').val());
+    const price = unformatNumber(row.find('.price-input').val());
     row.find('.amount-cell').text((qty * price).toFixed(2));
     recalcTotal();
   });
 
-  function recalcTotal() {
-    let subtotal = 0;
-    $('.item-row').each(function () { subtotal += parseFloat($(this).find('.amount-cell').text()) || 0; });
-    const gstApplicable = $('#gst_applicable').val() === '1';
-    const rate = gstApplicable ? (parseFloat($('#tax_select').find('option:selected').data('rate')) || 0) : 0;
-    const gst = subtotal * (rate / 100);
-    const brokerAmt = $('#broker_select').val() ? (parseFloat($('#broker_commission_amount').val()) || 0) : 0;
+function unformatNumber(value) {
+  return parseFloat((value || '').toString().replace(/,/g, '')) || 0;
+}
 
-    $('#subtotalDisplay').text(subtotal.toFixed(2));
-    $('#gstDisplay').text(gst.toFixed(2));
-    $('#brokerDisplay').text(brokerAmt.toFixed(2));
-    $('#totalDisplay').text((subtotal + gst + brokerAmt).toFixed(2));
-  }
+function recalcTotal() {
+  let subtotal = 0;
+  $('.item-row').each(function () {
+    subtotal += unformatNumber($(this).find('.amount-cell').text());
+  });
+  const gstApplicable = $('#gst_applicable').val() === '1';
+  const rate = gstApplicable ? (parseFloat($('#tax_select').find('option:selected').data('rate')) || 0) : 0;
+  const gst = subtotal * (rate / 100);
+  const brokerAmt = $('#broker_select').val() ? unformatNumber($('#broker_commission_amount').val()) : 0;
+
+  $('#subtotalDisplay').text(subtotal.toFixed(2));
+  $('#gstDisplay').text(gst.toFixed(2));
+  $('#brokerDisplay').text(brokerAmt.toFixed(2));
+  $('#totalDisplay').text((subtotal + gst + brokerAmt).toFixed(2));
+}
 
   $(document).on('change', '#tax_select', recalcTotal);
 
