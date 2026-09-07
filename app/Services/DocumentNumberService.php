@@ -7,29 +7,60 @@ use Illuminate\Support\Facades\DB;
 class DocumentNumberService
 {
     // Generates V{YY}-{CODE}-{NNNNN}, atomically incrementing per module+year.
+    // public function next(string $moduleKey, string $table, string $column, ?string $prefixCode = null): string
+    // {
+    //     return DB::transaction(function () use ($moduleKey, $table, $column, $prefixCode) {
+
+    //         $code = $prefixCode ?? $this->defaultCode($moduleKey);
+    //         $year = now()->format('y'); // 26 for 2026
+
+    //         $prefix = "V{$year}-{$code}-";
+
+    //         $existing = DB::table($table)
+    //             ->where($column, 'like', "{$prefix}%")
+    //             ->lockForUpdate()
+    //             ->orderByDesc($column)
+    //             ->value($column);
+
+    //         $nextSeq = 1;
+    //         if ($existing) {
+    //             $parts = explode('-', $existing);
+    //             $lastNum = (int) end($parts);
+    //             $nextSeq = $lastNum + 1;
+    //         }
+
+    //         return sprintf('%s%05d', $prefix, $nextSeq);
+    //     });
+    // }
+
     public function next(string $moduleKey, string $table, string $column, ?string $prefixCode = null): string
     {
         return DB::transaction(function () use ($moduleKey, $table, $column, $prefixCode) {
 
             $code = $prefixCode ?? $this->defaultCode($moduleKey);
-            $year = now()->format('y'); // 26 for 2026
+            $year = now()->format('y');
 
-            $prefix = "V{$year}-{$code}-";
+            $prefix = "VTX-{$code}-";
+            $suffix = "-{$year}";
+
+            // Match existing numbers with this prefix AND this year's suffix,
+            // so sequence resets per year while keeping VTX-{CAT} constant.
+            $pattern = "{$prefix}%{$suffix}";
 
             $existing = DB::table($table)
-                ->where($column, 'like', "{$prefix}%")
+                ->where($column, 'like', $pattern)
                 ->lockForUpdate()
-                ->orderByDesc($column)
-                ->value($column);
+                ->get([$column])
+                ->map(function ($row) use ($column, $prefix, $suffix) {
+                    $val = $row->{$column};
+                    $middle = substr($val, strlen($prefix), -strlen($suffix));
+                    return (int) $middle;
+                })
+                ->max();
 
-            $nextSeq = 1;
-            if ($existing) {
-                $parts = explode('-', $existing);
-                $lastNum = (int) end($parts);
-                $nextSeq = $lastNum + 1;
-            }
+            $nextSeq = ($existing ?? 0) + 1;
 
-            return sprintf('%s%05d', $prefix, $nextSeq);
+            return sprintf('%s%05d%s', $prefix, $nextSeq, $suffix);
         });
     }
 

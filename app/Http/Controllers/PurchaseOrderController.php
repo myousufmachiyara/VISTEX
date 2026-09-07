@@ -204,11 +204,8 @@ class PurchaseOrderController extends Controller
     public function print($id)
     {
         $order = PurchaseOrder::with([
-            'vendor', 'category', 'serviceType', 'job', 'broker', 'tax',
-            'dropOffLocation', 'fromLocation',
-            'items.product.measurementUnit', 'items.jobItem',
-            'warpProduct', 'weftProduct', 'greigeProduct',
-            'terms',
+            'vendor', 'category', 'serviceType', 'fromLocation', 'dropOffLocation',
+            'broker', 'tax', 'items.product.measurementUnit', 'terms',
         ])->findOrFail($id);
 
         $pdf = new \App\Services\myPDF();
@@ -220,245 +217,131 @@ class PurchaseOrderController extends Controller
         $pdf->SetAuthor('VISTEX (Private) Limited');
         $pdf->SetTitle($order->order_no);
         $pdf->SetSubject('Purchase Order');
-        $pdf->SetKeywords('PO, VISTEX, PDF');
 
         $pdf->AddPage();
         $pdf->SetFont('helvetica', '', 10);
 
         $logoPath = public_path('assets/img/vistex-logo.png');
         if (file_exists($logoPath)) {
-            $pdf->Image($logoPath, 12, 8, 60);
+            $pdf->Image($logoPath, 12, 8, 50);
         }
 
-        $typeLabel = match ($order->type) {
-            'purchase' => 'Purchase Order',
-            'weaving' => 'Weaving Purchase Order',
-            'processing' => 'Processing Purchase Order',
-            default => 'Purchase Order',
-        };
-
-        $pdf->SetFont('helvetica', 'B', 16);
+        $pdf->SetFont('helvetica', 'B', 18);
         $pdf->SetXY(120, 10);
-        $pdf->Cell(80, 8, $typeLabel, 0, 1, 'R');
+        $pdf->Cell(80, 8, 'PURCHASE ORDER', 0, 1, 'R');
 
-        $pdf->SetFont('helvetica', '', 9);
-        $pdf->SetXY(120, 18);
-        $pdf->Cell(80, 6, $order->order_no . '  (Rev ' . $order->revision_no . ')', 0, 1, 'R');
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->SetXY(120, 20);
+        $pdf->Cell(80, 6, $order->order_no, 0, 1, 'R');
 
-        $pdf->Ln(15);
-        $pdf->SetFont('helvetica', '', 10);
+        $pdf->Ln(18);
 
-        // ── Header info block ──────────────────────────────────────────
-        $infoHtml = '
-        <table cellpadding="3" cellspacing="0" width="100%">
-            <tr>
-                <td width="50%">
-                    <table border="1" cellpadding="4" cellspacing="0" style="font-size:10px;">
-                        <tr>
-                            <td width="35%"><b>Vendor</b></td>
-                            <td width="65%">' . e($order->vendor->name ?? '-') . '</td>
-                        </tr>
-                        <tr>
-                            <td width="35%"><b>Address</b></td>
-                            <td width="65%">' . e($order->vendor->address ?? '-') . '</td>
-                        </tr>
-                        <tr>
-                            <td width="35%"><b>Category</b></td>
-                            <td width="65%">' . e($order->category->name ?? '-') . '</td>
-                        </tr>';
-
-        if ($order->type === 'processing') {
-            $infoHtml .= '
-                        <tr>
-                            <td width="35%"><b>Service Type</b></td>
-                            <td width="65%">' . e($order->serviceType->name ?? '-') . '</td>
-                        </tr>
-                        <tr>
-                            <td width="35%"><b>Job / Customer Order</b></td>
-                            <td width="65%">' . e($order->job->job_no ?? '-') . '</td>
-                        </tr>
-                        <tr>
-                            <td width="35%"><b>Program</b></td>
-                            <td width="65%">' . e($order->program ?? '-') . '</td>
-                        </tr>';
-        }
-
-        $infoHtml .= '
-                    </table>
-                </td>
-                <td width="50%">
-                    <table border="1" cellpadding="4" cellspacing="0" style="font-size:10px;">
-                        <tr>
-                            <td width="40%"><b>PO Date</b></td>
-                            <td width="60%">' . \Carbon\Carbon::parse($order->order_date)->format('d-m-Y') . '</td>
-                        </tr>
-                        <tr>
-                            <td width="40%"><b>Expected Date</b></td>
-                            <td width="60%">' . ($order->expected_date ? \Carbon\Carbon::parse($order->expected_date)->format('d-m-Y') : '-') . '</td>
-                        </tr>
-                        <tr>
-                            <td width="40%"><b>Status</b></td>
-                            <td width="60%">' . e($order->status) . '</td>
-                        </tr>
-                        <tr>
-                            <td width="40%"><b>Payment Term</b></td>
-                            <td width="60%">' . e(ucfirst($order->payment_term_type)) . ($order->payment_term_days ? ' (' . $order->payment_term_days . ' days)' : '') . '</td>
-                        </tr>
-                        <tr>
-                            <td width="40%"><b>GST</b></td>
-                            <td width="60%">' . ($order->gst_applicable ? number_format($order->gst_rate, 2) . '%' : 'Not Applicable') . '</td>
-                        </tr>
-                    </table>
-                </td>
-            </tr>
+        // ── Vendor (left) / Company (right) — single bordered boxes, not tables ──
+        $vendorBox = '
+        <table cellpadding="6" cellspacing="0" width="100%">
+        <tr>
+            <td width="50%" style="border:1px solid #333; vertical-align:top;">
+            <b style="font-size:11px;">VENDOR</b><br><br>
+            <b>' . e($order->vendor->name ?? '-') . '</b><br>
+            NTN: ' . e($order->vendor->ntn_number ?? '-') . '<br>
+            STRN: ' . e($order->vendor->strn_number ?? '-') . '<br>
+            ' . nl2br(e($order->vendor->address ?? '-')) . '
+            </td>
+            <td width="4%"></td>
+            <td width="46%" style="border:1px solid #333; vertical-align:top;">
+            <b style="font-size:11px;">COMPANY</b><br><br>
+            <b>VISTEX (Private) Limited</b><br>
+            NTN: 1234567-8<br>
+            STRN: 12-34-5678-901-23<br>
+            F-128, Hub River Road, SITE Area, Karachi 75600, Pakistan
+            </td>
+        </tr>
         </table>';
 
-        $pdf->writeHTML($infoHtml, true, false, false, false, '');
+        $pdf->writeHTML($vendorBox, true, false, false, false, '');
+        $pdf->Ln(4);
+
+        // ── PO Details section ──
+        $detailsHtml = '
+        <table cellpadding="4" cellspacing="0" width="100%" style="border:1px solid #333; font-size:10px;">
+        <tr>
+            <td width="25%"><b>PO Date</b><br>' . \Carbon\Carbon::parse($order->order_date)->format('d-M-Y') . '</td>
+            <td width="25%"><b>Expected Date</b><br>' . ($order->expected_date ? \Carbon\Carbon::parse($order->expected_date)->format('d-M-Y') : '-') . '</td>
+            <td width="25%"><b>Broker</b><br>' . e($order->broker->name ?? '-') . '</td>
+            <td width="25%"><b>Payment Terms</b><br>' . e(ucfirst($order->payment_term_type)) . ($order->payment_term_days ? ' (' . $order->payment_term_days . ' days)' : '') . '</td>
+        </tr>
+        </table>';
+
+        $pdf->writeHTML($detailsHtml, true, false, false, false, '');
+        $pdf->Ln(4);
+
+        // ── Items table — clean borders, no footer totals here ──
+        $itemsHtml = '
+        <table cellpadding="4" cellspacing="0" width="100%" style="border:1px solid #333; font-size:10px;">
+        <tr style="font-weight:bold; background-color:#f0f0f0;">
+            <th width="6%" style="border:1px solid #333; text-align:center;">#</th>
+            <th width="38%" style="border:1px solid #333;">Item</th>
+            <th width="14%" style="border:1px solid #333; text-align:center;">Quantity</th>
+            <th width="12%" style="border:1px solid #333; text-align:center;">Unit</th>
+            <th width="15%" style="border:1px solid #333; text-align:right;">Rate</th>
+            <th width="15%" style="border:1px solid #333; text-align:right;">Amount</th>
+        </tr>';
+
+        $count = 0;
+        foreach ($order->items as $item) {
+            $count++;
+            $amount = (float) $item->quantity * (float) $item->rate;
+            $itemsHtml .= '
+        <tr>
+            <td style="border:1px solid #333; text-align:center;">' . $count . '</td>
+            <td style="border:1px solid #333;">' . e($item->product->name ?? '') . '</td>
+            <td style="border:1px solid #333; text-align:center;">' . number_format($item->quantity, 3) . '</td>
+            <td style="border:1px solid #333; text-align:center;">' . e($item->product->measurementUnit->shortcode ?? '') . '</td>
+            <td style="border:1px solid #333; text-align:right;">' . number_format($item->rate, 2) . '</td>
+            <td style="border:1px solid #333; text-align:right;">' . number_format($amount, 2) . '</td>
+        </tr>';
+        }
+        $itemsHtml .= '</table>';
+
+        $pdf->writeHTML($itemsHtml, true, false, false, false, '');
         $pdf->Ln(3);
 
-        // ── Fabric specs block (processing only) ────────────────────────
-        if ($order->type === 'processing' && !empty($order->fabric_specs)) {
-            $specHtml = '<table border="1" cellpadding="4" cellspacing="0" width="100%" style="font-size:10px;">';
-            $specHtml .= '<tr style="background-color:#f5f5f5;"><td colspan="4"><b>Fabric Specifications</b></td></tr><tr>';
-            $count = 0;
-            foreach ($order->fabric_specs as $key => $value) {
-                if (!$value) continue;
-                $label = ucwords(str_replace('_', ' ', $key));
-                $specHtml .= '<td width="15%"><b>' . e($label) . '</b></td><td width="10%">' . e($value) . '</td>';
-                $count++;
-                if ($count % 2 === 0) $specHtml .= '</tr><tr>';
-            }
-            $specHtml .= '</tr></table>';
-            $pdf->writeHTML($specHtml, true, false, false, false, '');
-            $pdf->Ln(3);
-        }
-
-        // ── Line items / weaving formula block ──────────────────────────
-        if ($order->type === 'purchase') {
-            $html = '
-            <table border="1" cellpadding="4" style="text-align:center;font-size:10px;">
-                <tr style="font-weight:bold; background-color:#f5f5f5;">
-                    <th width="6%">#</th><th width="34%">Item</th><th width="14%">Quantity</th>
-                    <th width="12%">Unit</th><th width="17%">Rate</th><th width="17%">Amount</th>
-                </tr>';
-            $count = 0; $totalQty = 0;
-            foreach ($order->items as $item) {
-                $count++;
-                $amount = (float) $item->quantity * (float) $item->rate;
-                $html .= '
-                <tr>
-                    <td>' . $count . '</td>
-                    <td style="text-align:left;">' . e($item->product->name ?? '') . '</td>
-                    <td>' . number_format($item->quantity, 3) . '</td>
-                    <td>' . e($item->product->measurementUnit->shortcode ?? '') . '</td>
-                    <td>' . number_format($item->rate, 2) . '</td>
-                    <td>' . number_format($amount, 2) . '</td>
-                </tr>';
-                $totalQty += $item->quantity;
-            }
-            $html .= '
-            <tr>
-                <td colspan="2" align="right"><b>Total</b></td>
-                <td><b>' . number_format($totalQty, 3) . '</b></td>
-                <td></td><td></td>
-                <td><b>' . number_format($order->subtotal, 2) . '</b></td>
-            </tr>';
-
-        } elseif ($order->type === 'processing') {
-            $html = '
-            <table border="1" cellpadding="4" style="text-align:center;font-size:10px;">
-                <tr style="font-weight:bold; background-color:#f5f5f5;">
-                    <th width="5%">#</th><th width="15%">Collection</th><th width="20%">Pattern / Code</th>
-                    <th width="22%">Description</th><th width="12%">Qty</th><th width="8%">Unit</th>
-                    <th width="9%">Rate</th><th width="9%">Amount</th>
-                </tr>';
-            $count = 0; $totalQty = 0;
-            foreach ($order->items as $item) {
-                $count++;
-                $amount = (float) $item->quantity * (float) $item->rate;
-                $html .= '
-                <tr>
-                    <td>' . $count . '</td>
-                    <td>' . e($item->collection ?? '') . '</td>
-                    <td>' . e($item->pattern_code ?? '') . '</td>
-                    <td style="text-align:left;">' . e($item->description ?? '') . '</td>
-                    <td>' . number_format($item->quantity, 3) . '</td>
-                    <td>' . e($item->measurementUnit->shortcode ?? '') . '</td>
-                    <td>' . number_format($item->rate, 2) . '</td>
-                    <td>' . number_format($amount, 2) . '</td>
-                </tr>';
-                $totalQty += $item->quantity;
-            }
-            $html .= '
-            <tr>
-                <td colspan="4" align="right"><b>Total</b></td>
-                <td><b>' . number_format($totalQty, 3) . '</b></td>
-                <td></td><td></td>
-                <td><b>' . number_format($order->subtotal, 2) . '</b></td>
-            </tr>';
-
-        } else { // weaving
-            $html = '
-            <table border="1" cellpadding="4" style="text-align:left;font-size:10px;">
-                <tr style="font-weight:bold; background-color:#f5f5f5;"><th colspan="2">Weaving Specification</th></tr>
-                <tr><td width="40%">Item</td><td width="60%">' . e($order->item_name ?? '-') . '</td></tr>
-                <tr><td>Warp Yarn</td><td>' . e($order->warpProduct->name ?? '-') . '</td></tr>
-                <tr><td>Weft Yarn</td><td>' . e($order->weftProduct->name ?? '-') . '</td></tr>
-                <tr><td>Output Greige</td><td>' . e($order->greigeProduct->name ?? '-') . '</td></tr>
-                <tr><td>Warp / Weft Count</td><td>' . number_format($order->warp_count, 2) . ' / ' . number_format($order->weft_count, 2) . '</td></tr>
-                <tr><td>Reed Count / Pick</td><td>' . number_format($order->reed_count, 2) . ' / ' . number_format($order->pick, 2) . '</td></tr>
-                <tr><td>Width</td><td>' . number_format($order->width, 2) . '</td></tr>
-                <tr><td>Warp / Weft Shrinkage %</td><td>' . number_format($order->warp_shrinkage_pct, 2) . '% / ' . number_format($order->weft_shrinkage_pct, 2) . '%</td></tr>
-                <tr><td>Total Meters Required</td><td>' . number_format($order->total_meters_required, 3) . '</td></tr>
-                <tr><td><b>Total Yarn Required (lbs)</b></td><td><b>' . number_format($order->total_yarn_weight_consumed, 0) . '</b></td></tr>
-                <tr><td>Weaving Rate (Rs/m)</td><td>' . number_format($order->weaving_rate, 4) . '</td></tr>
-                <tr><td><b>Weaving Cost</b></td><td><b>' . number_format($order->weaving_cost, 2) . '</b></td></tr>
-            </table>';
-        }
+        // ── Summary — right-aligned, professional ──
+        $summaryHtml = '
+        <table cellpadding="4" cellspacing="0" width="100%">
+        <tr>
+            <td width="60%"></td>
+            <td width="40%">
+            <table cellpadding="4" cellspacing="0" width="100%" style="border:1px solid #333; font-size:10px;">
+                <tr><td width="50%">Amount</td><td width="50%" style="text-align:right;">' . number_format($order->subtotal, 2) . '</td></tr>';
 
         if ($order->gst_applicable && $order->gst_amount > 0) {
-            $html .= '
-            <table border="1" cellpadding="4" style="text-align:right;font-size:10px;" width="100%">
-            <tr>
-                <td width="70%" align="right"><b>GST (' . number_format($order->gst_rate, 2) . '%)</b></td>
-                <td width="15%"><b>' . number_format($order->gst_amount, 2) . '</b></td>
-            </tr>';
-            if ($order->broker_commission_amount > 0) {
-                $html .= '
-            <tr>
-                <td align="right"><b>Broker Commission (' . e($order->broker->name ?? '') . ')</b></td>
-                <td><b>' . number_format($order->broker_commission_amount, 2) . '</b></td>
-            </tr>';
-            }
-            $html .= '
-            <tr>
-                <td align="right"><b>Net Total</b></td>
-                <td><b>' . number_format($order->total_amount, 2) . '</b></td>
-            </tr>
-            </table>';
-        } elseif ($order->broker_commission_amount > 0) {
-            $html .= '
-            <table border="1" cellpadding="4" style="text-align:right;font-size:10px;" width="100%">
-            <tr>
-                <td width="70%" align="right"><b>Broker Commission (' . e($order->broker->name ?? '') . ')</b></td>
-                <td width="15%"><b>' . number_format($order->broker_commission_amount, 2) . '</b></td>
-            </tr>
-            <tr>
-                <td align="right"><b>Net Total</b></td>
-                <td><b>' . number_format($order->total_amount, 2) . '</b></td>
-            </tr>
-            </table>';
+            $summaryHtml .= '<tr><td>GST (' . number_format($order->gst_rate, 2) . '%)</td><td style="text-align:right;">' . number_format($order->gst_amount, 2) . '</td></tr>';
+        }
+        if ($order->broker_commission_amount > 0) {
+            $summaryHtml .= '<tr><td>Broker Commission</td><td style="text-align:right;">' . number_format($order->broker_commission_amount, 2) . '</td></tr>';
         }
 
-        $pdf->writeHTML($html, true, false, false, false, '');
+        $summaryHtml .= '
+                <tr style="font-weight:bold; background-color:#f0f0f0;">
+                <td>Net Total</td><td style="text-align:right;">' . number_format($order->total_amount, 2) . '</td>
+                </tr>
+            </table>
+            </td>
+        </tr>
+        </table>';
 
-        $pdf->Ln(2);
-        $pdf->SetFont('helvetica', 'I', 9);
-        $pdf->Cell(0, 6, 'Amount in Words: ' . $pdf->convertCurrencyToWords(round($order->total_amount)), 0, 1, 'L');
+        $pdf->writeHTML($summaryHtml, true, false, false, false, '');
+        $pdf->Ln(4);
 
-        // ── Terms & Conditions ────────────────────────────────────────
+        // ── Amount in words — bold, readable ──
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->MultiCell(0, 6, 'Amount in Words: ' . $pdf->convertCurrencyToWords(round($order->total_amount)), 0, 'L');
+        $pdf->SetFont('helvetica', '', 10);
+
+        // ── Terms & Conditions ──
         if ($order->terms->isNotEmpty()) {
-            $pdf->Ln(2);
+            $pdf->Ln(3);
             $pdf->SetFont('helvetica', 'B', 9);
             $pdf->Cell(0, 6, 'Terms & Conditions:', 0, 1, 'L');
             $pdf->SetFont('helvetica', '', 8);
@@ -479,17 +362,14 @@ class PurchaseOrderController extends Controller
         $pdf->Ln(15);
         $lineWidth = 60;
         $yPosition = $pdf->GetY();
-
         $pdf->Line(28, $yPosition, 20 + $lineWidth, $yPosition);
         $pdf->Line(130, $yPosition, 120 + $lineWidth, $yPosition);
         $pdf->Ln(5);
-
         $pdf->SetXY(23, $yPosition);
         $pdf->Cell($lineWidth, 10, 'Prepared By', 0, 0, 'C');
-
         $pdf->SetXY(125, $yPosition);
         $pdf->Cell($lineWidth, 10, 'Approved By', 0, 0, 'C');
 
-        return $pdf->Output($order->order_no . '_rev' . $order->revision_no . '.pdf', 'I');
+        return $pdf->Output($order->order_no . '.pdf', 'I');
     }
 }

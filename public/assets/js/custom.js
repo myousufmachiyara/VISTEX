@@ -193,3 +193,39 @@ resetTimer();
 //
 // The single authoritative change-password handler lives in app.blade.php.
 // Do NOT add another one here.
+
+$(document).on('select2:open', () => {
+  document.querySelector('.select2-container--open .select2-search__field')?.focus();
+});
+
+function formatNumberInput(el) {
+  const raw = el.value.replace(/,/g, '');
+  if (raw === '' || isNaN(raw)) return;
+  const parts = raw.split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  el.value = parts.join('.');
+}
+
+function unformatNumberInput(value) {
+  return value.toString().replace(/,/g, '');
+}
+
+$(document).on('input', '.comma-input', function () {
+  formatNumberInput(this);
+});
+
+$(document).on('focus', '.comma-input', function () {
+  $(this).val(unformatNumberInput($(this).val()));
+});
+
+$(document).on('blur', '.comma-input', function () {
+  formatNumberInput(this);
+});
+
+// Before form submit, strip commas from every comma-input so the server
+// receives clean numeric strings
+$(document).on('submit', 'form', function () {
+  $(this).find('.comma-input').each(function () {
+    $(this).val(unformatNumberInput($(this).val()));
+  });
+});

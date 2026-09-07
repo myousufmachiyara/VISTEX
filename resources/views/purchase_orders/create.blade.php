@@ -29,6 +29,7 @@
             <label>Type <span class="text-danger">*</span></label>
             <select id="type_select" class="form-control">
               <option value="">Select Type</option>
+              <option value="purchase">Purchasing</option>
               <option value="weaving">Weaving</option>
               <option value="processing">Processing</option>
             </select>
@@ -92,7 +93,7 @@
             </div>
             <div class="col-md-4 mb-3" id="brokerAmountField" style="display:none">
               <label>Broker Commission Amount</label>
-              <input type="number" name="broker_commission_amount" id="broker_commission_amount" class="form-control" step="any" min="0" value="0">
+              <input type="number" name="broker_commission_amount" id="broker_commission_amount" class="form-control comma-input" step="any" min="0" value="0">
             </div>
           </div>
 
@@ -115,7 +116,7 @@
                 <option value="90">90 days</option>
                 <option value="0">Custom (enter below)</option>
               </select>
-              <input type="number" name="payment_term_days_custom" class="form-control mt-1" placeholder="Custom days" style="display:none">
+              <input type="number" name="payment_term_days_custom" class="form-control mt-1 comma-input" placeholder="Custom days" style="display:none">
             </div>
             <div class="col-md-4 mb-3" id="paymentNoteField" style="display:none">
               <label>Note</label>
@@ -190,16 +191,16 @@
                 </select>
               </div>
 
-              <div class="col-md-2 mb-3"><label>Warp Count</label><input type="number" name="warp_count" id="warp_count" class="form-control calc-input" step="any" min="0.01"></div>
-              <div class="col-md-2 mb-3"><label>Weft Count</label><input type="number" name="weft_count" id="weft_count" class="form-control calc-input" step="any" min="0.01"></div>
-              <div class="col-md-2 mb-3"><label>Reed Count</label><input type="number" name="reed_count" id="reed_count" class="form-control calc-input" step="any" min="0.01"></div>
-              <div class="col-md-2 mb-3"><label>Pick</label><input type="number" name="pick" id="pick" class="form-control calc-input" step="any" min="0.01"></div>
-              <div class="col-md-2 mb-3"><label>Width</label><input type="number" name="width" id="width" class="form-control calc-input" step="any" min="0.01"></div>
-              <div class="col-md-2 mb-3"><label>Total Meters</label><input type="number" name="total_meters_required" id="total_meters_required" class="form-control calc-input" step="any" min="0.001"></div>
+              <div class="col-md-2 mb-3"><label>Warp Count</label><input type="number" name="warp_count" id="warp_count" class="form-control comma-input calc-input" step="any" min="0.01"></div>
+              <div class="col-md-2 mb-3"><label>Weft Count</label><input type="number" name="weft_count" id="weft_count" class="form-control comma-input calc-input" step="any" min="0.01"></div>
+              <div class="col-md-2 mb-3"><label>Reed Count</label><input type="number" name="reed_count" id="reed_count" class="form-control comma-input calc-input" step="any" min="0.01"></div>
+              <div class="col-md-2 mb-3"><label>Pick</label><input type="number" name="pick" id="pick" class="form-control calc-input comma-input" step="any" min="0.01"></div>
+              <div class="col-md-2 mb-3"><label>Width</label><input type="number" name="width" id="width" class="form-control calc-input comma-input" step="any" min="0.01"></div>
+              <div class="col-md-2 mb-3"><label>Total Meters</label><input type="number" name="total_meters_required" id="total_meters_required" class="form-control comma-input calc-input" step="any" min="0.001"></div>
 
-              <div class="col-md-3 mb-3"><label>Rate per Pick</label><input type="number" name="rate_per_pick" id="rate_per_pick" class="form-control calc-input" step="any" min="0"></div>
-              <div class="col-md-3 mb-3"><label>Sizing (lbs)</label><input type="number" name="sizing_lbs" id="sizing_lbs" class="form-control calc-input" step="any" min="0" value="0"></div>
-              <div class="col-md-3 mb-3"><label>Warp Conversion %</label><input type="number" name="warp_conversion_pct" id="warp_conversion_pct" class="form-control calc-input" step="any" min="0" value="0"></div>
+              <div class="col-md-3 mb-3"><label>Rate per Pick</label><input type="number" name="rate_per_pick" id="rate_per_pick" class="form-control calc-input comma-input" step="any" min="0"></div>
+              <div class="col-md-3 mb-3"><label>Sizing (lbs)</label><input type="number" name="sizing_lbs" id="sizing_lbs" class="form-control calc-input comma-input" step="any" min="0" value="0"></div>
+              <div class="col-md-3 mb-3"><label>Warp Conversion %</label><input type="number" name="warp_conversion_pct" id="warp_conversion_pct" class="form-control calc-input comma-input" step="any" min="0" value="0"></div>
             </div>
 
             <h6>Calculated Preview</h6>
@@ -256,19 +257,21 @@
   $('#type_select').on('change', function () {
     const type = $(this).val();
     $('#po_type').val(type);
-    $('#weavingSection, #purchaseItemsSection, #service_type_field, #processingMsg').hide();
+    $('#weavingSection, #purchaseItemsSection, #service_type_field, #processingSection').hide();
     $('#submitBtn').hide();
 
-    if (type === 'weaving') {
+    if (type === 'purchase') {
       $('#categoryMsg').hide();
-      $('#commonFields').show();
-      $('#weavingSection').show();
-      $('#brokerSection').show();
-      $('#submitBtn').show();
+      $('#commonFields, #purchaseItemsSection, #brokerSection, #submitBtn').show();
+      loadCategoryProducts($('#category_select').val());
+      if ($('#itemsBody').children().length === 0) addRow();
+    } else if (type === 'weaving') {
+      $('#categoryMsg').hide();
+      $('#commonFields, #weavingSection, #brokerSection, #submitBtn').show();
     } else if (type === 'processing') {
-      $('#service_type_field').show();
-      $('#processingMsg').show();
-      $('#commonFields, #categoryMsg').hide();
+      $('#categoryMsg').hide();
+      $('#commonFields, #service_type_field, #processingSection, #submitBtn').show();
+      addProcRow();
     }
   });
 
@@ -331,8 +334,8 @@
         <td><select name="items[${idx}][product_id]" class="form-control select2-js product-select" required>${productOptionsHtml()}</select></td>
         <td><select name="items[${idx}][measurement_unit]" class="form-control unit-select">${unitOptionsHtml(null)}</select></td>
         <td><select name="items[${idx}][forecast_id]" class="form-control forecast-select" disabled><option value="">—</option></select></td>
-        <td><input type="number" name="items[${idx}][quantity]" class="form-control qty-input" step="any" min="0.001" value="0"></td>
-        <td><input type="number" name="items[${idx}][rate]" class="form-control rate-input" step="any" min="0" value="0"></td>
+        <td><input type="number" name="items[${idx}][quantity]" class="form-control qty-input comma-input" step="any" min="0.001" value="0"></td>
+        <td><input type="number" name="items[${idx}][rate]" class="form-control rate-input comma-input" step="any" min="0" value="0"></td>
         <td class="amount-cell text-end">0.00</td>
         <td><button type="button" class="btn btn-sm btn-outline-danger remove-row">&times;</button></td>
       </tr>
