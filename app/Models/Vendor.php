@@ -24,7 +24,8 @@ class Vendor extends Model
         'name', 'vendor_type', 'phone', 'email', 'contact_person', 'address', 'city',
         'tax_id_number', 'payment_terms_type', 'payment_days', 'currency',
         'opening_balance', 'opening_type', 'opening_balance_date',
-        'notes', 'is_active', 'created_by', 'updated_by',
+        'notes', 'is_active', 'created_by', 'updated_by', 'ntn_number',
+
     ];
 
     protected $casts = [

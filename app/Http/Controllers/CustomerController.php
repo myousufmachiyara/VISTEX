@@ -25,6 +25,7 @@ class CustomerController extends Controller
             'address'              => 'nullable|string|max:500',
             'city'                 => 'nullable|string|max:100',
             'tax_id_number'        => 'nullable|string|max:50',
+            'ntn_number'           => 'nullable|string|max:50',
             'payment_terms_type'   => 'required|in:days_after_invoice,of_current_month,of_following_month',
             'payment_days'         => 'required|integer|min:0|max:31',
             'currency'             => 'required|string|max:10',

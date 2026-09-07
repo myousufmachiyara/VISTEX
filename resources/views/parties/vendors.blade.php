@@ -56,6 +56,7 @@
               <tr>
                 <th>#</th>
                 <th>Name</th>
+                <th>NTN</th>
                 <th>Type</th>
                 <th>Phone</th>
                 <th>City</th>
@@ -77,6 +78,7 @@
                     <br><small class="text-muted">{{ $vendor->contact_person }}</small>
                   @endif
                 </td>
+                <td>{{ $vendor->ntn_number ?? '—' }}</td>
                 <td>
                   <span class="badge {{ $typeBadge[$vendor->vendor_type] ?? 'bg-secondary' }}">
                     {{ $vendorTypes[$vendor->vendor_type] ?? $vendor->vendor_type }}
@@ -160,6 +162,12 @@
                 <label class="form-label">Vendor Name <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" name="name"
                        placeholder="Vendor name" required>
+              </div>
+
+              <div class="col-lg-6 mb-2">
+                <label class="form-label">NTN Number</label>
+                <input type="text" class="form-control" name="ntn_number"
+                       placeholder="NTN Number">
               </div>
 
               <div class="col-lg-6 mb-2">
@@ -312,6 +320,11 @@
                 <label class="form-label">Vendor Name <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" name="name"
                        id="ev_name" placeholder="Vendor name" required>
+              </div>
+
+              <div class="col-lg-6 mb-2">
+                <label class="form-label">NTN Number</label>
+                <input type="text" class="form-control" name="ntn_number" id="ev_ntn_number">
               </div>
 
               <div class="col-lg-6 mb-2">
@@ -473,6 +486,7 @@ function editVendor(id) {
 
     // Populate fields
     $('#ev_name').val(data.name);
+    $('#ev_ntn_number').val(data.ntn_number ?? '');
     $('#ev_contact_person').val(data.contact_person ?? '');
     $('#ev_phone').val(data.phone ?? '');
     $('#ev_email').val(data.email ?? '');

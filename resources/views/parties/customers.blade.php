@@ -44,6 +44,7 @@
               <tr>
                 <th>#</th>
                 <th>Name</th>
+                <th>NTN</th>
                 <th>Contact Person</th>
                 <th>Phone</th>
                 <th>City</th>
@@ -61,6 +62,7 @@
               <tr>
                 <td>{{ $loop->iteration }}</td>
                 <td><strong>{{ $customer->name }}</strong></td>
+                <td>{{ $customer->ntn_number ?? '—' }}</td>
                 <td>{{ $customer->contact_person ?? '—' }}</td>
                 <td>{{ $customer->phone ?? '—' }}</td>
                 <td>{{ $customer->city ?? '—' }}</td>
@@ -147,6 +149,12 @@
                 <label class="form-label">Customer / Brand Name <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" name="name"
                        placeholder="Customer or brand name" required>
+              </div>
+
+              <div class="col-lg-6 mb-2">
+                <label class="form-label">NTN Number</label>
+                <input type="text" class="form-control" name="ntn_number"
+                       placeholder="NTN Number">
               </div>
 
               <div class="col-lg-6 mb-2">
@@ -298,6 +306,11 @@
               </div>
 
               <div class="col-lg-6 mb-2">
+                <label class="form-label">NTN Number</label>
+                <input type="text" class="form-control" name="ntn_number" id="ec_ntn_number">
+              </div>
+
+              <div class="col-lg-6 mb-2">
                 <label class="form-label">Contact Person</label>
                 <input type="text" class="form-control" name="contact_person"
                        id="ec_contact_person">
@@ -441,6 +454,7 @@ function editCustomer(id) {
     $('#editCustomerForm').attr('action', '/customers/' + id);
 
     $('#ec_name').val(data.name);
+    $('#ec_ntn_number').val(data.ntn_number ?? '');
     $('#ec_contact_person').val(data.contact_person ?? '');
     $('#ec_phone').val(data.phone ?? '');
     $('#ec_email').val(data.email ?? '');
