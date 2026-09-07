@@ -289,7 +289,6 @@
     $('#po_type').val('');
   }
 
-
   $('#vendor_select').on('change', function () {
     const vendorId = $(this).val();
     const $fromLoc = $('#from_location_select');
@@ -311,6 +310,12 @@
     const val = $(this).val();
     $('#paymentDaysField').toggle(val === 'credit' || val === 'pdc');
     $('#paymentNoteField').toggle(val === 'other');
+  });
+
+  // ── THIS WAS MISSING — toggles the custom-days input when "Custom" is picked ──
+  $(document).on('change', 'select[name="payment_term_days"]', function () {
+    const isCustom = $(this).val() === '0';
+    $('#paymentDaysField input[name="payment_term_days_custom"]').toggle(isCustom);
   });
 
   $('#gst_applicable').on('change', function () { $('#tax_field').toggle($(this).val() === '1'); recalcPurchaseTotal(); recalcCpo(); });
@@ -366,27 +371,28 @@
     if (shortfall !== undefined) $(this).closest('tr').find('.qty-input').val(shortfall).trigger('input');
   });
 
+  function unformatNumber(value) {
+    return parseFloat((value || '').toString().replace(/,/g, '')) || 0;
+  }
+
   $(document).on('input', '.qty-input, .rate-input', function () {
     const row = $(this).closest('tr');
-    const qty = parseFloat(row.find('.qty-input').val()) || 0;
-    const rate = parseFloat(row.find('.rate-input').val()) || 0;
+    const qty = unformatNumber(row.find('.qty-input').val());
+    const rate = unformatNumber(row.find('.rate-input').val());
     row.find('.amount-cell').text((qty * rate).toFixed(2));
     recalcPurchaseTotal();
   });
 
-  $(document).on('input change', '[name="broker_commission_value"], [name="broker_commission_type"]', recalcPurchaseTotal);
+  $(document).on('input change', '#broker_commission_amount', recalcPurchaseTotal);
   $(document).on('change', '#tax_select', function () { recalcPurchaseTotal(); recalcCpo(); });
 
   function recalcPurchaseTotal() {
     let subtotal = 0;
-    $('.item-row').each(function () { subtotal += parseFloat($(this).find('.amount-cell').text()) || 0; });
+    $('.item-row').each(function () { subtotal += unformatNumber($(this).find('.amount-cell').text()); });
     const gstApplicable = $('#gst_applicable').val() === '1';
     const rate = gstApplicable ? (parseFloat($('#tax_select').find('option:selected').data('rate')) || 0) : 0;
     const gst = subtotal * (rate / 100);
-
-    const brokerType = $('[name="broker_commission_type"]').val();
-    const brokerVal = parseFloat($('[name="broker_commission_value"]').val()) || 0;
-    const brokerAmt = $('#broker_select').val() ? (parseFloat($('#broker_commission_amount').val()) || 0) : 0;
+    const brokerAmt = $('#broker_select').val() ? unformatNumber($('#broker_commission_amount').val()) : 0;
 
     $('#subtotalDisplay').text(subtotal.toFixed(2));
     $('#gstDisplay').text(gst.toFixed(2));
@@ -408,10 +414,11 @@
     const gstRate = gstApplicable ? (parseFloat($('#tax_select').find('option:selected').data('rate')) || 0) : 0;
 
     const payload = {
-      warp_count: $('#warp_count').val(), weft_count: $('#weft_count').val(), reed_count: $('#reed_count').val(),
-      pick: $('#pick').val(), width: $('#width').val(), total_meters_required: $('#total_meters_required').val(),
-      rate_per_pick: $('#rate_per_pick').val(), sizing_lbs: $('#sizing_lbs').val() || 0,
-      warp_conversion_pct: $('#warp_conversion_pct').val() || 0,
+      warp_count: unformatNumber($('#warp_count').val()), weft_count: unformatNumber($('#weft_count').val()),
+      reed_count: unformatNumber($('#reed_count').val()), pick: unformatNumber($('#pick').val()),
+      width: unformatNumber($('#width').val()), total_meters_required: unformatNumber($('#total_meters_required').val()),
+      rate_per_pick: unformatNumber($('#rate_per_pick').val()), sizing_lbs: unformatNumber($('#sizing_lbs').val()) || 0,
+      warp_conversion_pct: unformatNumber($('#warp_conversion_pct').val()) || 0,
       gst_applicable: gstApplicable ? 1 : 0, gst_rate: gstRate, _token: '{{ csrf_token() }}',
     };
 
@@ -432,28 +439,16 @@
     });
   }
 
-
-  $(document).on('input', 'input[name="payment_term_days_custom"]', function () {
-  const val = $(this).val();
-  if (val) {
-    $(this).closest('#paymentDaysField').find('select[name="payment_term_days"]').val(val).length === 0;
-  }
-});
-
-// Cleaner approach: on form submit, if custom days field is visible and has a value,
-// overwrite the select's value with it before the request goes out.
-$('form').on('submit', function () {
-  const $customInput = $('input[name="payment_term_days_custom"]:visible');
-  if ($customInput.length && $customInput.val()) {
-    // Since the select only has fixed options (30/60/90/0), add a temporary
-    // option matching the custom value so it actually gets submitted.
-    const customVal = $customInput.val();
-    const $select = $('select[name="payment_term_days"]');
-    if ($select.find(`option[value="${customVal}"]`).length === 0) {
-      $select.append(`<option value="${customVal}"></option>`);
+  $('form').on('submit', function () {
+    const $customInput = $('input[name="payment_term_days_custom"]:visible');
+    if ($customInput.length && $customInput.val()) {
+      const customVal = $customInput.val();
+      const $select = $('select[name="payment_term_days"]');
+      if ($select.find(`option[value="${customVal}"]`).length === 0) {
+        $select.append(`<option value="${customVal}"></option>`);
+      }
+      $select.val(customVal);
     }
-    $select.val(customVal);
-  }
-});
+  });
 </script>
 @endsection
