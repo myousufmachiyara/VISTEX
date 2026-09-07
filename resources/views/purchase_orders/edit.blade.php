@@ -168,10 +168,26 @@
               @endforeach
             </tbody>
             <tfoot>
-              <tr><td colspan="2" class="text-end">Subtotal:</td><td class="text-end" id="subtotalDisplay">{{ number_format($order->subtotal, 2) }}</td><td></td></tr>
-              <tr><td colspan="2" class="text-end">GST:</td><td class="text-end" id="gstDisplay">{{ number_format($order->gst_amount, 2) }}</td><td></td></tr>
-              <tr><td colspan="2" class="text-end">Broker Commission:</td><td class="text-end" id="brokerDisplay">{{ number_format($order->broker_commission_amount ?? 0, 2) }}</td><td></td></tr>
-              <tr class="fw-bold"><td colspan="2" class="text-end">Total:</td><td class="text-end" id="totalDisplay">{{ number_format($order->total_amount, 2) }}</td><td></td></tr>
+              <tr>
+                <td colspan="3" class="text-end">Subtotal:</td>
+                <td class="text-end" id="subtotalDisplay">{{ number_format($order->subtotal, 2) }}</td>
+                <td></td>
+              </tr>
+              <tr>
+                <td colspan="3" class="text-end">GST:</td>
+                <td class="text-end" id="gstDisplay">{{ number_format($order->gst_amount, 2) }}</td>
+                <td></td>
+              </tr>
+              <tr>
+                <td colspan="3" class="text-end">Broker Commission:</td>
+                <td class="text-end" id="brokerDisplay">{{ number_format($order->broker_commission_amount ?? 0, 2) }}</td>
+                <td></td>
+              </tr>
+              <tr class="fw-bold">
+                <td colspan="3" class="text-end">Total:</td>
+                <td class="text-end" id="totalDisplay">{{ number_format($order->total_amount, 2) }}</td>
+                <td></td>
+              </tr>
             </tfoot>
           </table>
           <button type="button" class="btn btn-outline-primary" id="addRowBtn">Add Item</button>
