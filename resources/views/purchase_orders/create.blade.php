@@ -431,5 +431,29 @@
       $('#p_net_amount').text(data.net_amount);
     });
   }
+
+
+  $(document).on('input', 'input[name="payment_term_days_custom"]', function () {
+  const val = $(this).val();
+  if (val) {
+    $(this).closest('#paymentDaysField').find('select[name="payment_term_days"]').val(val).length === 0;
+  }
+});
+
+// Cleaner approach: on form submit, if custom days field is visible and has a value,
+// overwrite the select's value with it before the request goes out.
+$('form').on('submit', function () {
+  const $customInput = $('input[name="payment_term_days_custom"]:visible');
+  if ($customInput.length && $customInput.val()) {
+    // Since the select only has fixed options (30/60/90/0), add a temporary
+    // option matching the custom value so it actually gets submitted.
+    const customVal = $customInput.val();
+    const $select = $('select[name="payment_term_days"]');
+    if ($select.find(`option[value="${customVal}"]`).length === 0) {
+      $select.append(`<option value="${customVal}"></option>`);
+    }
+    $select.val(customVal);
+  }
+});
 </script>
 @endsection
