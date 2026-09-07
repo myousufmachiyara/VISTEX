@@ -244,7 +244,7 @@ class PurchaseOrderController extends Controller
             <b style="font-size:11px;">SUPPLIER</b><br><br>
             <b>' . e($order->vendor->name ?? '-') . '</b><br>
             NTN: ' . e($order->vendor->ntn_number ?? '-') . '<br>
-            STRN: ' . e($order->vendor->strn_number ?? '-') . '<br>
+            STRN: ' . e($order->vendor->tax_id_number ?? '-') . '<br>
             ' . nl2br(e($order->vendor->address ?? '-')) . '
             </td>
             <td width="4%"></td>
