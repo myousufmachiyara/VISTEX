@@ -31,7 +31,7 @@
             <select name="product_category_id" id="category_select" class="form-control select2-js" required>
               <option value="">Select Category</option>
               @foreach ($categories as $cat)
-                <option value="{{ $cat->id }}" @selected($cat->id == $order->product_category_id)>{{ $cat->name }}</option>
+                <option value="{{ $cat->id }}" data-code="{{ $cat->code }}" @selected($cat->id == $order->product_category_id)>{{ $cat->name }}</option>
               @endforeach
             </select>
           </div>
@@ -47,8 +47,8 @@
           </div>
 
           <div class="col-md-3 mb-3">
-            <label>From Location <span class="text-danger">*</span></label>
-            <select name="from_location_id" id="from_location_select" class="form-control select2-js" required>
+            <label>From Location</label>
+            <select name="from_location_id" id="from_location_select" class="form-control select2-js">
               <option value="">Select Vendor First</option>
             </select>
           </div>
@@ -72,6 +72,50 @@
             <label>Expected Date</label>
             <input type="date" name="expected_date" class="form-control" value="{{ $order->expected_date?->format('Y-m-d') }}">
           </div>
+        </div>
+
+        {{-- Broker --}}
+        <div class="row" id="brokerSection">
+          <div class="col-md-4 mb-3">
+            <label>Broker <span class="text-muted">(optional)</span></label>
+            <select name="broker_id" id="broker_select" class="form-control select2-js">
+              <option value="">No Broker</option>
+              @foreach ($brokers as $b)
+                <option value="{{ $b->id }}" @selected($b->id == $order->broker_id)>{{ $b->name }}</option>
+              @endforeach
+            </select>
+          </div>
+          <div class="col-md-4 mb-3" id="brokerAmountField" style="{{ $order->broker_id ? '' : 'display:none' }}">
+            <label>Broker Commission Amount</label>
+            <input type="number" name="broker_commission_amount" id="broker_commission_amount" class="form-control comma-input" step="any" min="0" value="{{ $order->broker_commission_amount ?? 0 }}">
+          </div>
+        </div>
+
+        {{-- Payment Terms --}}
+        <div class="row">
+          <div class="col-md-3 mb-3">
+            <label>Payment Term <span class="text-danger">*</span></label>
+            <select name="payment_term_type" id="payment_term_type" class="form-control" required>
+              <option value="cash" @selected($order->payment_term_type == 'cash')>Cash</option>
+              <option value="credit" @selected($order->payment_term_type == 'credit')>Credit</option>
+              <option value="pdc" @selected($order->payment_term_type == 'pdc')>PDC</option>
+              <option value="other" @selected($order->payment_term_type == 'other')>Other</option>
+            </select>
+          </div>
+          <div class="col-md-3 mb-3" id="paymentDaysField" style="{{ in_array($order->payment_term_type, ['credit','pdc']) ? '' : 'display:none' }}">
+            <label>Days</label>
+            <select name="payment_term_days" class="form-control">
+              <option value="30" @selected($order->payment_term_days == 30)>30 days</option>
+              <option value="60" @selected($order->payment_term_days == 60)>60 days</option>
+              <option value="90" @selected($order->payment_term_days == 90)>90 days</option>
+              <option value="0" @selected(!in_array($order->payment_term_days, [30,60,90]))>Custom (enter below)</option>
+            </select>
+            <input type="number" name="payment_term_days_custom" class="form-control mt-1 comma-input" placeholder="Custom days" value="{{ !in_array($order->payment_term_days, [30,60,90]) ? $order->payment_term_days : '' }}" style="{{ !in_array($order->payment_term_days, [30,60,90]) ? '' : 'display:none' }}">
+          </div>
+          <div class="col-md-4 mb-3" id="paymentNoteField" style="{{ $order->payment_term_type == 'other' ? '' : 'display:none' }}">
+            <label>Note</label>
+            <input type="text" name="payment_term_note" class="form-control" value="{{ $order->payment_term_note }}">
+          </div>
 
           <div class="col-md-2 mb-3">
             <label>GST Terms <span class="text-danger">*</span></label>
@@ -89,6 +133,11 @@
                 <option value="{{ $tax->id }}" data-rate="{{ $tax->rate }}" @selected($tax->id == $order->tax_id)>{{ $tax->name }}</option>
               @endforeach
             </select>
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <label>Add More Attachments</label>
+            <input type="file" name="attachments[]" class="form-control" multiple>
           </div>
 
           <div class="col-md-12 mb-3">
@@ -111,8 +160,8 @@
                     @endforeach
                   </select>
                 </td>
-                <td><input type="number" name="items[{{ $i }}][quantity]" class="form-control qty-input" step="any" min="0.001" value="{{ $item->quantity }}"></td>
-                <td><input type="number" name="items[{{ $i }}][rate]" class="form-control price-input" step="any" min="0" value="{{ $item->rate }}"></td>
+                <td><input type="number" name="items[{{ $i }}][quantity]" class="form-control qty-input comma-input" step="any" min="0.001" value="{{ $item->quantity }}"></td>
+                <td><input type="number" name="items[{{ $i }}][rate]" class="form-control price-input comma-input" step="any" min="0" value="{{ $item->rate }}"></td>
                 <td class="amount-cell text-end">{{ number_format($item->amount, 2) }}</td>
                 <td><button type="button" class="btn btn-sm btn-outline-danger remove-row">&times;</button></td>
               </tr>
@@ -121,6 +170,7 @@
             <tfoot>
               <tr><td colspan="2" class="text-end">Subtotal:</td><td class="text-end" id="subtotalDisplay">{{ number_format($order->subtotal, 2) }}</td><td></td></tr>
               <tr><td colspan="2" class="text-end">GST:</td><td class="text-end" id="gstDisplay">{{ number_format($order->gst_amount, 2) }}</td><td></td></tr>
+              <tr><td colspan="2" class="text-end">Broker Commission:</td><td class="text-end" id="brokerDisplay">{{ number_format($order->broker_commission_amount ?? 0, 2) }}</td><td></td></tr>
               <tr class="fw-bold"><td colspan="2" class="text-end">Total:</td><td class="text-end" id="totalDisplay">{{ number_format($order->total_amount, 2) }}</td><td></td></tr>
             </tfoot>
           </table>
@@ -137,25 +187,25 @@
   let categoryProducts = @json($products->map(fn($p) => ['id' => $p->id, 'name' => $p->name, 'sku' => $p->sku]));
 
   $(document).ready(function () {
-  $('.select2-js').select2({ width: '100%' });
-  toggleGst();
+    $('.select2-js').select2({ width: '100%' });
+    toggleGst();
 
-  const currentVendorId = {{ $order->vendor_id }};
-  const currentFromLocationId = {{ $order->from_location_id ?? 'null' }};
+    const currentVendorId = {{ $order->vendor_id }};
+    const currentFromLocationId = {{ $order->from_location_id ?? 'null' }};
 
-  if (currentVendorId) {
-    fetch(`/purchase-orders/vendor-locations/${currentVendorId}`)
-      .then(res => res.json())
-      .then(locations => {
-        let html = '<option value="">Select Location</option>';
-        locations.forEach(loc => {
-          const selected = loc.id === currentFromLocationId ? 'selected' : '';
-          html += `<option value="${loc.id}" ${selected}>${loc.name}</option>`;
+    if (currentVendorId) {
+      fetch(`/purchase-orders/vendor-locations/${currentVendorId}`)
+        .then(res => res.json())
+        .then(locations => {
+          let html = '<option value="">Select Location</option>';
+          locations.forEach(loc => {
+            const selected = loc.id === currentFromLocationId ? 'selected' : '';
+            html += `<option value="${loc.id}" ${selected}>${loc.name}</option>`;
+          });
+          $('#from_location_select').html(html).trigger('change');
         });
-        $('#from_location_select').html(html).trigger('change');
-      });
-  }
-});
+    }
+  });
 
   $('#category_select').on('change', function () {
     const catId = $(this).val();
@@ -180,6 +230,19 @@
       });
   });
 
+  $('#broker_select').on('change', function () {
+    $('#brokerAmountField').toggle(!!$(this).val());
+    recalcTotal();
+  });
+
+  $(document).on('input', '#broker_commission_amount', recalcTotal);
+
+  $('#payment_term_type').on('change', function () {
+    const val = $(this).val();
+    $('#paymentDaysField').toggle(val === 'credit' || val === 'pdc');
+    $('#paymentNoteField').toggle(val === 'other');
+  });
+
   $('#gst_applicable').on('change', toggleGst);
   function toggleGst() { $('#tax_field').toggle($('#gst_applicable').val() === '1'); recalcTotal(); }
 
@@ -194,8 +257,8 @@
     const row = $(`
       <tr class="item-row">
         <td><select name="items[${idx}][product_id]" class="form-control select2-js product-select" required>${productOptionsHtml()}</select></td>
-        <td><input type="number" name="items[${idx}][quantity]" class="form-control qty-input" step="any" min="0.001" value="0"></td>
-        <td><input type="number" name="items[${idx}][rate]" class="form-control price-input" step="any" min="0" value="0"></td>
+        <td><input type="number" name="items[${idx}][quantity]" class="form-control qty-input comma-input" step="any" min="0.001" value="0"></td>
+        <td><input type="number" name="items[${idx}][rate]" class="form-control price-input comma-input" step="any" min="0" value="0"></td>
         <td class="amount-cell text-end">0.00</td>
         <td><button type="button" class="btn btn-sm btn-outline-danger remove-row">&times;</button></td>
       </tr>
@@ -218,9 +281,12 @@
     const gstApplicable = $('#gst_applicable').val() === '1';
     const rate = gstApplicable ? (parseFloat($('#tax_select').find('option:selected').data('rate')) || 0) : 0;
     const gst = subtotal * (rate / 100);
+    const brokerAmt = $('#broker_select').val() ? (parseFloat($('#broker_commission_amount').val()) || 0) : 0;
+
     $('#subtotalDisplay').text(subtotal.toFixed(2));
     $('#gstDisplay').text(gst.toFixed(2));
-    $('#totalDisplay').text((subtotal + gst).toFixed(2));
+    $('#brokerDisplay').text(brokerAmt.toFixed(2));
+    $('#totalDisplay').text((subtotal + gst + brokerAmt).toFixed(2));
   }
 
   $(document).on('change', '#tax_select', recalcTotal);
