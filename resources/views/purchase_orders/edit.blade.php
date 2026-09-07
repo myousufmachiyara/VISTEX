@@ -49,10 +49,7 @@
           <div class="col-md-3 mb-3">
             <label>From Location <span class="text-danger">*</span></label>
             <select name="from_location_id" id="from_location_select" class="form-control select2-js" required>
-              <option value="">Select Location</option>
-              @foreach ($fromLocations as $loc)
-                <option value="{{ $loc->id }}" @selected($loc->id == $order->from_location_id)>{{ $loc->name }}</option>
-              @endforeach
+              <option value="">Select Vendor First</option>
             </select>
           </div>
 
