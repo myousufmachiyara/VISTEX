@@ -223,7 +223,7 @@ class PurchaseOrderController extends Controller
 
         $logoPath = public_path('assets/img/vistex-logo.png');
         if (file_exists($logoPath)) {
-            $pdf->Image($logoPath, 12, 8, 50);
+            $pdf->Image($logoPath, 12, 8, 30);
         }
 
         $pdf->SetFont('helvetica', 'B', 18);
