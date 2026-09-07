@@ -136,7 +136,26 @@
   let rowIndex = {{ $order->items->count() }};
   let categoryProducts = @json($products->map(fn($p) => ['id' => $p->id, 'name' => $p->name, 'sku' => $p->sku]));
 
-  $(document).ready(function () { $('.select2-js').select2({ width: '100%' }); toggleGst(); });
+  $(document).ready(function () {
+  $('.select2-js').select2({ width: '100%' });
+  toggleGst();
+
+  const currentVendorId = {{ $order->vendor_id }};
+  const currentFromLocationId = {{ $order->from_location_id ?? 'null' }};
+
+  if (currentVendorId) {
+    fetch(`/purchase-orders/vendor-locations/${currentVendorId}`)
+      .then(res => res.json())
+      .then(locations => {
+        let html = '<option value="">Select Location</option>';
+        locations.forEach(loc => {
+          const selected = loc.id === currentFromLocationId ? 'selected' : '';
+          html += `<option value="${loc.id}" ${selected}>${loc.name}</option>`;
+        });
+        $('#from_location_select').html(html).trigger('change');
+      });
+  }
+});
 
   $('#category_select').on('change', function () {
     const catId = $(this).val();
@@ -176,7 +195,7 @@
       <tr class="item-row">
         <td><select name="items[${idx}][product_id]" class="form-control select2-js product-select" required>${productOptionsHtml()}</select></td>
         <td><input type="number" name="items[${idx}][quantity]" class="form-control qty-input" step="any" min="0.001" value="0"></td>
-        <td><input type="number" name="items[${idx}][estimated_price]" class="form-control price-input" step="any" min="0" value="0"></td>
+        <td><input type="number" name="items[${idx}][rate]" class="form-control price-input" step="any" min="0" value="0"></td>
         <td class="amount-cell text-end">0.00</td>
         <td><button type="button" class="btn btn-sm btn-outline-danger remove-row">&times;</button></td>
       </tr>
