@@ -42,7 +42,6 @@ class VendorController extends Controller
     public function store(Request $request)
     {
         $request->validate($this->rules());
-,
         DB::beginTransaction();
         try {
             $vendor = Vendor::create(array_merge($request->only([
@@ -87,7 +86,7 @@ class VendorController extends Controller
             $vendor = Vendor::findOrFail($id);
 
             $vendor->update(array_merge($request->only([
-                'name', 'vendor_type', 'phone', 'email', 'contact_person', 'address', 'city','ntn_number',
+                'name', 'vendor_type', 'phone', 'email', 'contact_person', 'address', 'city',
                 'tax_id_number', 'payment_terms_type', 'payment_days', 'currency', 'notes',
             ]), [
                 'opening_balance'      => $request->opening_balance ?? $vendor->opening_balance,
