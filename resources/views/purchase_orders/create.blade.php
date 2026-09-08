@@ -483,11 +483,10 @@
 
   $(document).on('input', '#reed_space', function () {
     reedSpaceManuallyEdited = $(this).val().trim() !== '';
-    if (!reedSpaceManuallyEdited) recalcReedSpace();
   });
 
   function recalcReedSpace() {
-    if (reedSpaceManuallyEdited) return; // don't overwrite a user-typed value
+    if (reedSpaceManuallyEdited) return;
 
     const reed = unformatNumber($('#reed_input').val());
     const width = unformatNumber($('#width').val());
@@ -496,12 +495,10 @@
     if (reed > 0 && width > 0 && reedCount > 0) {
       const reedSpace = (reed * width) / reedCount;
       $('#reed_space').val(reedSpace.toFixed(4));
-      formatNumberInput(document.getElementById('reed_space')); // apply comma formatting if that helper exists
     }
   }
 
-  $(document).on('input', '#reed_input, #width, #reed_count', function () {
-    recalcReedSpace();
-  });
+  $(document).on('keyup', '#reed_count', recalcReedSpace);
+  $(document).on('input', '#reed_input, #width', recalcReedSpace);
 </script>
 @endsection
