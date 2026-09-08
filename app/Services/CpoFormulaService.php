@@ -45,7 +45,7 @@ class CpoFormulaService
         $weftConsumption = $weftConsumptionBase * (1 + $weftShrinkagePct / 100);
 
         // 5. Total Yarn Weight Consumed
-        $totalYarnWeightConsumed = ceil($warpConsumption + $weftConsumption);
+        $totalYarnWeightConsumed = $warpConsumption + $weftConsumption;
 
         // 6. Warp Yarn Rate (Rs/m)
         $warpYarnRate = $warpYarnCostPrice * $warpConsumption;
