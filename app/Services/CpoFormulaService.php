@@ -15,22 +15,27 @@ class CpoFormulaService
         $totalMeters  = (float) $inputs['total_meters_required'];
         $ratePerPick  = (float) $inputs['rate_per_pick'];
         $sizingLbs    = (float) ($inputs['sizing_lbs'] ?? 0);
-        $warping      = (float) ($inputs['warping'] ?? 1); // avoid div-by-zero; confirm default
+        $warping      = (float) ($inputs['warping'] ?? 1);
         $warpShrinkagePct = (float) ($inputs['warp_shrinkage_pct'] ?? 0);
         $weftShrinkagePct = (float) ($inputs['weft_shrinkage_pct'] ?? 0);
         $warpYarnCostPrice = (float) ($inputs['warp_yarn_cost_price'] ?? 0);
         $weftYarnCostPrice = (float) ($inputs['weft_yarn_cost_price'] ?? 0);
 
-        // 1. Reed Space — calculated, but editable (user override respected if provided)
+        // 1. Reed Space — calculated, but editable
         $reedSpace = isset($inputs['reed_space']) && $inputs['reed_space'] !== ''
             ? (float) $inputs['reed_space']
             : ($reed * $width / $reedCount);
 
-        // 2. GSM — broken into Warp GSM + Weft GSM, plus GSM in Kg
+        // 2. GSM — broken into Warp GSM + Weft GSM
         $warpGsm = ($reed * 25.4) / $warpCount;
         $weftGsm = ($pick * 25.4) / $weftCount;
         $gsm = $warpGsm + $weftGsm;
-        $gsmKg = $gsm / 1000;
+
+        // Linear Meter = Width (inches) / 39.37
+        $linearMeter = $width / 39.37;
+
+        // GSM in Kg = Linear Meter × GSM / 1000
+        $gsmKg = $linearMeter * $gsm / 1000;
 
         // 3, 4 Warp & Weft Consumption
         $warpConsumptionBase = ($reed * $width * 1.0936 / 840) / $warpCount;
@@ -54,7 +59,7 @@ class CpoFormulaService
         // 9. Sizing Rate per Meter
         $sizingRatePerMeter = ($sizingLbs / $warping) * $warpConsumption;
 
-        // 10. Weaving Per Meter (this is the actual weaving charge, per meter)
+        // 10. Weaving Per Meter
         $weavingPerMeter = $weavingCostPerMeter + $sizingRatePerMeter + $warpYarnRate + $weftYarnRate;
 
         // Total weaving cost across all meters ordered
