@@ -26,8 +26,10 @@ class CpoFormulaService
             ? (float) $inputs['reed_space']
             : ($reed * $width / $reedCount);
 
-        // 2. GSM
-        $gsm = (($reed * 25.4) / $warpCount ) + (($pick * 25.4) / $weftCount);
+        // 2. GSM — broken into Warp GSM + Weft GSM
+        $warpGsm = ($reed * 25.4) / $warpCount;
+        $weftGsm = ($pick * 25.4) / $weftCount;
+        $gsm = $warpGsm + $weftGsm;
 
         // 3, 4 Warp & Weft Consumption
         $warpConsumptionBase = ($reed * $width * 1.0936 / 840) / $warpCount;
@@ -61,6 +63,8 @@ class CpoFormulaService
 
         return [
             'reed_space'                  => round($reedSpace, 2),
+            'warp_gsm'                     => round($warpGsm, 2),
+            'weft_gsm'                     => round($weftGsm, 2),
             'gsm'                          => round($gsm, 2),
             'warp_consumption'             => round($warpConsumption, 4),
             'weft_consumption'             => round($weftConsumption, 4),
