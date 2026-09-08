@@ -31,7 +31,7 @@ class CpoFormulaService
 
         // 3, 4 Warp & Weft Consumption
         $warpConsumptionBase = ($reed * $width * 1.0936 / 840) / $warpCount;
-        $weftConsumptionBase = ($reedSpace * 1.0936 / 840) / $weftCount;
+        $weftConsumptionBase = ($reedSpace * 1.0936 * 840) / $weftCount;
 
         $warpConsumption = $warpConsumptionBase * (1 + $warpShrinkagePct / 100);
         $weftConsumption = $weftConsumptionBase * (1 + $weftShrinkagePct / 100);
