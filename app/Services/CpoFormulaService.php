@@ -27,7 +27,7 @@ class CpoFormulaService
             : ($reed * $width / $reedCount);
 
         // 2. GSM
-        $gsm = ($reed / 25.4 * $warpCount) + ($pick / 25.4 * $weftCount);
+        $gsm = (($reed * 25.4) / $warpCount ) + (($pick * 25.4) / $weftCount);
 
         // 3. Warp Consumption
         $warpConsumption = ($reed * $width * 1.0936 / 840) / $warpCount + $warpShrinkagePct;
