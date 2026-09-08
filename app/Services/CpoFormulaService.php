@@ -29,11 +29,12 @@ class CpoFormulaService
         // 2. GSM
         $gsm = (($reed * 25.4) / $warpCount ) + (($pick * 25.4) / $weftCount);
 
-        // 3. Warp Consumption
-        $warpConsumption = ($reed * $width * 1.0936 / 840) / $warpCount + $warpShrinkagePct;
+        // 3, 4 Warp & Weft Consumption
+        $warpConsumptionBase = ($reed * $width * 1.0936 / 840) / $warpCount;
+        $weftConsumptionBase = ($reedSpace * 1.0936 / 840) / $weftCount;
 
-        // 4. Weft Consumption
-        $weftConsumption = ($reedSpace * 1.0936 / 840) / $weftCount + $weftShrinkagePct;
+        $warpConsumption = $warpConsumptionBase * (1 + $warpShrinkagePct / 100);
+        $weftConsumption = $weftConsumptionBase * (1 + $weftShrinkagePct / 100);
 
         // 5. Total Yarn Weight Consumed
         $totalYarnWeightConsumed = ceil(($warpConsumption + $weftConsumption) * $totalMeters);
