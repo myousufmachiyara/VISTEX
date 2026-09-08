@@ -263,8 +263,9 @@
     if (type === 'purchase') {
       $('#categoryMsg').hide();
       $('#commonFields, #purchaseItemsSection, #brokerSection, #submitBtn').show();
-      loadCategoryProducts($('#category_select').val());
-      if ($('#itemsBody').children().length === 0) addRow();
+      loadCategoryProducts($('#category_select').val()).then(() => {
+        if ($('#itemsBody').children().length === 0) addRow();
+      });
     } else if (type === 'weaving') {
       $('#categoryMsg').hide();
       $('#commonFields, #weavingSection, #brokerSection, #submitBtn').show();
