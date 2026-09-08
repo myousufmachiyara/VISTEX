@@ -37,7 +37,7 @@ class CpoFormulaService
         $weftConsumption = $weftConsumptionBase * (1 + $weftShrinkagePct / 100);
 
         // 5. Total Yarn Weight Consumed
-        $totalYarnWeightConsumed = ceil(($warpConsumption + $weftConsumption) * $totalMeters);
+        $totalYarnWeightConsumed = ceil($warpConsumption + $weftConsumption);
 
         // 6. Warp Yarn Rate (Rs/m)
         $warpYarnRate = $warpYarnCostPrice * $warpConsumption;
@@ -60,16 +60,16 @@ class CpoFormulaService
         $itemName = sprintf('%sx%s/%s-%s-%s', $warpCount, $weftCount, $reed, $pick, $width);
 
         return [
-            'reed_space'                  => round($reedSpace, 4),
-            'gsm'                          => round($gsm, 3),
-            'warp_consumption'             => round($warpConsumption, 6),
-            'weft_consumption'             => round($weftConsumption, 6),
+            'reed_space'                  => round($reedSpace, 2),
+            'gsm'                          => round($gsm, 2),
+            'warp_consumption'             => round($warpConsumption, 4),
+            'weft_consumption'             => round($weftConsumption, 4),
             'total_yarn_weight_consumed'   => $totalYarnWeightConsumed,
-            'warp_yarn_rate'               => round($warpYarnRate, 4),
-            'weft_yarn_rate'               => round($weftYarnRate, 4),
-            'weaving_cost_per_meter'       => round($weavingCostPerMeter, 4),
-            'sizing_rate_per_meter'        => round($sizingRatePerMeter, 4),
-            'actual_cost_per_meter'        => round($actualCostPerMeter, 4),
+            'warp_yarn_rate'               => round($warpYarnRate, 2),
+            'weft_yarn_rate'               => round($weftYarnRate, 2),
+            'weaving_cost_per_meter'       => round($weavingCostPerMeter, 2),
+            'sizing_rate_per_meter'        => round($sizingRatePerMeter, 2),
+            'actual_cost_per_meter'        => round($actualCostPerMeter, 2),
             'weaving_cost'                 => round($weavingCost, 2),
             'item_name'                    => $itemName,
         ];
