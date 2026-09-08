@@ -11,28 +11,28 @@ class CpoFormulaService
         $warpCount    = (float) $inputs['warp_count'];
         $weftCount    = (float) $inputs['weft_count'];
         $reedCount    = (float) $inputs['reed_count'];
+        $reed         = (float) $inputs['reed_input'];
+        $reedSpace    = (float) ($inputs['reed_space'] ?? $inputs['width']); // now a real input, falls back to width if not provided
         $pick         = (float) $inputs['pick'];
         $width        = (float) $inputs['width'];
         $totalMeters  = (float) $inputs['total_meters_required'];
         $ratePerPick  = (float) $inputs['rate_per_pick'];
         $sizingLbs    = (float) ($inputs['sizing_lbs'] ?? 0);
         $warpConvPct  = (float) ($inputs['warp_conversion_pct'] ?? 0);
+        $weftConvPct  = (float) ($inputs['weft_conversion_pct'] ?? 0);
         $warpShrinkagePct = (float) ($inputs['warp_shrinkage_pct'] ?? 0);
         $weftShrinkagePct = (float) ($inputs['weft_shrinkage_pct'] ?? 0);
-
-        $reedSpace = $width;
 
         $gsm = (($reedCount * 25.4) / $warpCount) + (($pick * 25.4) / $weftCount);
 
         $warpConsumptionBase = ((($reedCount * $width * 1.0936) / 840) / $warpCount) + $warpConvPct;
-        $weftConsumptionBase = (((($reedCount * ($width / $reedCount)) * $pick * 1.0936) / 840) / $weftCount) * 0.02;
+        $weftConsumptionBase = (((($reedCount * ($width / $reedCount)) * $pick * 1.0936) / 840) / $weftCount) * 0.02 + $weftConvPct;
 
-        // Option A — shrinkage inflates consumption directly
         $warpConsumption = $warpConsumptionBase * (1 + $warpShrinkagePct / 100);
         $weftConsumption = $weftConsumptionBase * (1 + $weftShrinkagePct / 100);
 
         $totalGreigeQtyRequired = $warpConsumption + $weftConsumption;
-        $totalYarnWeightConsumed = ceil($totalGreigeQtyRequired * $totalMeters); // rounded UP, per point 15
+        $totalYarnWeightConsumed = ceil($totalGreigeQtyRequired * $totalMeters);
 
         $ratePerMeter = $pick * $ratePerPick;
         $sizingPerMeter = $warpConsumption * $sizingLbs;
