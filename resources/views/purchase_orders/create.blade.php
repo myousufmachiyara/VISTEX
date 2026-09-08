@@ -210,7 +210,7 @@
               <div class="col-md-3 mb-3"><label>Weft Yarn Cost Price</label><input type="number" name="weft_yarn_cost_price" id="weft_yarn_cost_price" class="form-control calc-input comma-input" step="any" min="0" value="0"></div>
             </div>
 
-            <h6>Calculated Preview</h6>
+            <h6 class="card-title">Calculated Preview</h6>
             <table class="table table-bordered table-sm">
               <tbody>
                 <tr><td>Item Name</td><td id="p_item_name">—</td></tr>
