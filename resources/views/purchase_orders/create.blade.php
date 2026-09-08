@@ -202,7 +202,7 @@
               <div class="col-md-2 mb-3"><label>Total Meters</label><input type="number" name="total_meters_required" id="total_meters_required" class="form-control comma-input calc-input" step="any" min="0.001"></div>
               <div class="col-md-2 mb-3"><label>Rate per Pick</label><input type="number" name="rate_per_pick" id="rate_per_pick" class="form-control calc-input comma-input" step="any" min="0"></div>
               <div class="col-md-2 mb-3"><label>Sizing (lbs)</label><input type="number" name="sizing_lbs" id="sizing_lbs" class="form-control calc-input comma-input" step="any" min="0" value="0"></div>
-              <div class="col-md-2 mb-3"><label>Warping</label><input type="number" name="warping" id="warping" class="form-control calc-input comma-input" step="any" min="0.01" value="0"></div>
+              <div class="col-md-2 mb-3"><label>Warping</label><input type="number" name="warping" id="warping" class="form-control calc-input comma-input" step="any" min="0.01" value="1"></div>
 
               <div class="col-md-3 mb-3"><label>Warp Shrinkage %</label><input type="number" name="warp_conversion_pct" id="warp_conversion_pct" class="form-control calc-input comma-input" step="any" min="0" value="0"></div>
               <div class="col-md-3 mb-3"><label>Weft Shrinkage %</label><input type="number" name="weft_conversion_pct" id="weft_conversion_pct" class="form-control calc-input comma-input" step="any" min="0" value="0"></div>
@@ -210,13 +210,14 @@
               <div class="col-md-3 mb-3"><label>Weft Yarn Cost Price</label><input type="number" name="weft_yarn_cost_price" id="weft_yarn_cost_price" class="form-control calc-input comma-input" step="any" min="0" value="0"></div>
             </div>
 
-            <h6 class="card-title">Calculated Preview</h6>
+            <h6>Calculated Preview</h6>
             <table class="table table-bordered table-sm">
               <tbody>
                 <tr><td>Item Name</td><td id="p_item_name">—</td></tr>
                 <tr><td>Warp GSM</td><td id="p_warp_gsm">—</td></tr>
                 <tr><td>Weft GSM</td><td id="p_weft_gsm">—</td></tr>
                 <tr><td><strong>Total GSM</strong></td><td id="p_gsm">—</td></tr>
+                <tr><td>GSM (Kg)</td><td id="p_gsm_kg">—</td></tr>
                 <tr><td>Reed Space</td><td id="p_reed_space">—</td></tr>
                 <tr><td>Warp Consumption (lbs/m)</td><td id="p_warp_consumption">—</td></tr>
                 <tr><td>Weft Consumption (lbs/m)</td><td id="p_weft_consumption">—</td></tr>
@@ -225,7 +226,7 @@
                 <tr><td>Weft Yarn Rate (Rs/m)</td><td id="p_weft_yarn_rate">—</td></tr>
                 <tr><td>Weaving Cost (Rs/m)</td><td id="p_weaving_cost_per_meter">—</td></tr>
                 <tr><td>Sizing Rate per Meter</td><td id="p_sizing_rate_per_meter">—</td></tr>
-                <tr><td><strong>Actual Cost per Meter</strong></td><td id="p_actual_cost_per_meter">—</td></tr>
+                <tr><td><strong>Weaving Per Meter</strong></td><td id="p_weaving_per_meter">—</td></tr>
                 <tr><td><strong>Weaving Cost (Total)</strong></td><td id="p_weaving_cost">—</td></tr>
                 <tr><td>GST</td><td id="p_gst_amount">—</td></tr>
                 <tr class="fw-bold"><td>Net Amount</td><td id="p_net_amount">—</td></tr>
@@ -416,6 +417,28 @@
 
   $(document).on('click', '.remove-row', function () { if ($('.item-row').length > 1) { $(this).closest('tr').remove(); recalcPurchaseTotal(); } });
 
+  // ── Reed Space live calc ──
+  let reedSpaceManuallyEdited = false;
+
+  $(document).on('input', '#reed_space', function () {
+    reedSpaceManuallyEdited = $(this).val().trim() !== '';
+    if (!reedSpaceManuallyEdited) recalcReedSpace();
+  });
+
+  function recalcReedSpace() {
+    if (reedSpaceManuallyEdited) return;
+    const reed = unformatNumber($('#reed_input').val());
+    const width = unformatNumber($('#width').val());
+    const reedCount = unformatNumber($('#reed_count').val());
+    if (reed > 0 && width > 0 && reedCount > 0) {
+      const reedSpace = (reed * width) / reedCount;
+      $('#reed_space').val(reedSpace.toFixed(4));
+    }
+  }
+
+  $(document).on('keyup', '#reed_count', recalcReedSpace);
+  $(document).on('input', '#reed_input, #width', recalcReedSpace);
+
   // ── CPO live calc ──
   let calcTimer = null;
   $(document).on('input change', '.calc-input', function () { clearTimeout(calcTimer); calcTimer = setTimeout(recalcCpo, 300); });
@@ -455,6 +478,7 @@
       $('#p_warp_gsm').text(data.warp_gsm);
       $('#p_weft_gsm').text(data.weft_gsm);
       $('#p_gsm').text(data.gsm);
+      $('#p_gsm_kg').text(data.gsm_kg);
       $('#p_reed_space').text(data.reed_space);
       if (!$('#reed_space').val()) $('#reed_space').attr('placeholder', data.reed_space);
       $('#p_warp_consumption').text(data.warp_consumption);
@@ -464,7 +488,7 @@
       $('#p_weft_yarn_rate').text(data.weft_yarn_rate);
       $('#p_weaving_cost_per_meter').text(data.weaving_cost_per_meter);
       $('#p_sizing_rate_per_meter').text(data.sizing_rate_per_meter);
-      $('#p_actual_cost_per_meter').text(data.actual_cost_per_meter);
+      $('#p_weaving_per_meter').text(data.weaving_per_meter);
       $('#p_weaving_cost').text(data.weaving_cost);
       $('#p_gst_amount').text(data.gst_amount);
       $('#p_net_amount').text(data.net_amount);
@@ -482,27 +506,5 @@
       $select.val(customVal);
     }
   });
-
-  let reedSpaceManuallyEdited = false;
-
-  $(document).on('input', '#reed_space', function () {
-    reedSpaceManuallyEdited = $(this).val().trim() !== '';
-  });
-
-  function recalcReedSpace() {
-    if (reedSpaceManuallyEdited) return;
-
-    const reed = unformatNumber($('#reed_input').val());
-    const width = unformatNumber($('#width').val());
-    const reedCount = unformatNumber($('#reed_count').val());
-
-    if (reed > 0 && width > 0 && reedCount > 0) {
-      const reedSpace = (reed * width) / reedCount;
-      $('#reed_space').val(reedSpace.toFixed(4));
-    }
-  }
-
-  $(document).on('keyup', '#reed_count', recalcReedSpace);
-  $(document).on('input', '#reed_input, #width', recalcReedSpace);
 </script>
 @endsection
