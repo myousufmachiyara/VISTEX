@@ -5,6 +5,7 @@
   <form action="{{ route('purchase_orders.update', $order->id) }}" method="POST" onkeydown="return event.key != 'Enter';" enctype="multipart/form-data">
     @csrf
     @method('PUT')
+    <input type="hidden" name="type" value="{{ $order->type }}">
     <section class="card">
       <header class="card-header d-flex justify-content-between align-items-center">
         <h2 class="card-title">Edit Purchase Order — {{ $order->order_no }} <small class="text-muted">(Rev {{ $order->revision_no }})</small></h2>
@@ -104,7 +105,7 @@
           </div>
           <div class="col-md-3 mb-3" id="paymentDaysField" style="{{ in_array($order->payment_term_type, ['credit','pdc']) ? '' : 'display:none' }}">
             <label>Days</label>
-            <select name="payment_term_days" class="form-control">
+            <select name="payment_term_days" id="payment_term_days_select" class="form-control">
               <option value="30" @selected($order->payment_term_days == 30)>30 days</option>
               <option value="60" @selected($order->payment_term_days == 60)>60 days</option>
               <option value="90" @selected($order->payment_term_days == 90)>90 days</option>
@@ -146,7 +147,9 @@
           </div>
         </div>
 
-        <div class="table-responsive mb-3">
+        {{-- ═══ PURCHASE TYPE: item grid ═══ --}}
+        @if($order->type === 'purchase')
+        <div id="purchaseItemsSection">
           <table class="table table-bordered" id="itemsTable">
             <thead><tr><th>Item</th><th>Quantity</th><th>Rate</th><th>Amount</th><th></th></tr></thead>
             <tbody id="itemsBody">
@@ -192,6 +195,73 @@
           </table>
           <button type="button" class="btn btn-outline-primary" id="addRowBtn">Add Item</button>
         </div>
+        @endif
+
+        {{-- ═══ WEAVING TYPE: CPO formula fields ═══ --}}
+        @if($order->type === 'weaving')
+        <div id="weavingSection">
+          <hr><h6>Weaving / CPO Details</h6>
+          <div class="row">
+            <div class="col-md-4 mb-3"><label>Warp Yarn <span class="text-danger">*</span></label>
+              <select name="warp_product_id" class="form-control select2-js">
+                <option value="">Select Yarn</option>
+                @foreach($yarnProducts as $p)<option value="{{ $p->id }}" @selected($p->id == $order->warp_product_id)>{{ $p->name }} ({{ $p->sku }})</option>@endforeach
+              </select>
+            </div>
+            <div class="col-md-4 mb-3"><label>Weft Yarn <span class="text-danger">*</span></label>
+              <select name="weft_product_id" class="form-control select2-js">
+                <option value="">Select Yarn</option>
+                @foreach($yarnProducts as $p)<option value="{{ $p->id }}" @selected($p->id == $order->weft_product_id)>{{ $p->name }} ({{ $p->sku }})</option>@endforeach
+              </select>
+            </div>
+            <div class="col-md-4 mb-3"><label>Output Greige Product</label>
+              <select name="greige_product_id" class="form-control select2-js">
+                <option value="">Not specified yet</option>
+                @foreach($greigeProducts as $p)<option value="{{ $p->id }}" @selected($p->id == $order->greige_product_id)>{{ $p->name }} ({{ $p->sku }})</option>@endforeach
+              </select>
+            </div>
+
+            <div class="col-md-2 mb-3"><label>Warp Count</label><input type="number" name="warp_count" id="warp_count" class="form-control comma-input calc-input" step="any" min="0.01" value="{{ $order->warp_count }}"></div>
+            <div class="col-md-2 mb-3"><label>Weft Count</label><input type="number" name="weft_count" id="weft_count" class="form-control comma-input calc-input" step="any" min="0.01" value="{{ $order->weft_count }}"></div>
+            <div class="col-md-2 mb-3"><label>Reed</label><input type="number" name="reed_input" id="reed_input" class="form-control comma-input calc-input" step="any" min="0.01" value="{{ $order->reed ?? '' }}"></div>
+            <div class="col-md-2 mb-3"><label>Pick</label><input type="number" name="pick" id="pick" class="form-control calc-input comma-input" step="any" min="0.01" value="{{ $order->pick }}"></div>
+            <div class="col-md-2 mb-3"><label>Width</label><input type="number" name="width" id="width" class="form-control calc-input comma-input" step="any" min="0.01" value="{{ $order->width }}"></div>
+            <div class="col-md-2 mb-3"><label>Reed Count</label><input type="number" name="reed_count" id="reed_count" class="form-control comma-input calc-input" step="any" min="0.01" value="{{ $order->reed_count }}"></div>
+
+            <div class="col-md-2 mb-3"><label>Reed Space <small class="text-muted">(auto/editable)</small></label><input type="number" name="reed_space" id="reed_space" class="form-control comma-input calc-input" step="any" min="0.01" value="{{ $order->reed_space ?? '' }}"></div>
+            <div class="col-md-2 mb-3"><label>Total Meters</label><input type="number" name="total_meters_required" id="total_meters_required" class="form-control comma-input calc-input" step="any" min="0.001" value="{{ $order->total_meters_required }}"></div>
+            <div class="col-md-2 mb-3"><label>Rate per Pick</label><input type="number" name="rate_per_pick" id="rate_per_pick" class="form-control calc-input comma-input" step="any" min="0" value="{{ $order->rate_per_pick }}"></div>
+            <div class="col-md-2 mb-3"><label>Sizing (lbs)</label><input type="number" name="sizing_lbs" id="sizing_lbs" class="form-control calc-input comma-input" step="any" min="0" value="{{ $order->sizing_lbs ?? 0 }}"></div>
+            <div class="col-md-2 mb-3"><label>Warping</label><input type="number" name="warping" id="warping" class="form-control calc-input comma-input" step="any" min="0.01" value="{{ $order->warping ?? 1 }}"></div>
+
+            <div class="col-md-3 mb-3"><label>Warp Shrinkage %</label><input type="number" name="warp_conversion_pct" id="warp_conversion_pct" class="form-control calc-input comma-input" step="any" min="0" value="{{ $order->warp_conversion_pct ?? 0 }}"></div>
+            <div class="col-md-3 mb-3"><label>Weft Shrinkage %</label><input type="number" name="weft_conversion_pct" id="weft_conversion_pct" class="form-control calc-input comma-input" step="any" min="0" value="{{ $order->weft_conversion_pct ?? 0 }}"></div>
+            <div class="col-md-3 mb-3"><label>Warp Yarn Cost Price</label><input type="number" name="warp_yarn_cost_price" id="warp_yarn_cost_price" class="form-control calc-input comma-input" step="any" min="0" value="{{ $order->warp_yarn_cost_price ?? 0 }}"></div>
+            <div class="col-md-3 mb-3"><label>Weft Yarn Cost Price</label><input type="number" name="weft_yarn_cost_price" id="weft_yarn_cost_price" class="form-control calc-input comma-input" step="any" min="0" value="{{ $order->weft_yarn_cost_price ?? 0 }}"></div>
+          </div>
+
+          <h6>Calculated Preview</h6>
+          <table class="table table-bordered table-sm">
+            <tbody>
+              <tr><td>Item Name</td><td id="p_item_name">{{ $order->item_name ?? '—' }}</td></tr>
+              <tr><td>GSM</td><td id="p_gsm">{{ $order->gsm ?? '—' }}</td></tr>
+              <tr><td>Reed Space</td><td id="p_reed_space">{{ $order->reed_space ?? '—' }}</td></tr>
+              <tr><td>Warp Consumption (lbs/m)</td><td id="p_warp_consumption">{{ $order->warp_consumption ?? '—' }}</td></tr>
+              <tr><td>Weft Consumption (lbs/m)</td><td id="p_weft_consumption">{{ $order->weft_consumption ?? '—' }}</td></tr>
+              <tr><td><strong>Total Yarn Weight Consumed (lbs, rounded up)</strong></td><td id="p_total_yarn_weight_consumed">{{ $order->total_yarn_weight_consumed ?? '—' }}</td></tr>
+              <tr><td>Warp Yarn Rate (Rs/m)</td><td id="p_warp_yarn_rate">—</td></tr>
+              <tr><td>Weft Yarn Rate (Rs/m)</td><td id="p_weft_yarn_rate">—</td></tr>
+              <tr><td>Weaving Cost (Rs/m)</td><td id="p_weaving_cost_per_meter">—</td></tr>
+              <tr><td>Sizing Rate per Meter</td><td id="p_sizing_rate_per_meter">—</td></tr>
+              <tr><td><strong>Actual Cost per Meter</strong></td><td id="p_actual_cost_per_meter">—</td></tr>
+              <tr><td><strong>Weaving Cost (Total)</strong></td><td id="p_weaving_cost">{{ $order->weaving_cost ?? '—' }}</td></tr>
+              <tr><td>GST</td><td id="p_gst_amount">{{ $order->gst_amount ?? '—' }}</td></tr>
+              <tr class="fw-bold"><td>Net Amount</td><td id="p_net_amount">{{ $order->total_amount ?? '—' }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        @endif
+
       </div>
       <footer class="card-footer text-end"><button type="submit" class="btn btn-success">Update Purchase Order</button></footer>
     </section>
@@ -199,8 +269,12 @@
 </div></div>
 
 <script>
-  let rowIndex = {{ $order->items->count() }};
+  let rowIndex = {{ $order->type === 'purchase' ? $order->items->count() : 0 }};
   let categoryProducts = @json($products->map(fn($p) => ['id' => $p->id, 'name' => $p->name, 'sku' => $p->sku]));
+
+  function unformatNumber(value) {
+    return parseFloat((value || '').toString().replace(/,/g, '')) || 0;
+  }
 
   $(document).ready(function () {
     $('.select2-js').select2({ width: '100%' });
@@ -221,6 +295,10 @@
           $('#from_location_select').html(html).trigger('change');
         });
     }
+
+    @if($order->type === 'weaving')
+      recalcCpo();
+    @endif
   });
 
   $('#category_select').on('change', function () {
@@ -259,7 +337,12 @@
     $('#paymentNoteField').toggle(val === 'other');
   });
 
-  $('#gst_applicable').on('change', toggleGst);
+  $(document).on('change', '#payment_term_days_select', function () {
+    const isCustom = $(this).val() === '0';
+    $('#paymentDaysField input[name="payment_term_days_custom"]').toggle(isCustom);
+  });
+
+  $('#gst_applicable').on('change', function () { toggleGst(); recalcCpo(); });
   function toggleGst() { $('#tax_field').toggle($('#gst_applicable').val() === '1'); recalcTotal(); }
 
   function productOptionsHtml() {
@@ -291,30 +374,92 @@
     recalcTotal();
   });
 
-function unformatNumber(value) {
-  return parseFloat((value || '').toString().replace(/,/g, '')) || 0;
-}
+  function recalcTotal() {
+    let subtotal = 0;
+    $('.item-row').each(function () {
+      subtotal += unformatNumber($(this).find('.amount-cell').text());
+    });
+    const gstApplicable = $('#gst_applicable').val() === '1';
+    const rate = gstApplicable ? (parseFloat($('#tax_select').find('option:selected').data('rate')) || 0) : 0;
+    const gst = subtotal * (rate / 100);
+    const brokerAmt = $('#broker_select').val() ? unformatNumber($('#broker_commission_amount').val()) : 0;
 
-function recalcTotal() {
-  let subtotal = 0;
-  $('.item-row').each(function () {
-    subtotal += unformatNumber($(this).find('.amount-cell').text());
-  });
-  const gstApplicable = $('#gst_applicable').val() === '1';
-  const rate = gstApplicable ? (parseFloat($('#tax_select').find('option:selected').data('rate')) || 0) : 0;
-  const gst = subtotal * (rate / 100);
-  const brokerAmt = $('#broker_select').val() ? unformatNumber($('#broker_commission_amount').val()) : 0;
+    $('#subtotalDisplay').text(subtotal.toFixed(2));
+    $('#gstDisplay').text(gst.toFixed(2));
+    $('#brokerDisplay').text(brokerAmt.toFixed(2));
+    $('#totalDisplay').text((subtotal + gst + brokerAmt).toFixed(2));
+  }
 
-  $('#subtotalDisplay').text(subtotal.toFixed(2));
-  $('#gstDisplay').text(gst.toFixed(2));
-  $('#brokerDisplay').text(brokerAmt.toFixed(2));
-  $('#totalDisplay').text((subtotal + gst + brokerAmt).toFixed(2));
-}
-
-  $(document).on('change', '#tax_select', recalcTotal);
+  $(document).on('change', '#tax_select', function () { recalcTotal(); recalcCpo(); });
 
   $(document).on('click', '.remove-row', function () {
     if ($('.item-row').length > 1) { $(this).closest('tr').remove(); recalcTotal(); }
+  });
+
+  // ── CPO live calc (weaving type only) ──
+  let calcTimer = null;
+  $(document).on('input change', '.calc-input', function () { clearTimeout(calcTimer); calcTimer = setTimeout(recalcCpo, 300); });
+
+  function recalcCpo() {
+    if ($('#reed_input').length === 0) return; // not a weaving-type PO
+    const required = ['reed_input','reed_count','warp_count','weft_count','pick','width','total_meters_required','rate_per_pick'];
+    for (const f of required) if (!$('#' + f).val()) return;
+
+    const gstApplicable = $('#gst_applicable').val() === '1';
+    const gstRate = gstApplicable ? (parseFloat($('#tax_select').find('option:selected').data('rate')) || 0) : 0;
+
+    const payload = {
+      reed: unformatNumber($('#reed_input').val()),
+      reed_count: unformatNumber($('#reed_count').val()),
+      reed_space: $('#reed_space').val() ? unformatNumber($('#reed_space').val()) : '',
+      warp_count: unformatNumber($('#warp_count').val()),
+      weft_count: unformatNumber($('#weft_count').val()),
+      pick: unformatNumber($('#pick').val()),
+      width: unformatNumber($('#width').val()),
+      total_meters_required: unformatNumber($('#total_meters_required').val()),
+      rate_per_pick: unformatNumber($('#rate_per_pick').val()),
+      sizing_lbs: unformatNumber($('#sizing_lbs').val()) || 0,
+      warping: unformatNumber($('#warping').val()) || 1,
+      warp_shrinkage_pct: unformatNumber($('#warp_conversion_pct').val()) || 0,
+      weft_shrinkage_pct: unformatNumber($('#weft_conversion_pct').val()) || 0,
+      warp_yarn_cost_price: unformatNumber($('#warp_yarn_cost_price').val()) || 0,
+      weft_yarn_cost_price: unformatNumber($('#weft_yarn_cost_price').val()) || 0,
+      gst_applicable: gstApplicable ? 1 : 0, gst_rate: gstRate, _token: '{{ csrf_token() }}',
+    };
+
+    fetch('{{ route("purchase_orders.calculate") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+      body: new URLSearchParams(payload),
+    }).then(r => r.json()).then(data => {
+      $('#p_item_name').text(data.item_name);
+      $('#p_gsm').text(data.gsm);
+      $('#p_reed_space').text(data.reed_space);
+      if (!$('#reed_space').val()) $('#reed_space').attr('placeholder', data.reed_space);
+      $('#p_warp_consumption').text(data.warp_consumption);
+      $('#p_weft_consumption').text(data.weft_consumption);
+      $('#p_total_yarn_weight_consumed').text(data.total_yarn_weight_consumed);
+      $('#p_warp_yarn_rate').text(data.warp_yarn_rate);
+      $('#p_weft_yarn_rate').text(data.weft_yarn_rate);
+      $('#p_weaving_cost_per_meter').text(data.weaving_cost_per_meter);
+      $('#p_sizing_rate_per_meter').text(data.sizing_rate_per_meter);
+      $('#p_actual_cost_per_meter').text(data.actual_cost_per_meter);
+      $('#p_weaving_cost').text(data.weaving_cost);
+      $('#p_gst_amount').text(data.gst_amount);
+      $('#p_net_amount').text(data.net_amount);
+    });
+  }
+
+  $('form').on('submit', function () {
+    const $customInput = $('input[name="payment_term_days_custom"]:visible');
+    if ($customInput.length && $customInput.val()) {
+      const customVal = unformatNumber($customInput.val());
+      const $select = $('#payment_term_days_select');
+      if ($select.find(`option[value="${customVal}"]`).length === 0) {
+        $select.append(`<option value="${customVal}"></option>`);
+      }
+      $select.val(customVal);
+    }
   });
 </script>
 @endsection

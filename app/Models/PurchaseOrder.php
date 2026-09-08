@@ -14,16 +14,22 @@ class PurchaseOrder extends Model
         'job_id', 'program', 'fabric_specs',
         'from_location_id', 'drop_off_location_id',
         'order_date', 'expected_date',
-        'broker_id', 'broker_commission_type', 'broker_commission_value', 'broker_commission_amount',
+        'broker_id', 'broker_commission_amount', // ← 'broker_commission_type'/'broker_commission_value' REMOVED (Fix 3 dropped these)
         'payment_term_type', 'payment_term_days', 'payment_term_note',
         'gst_applicable', 'tax_id', 'gst_rate',
         'subtotal', 'gst_amount', 'total_amount',
         'status', 'approved_by', 'approved_at', 'rejection_reason', 'locked_by',
         'warp_product_id', 'weft_product_id', 'greige_product_id',
         'warp_count', 'weft_count', 'reed_count', 'pick', 'width', 'total_meters_required',
-        'rate_per_pick', 'sizing_lbs', 'warp_conversion_pct', 'warp_shrinkage_pct', 'weft_shrinkage_pct',
-        'gsm', 'warp_consumption', 'weft_consumption', 'total_greige_qty_required', 'total_yarn_weight_consumed',
-        'rate_per_meter', 'sizing_per_meter', 'weaving_rate', 'weaving_cost', 'item_name',
+        'rate_per_pick', 'sizing_lbs',
+        'reed', 'reed_space', 'warping',                                  // ← NEW
+        'warp_conversion_pct', 'weft_conversion_pct',                      // ← labels renamed to "Shrinkage %" but field names unchanged (per last message)
+        'warp_shrinkage_pct', 'weft_shrinkage_pct',                        // ← keep only if these still exist as separate DB columns from the earlier fix; see note below
+        'warp_yarn_cost_price', 'weft_yarn_cost_price',                    // ← NEW
+        'warp_yarn_rate', 'weft_yarn_rate',                                // ← NEW (computed, stored)
+        'weaving_cost_per_meter', 'sizing_rate_per_meter', 'actual_cost_per_meter', // ← NEW (computed, stored)
+        'gsm', 'total_greige_qty_required', 'total_yarn_weight_consumed',
+        'weaving_cost', 'item_name',
         'is_final_receiving_done',
         'forecast_id', 'remarks', 'attachments', 'created_by', 'updated_by',
     ];
@@ -32,6 +38,11 @@ class PurchaseOrder extends Model
         'order_date' => 'date', 'expected_date' => 'date', 'approved_at' => 'datetime',
         'gst_applicable' => 'boolean', 'is_final_receiving_done' => 'boolean',
         'attachments' => 'array', 'fabric_specs' => 'array',
+        'reed' => 'decimal:4', 'reed_space' => 'decimal:4', 'warping' => 'decimal:4',
+        'warp_yarn_cost_price' => 'decimal:4', 'weft_yarn_cost_price' => 'decimal:4',
+        'warp_yarn_rate' => 'decimal:4', 'weft_yarn_rate' => 'decimal:4',
+        'weaving_cost_per_meter' => 'decimal:4', 'sizing_rate_per_meter' => 'decimal:4',
+        'actual_cost_per_meter' => 'decimal:4',
     ];
 
     public const TYPES = ['purchase' => 'Purchase', 'weaving' => 'Weaving', 'processing' => 'Processing'];

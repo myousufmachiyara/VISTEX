@@ -110,7 +110,7 @@
             </div>
             <div class="col-md-3 mb-3" id="paymentDaysField" style="display:none">
               <label>Days</label>
-              <select name="payment_term_days" class="form-control">
+              <select name="payment_term_days" id="payment_term_days_select" class="form-control">
                 <option value="30">30 days</option>
                 <option value="60">60 days</option>
                 <option value="90">90 days</option>
@@ -193,18 +193,21 @@
 
               <div class="col-md-2 mb-3"><label>Warp Count</label><input type="number" name="warp_count" id="warp_count" class="form-control comma-input calc-input" step="any" min="0.01"></div>
               <div class="col-md-2 mb-3"><label>Weft Count</label><input type="number" name="weft_count" id="weft_count" class="form-control comma-input calc-input" step="any" min="0.01"></div>
-              
-              <div class="col-md-2 mb-3"><label>Reed</label><input type="number" name="reed_input" id="reed_input" class="form-control comma-input calc-input" step="any" min="0.01"></div>              
+              <div class="col-md-2 mb-3"><label>Reed</label><input type="number" name="reed_input" id="reed_input" class="form-control comma-input calc-input" step="any" min="0.01"></div>
               <div class="col-md-2 mb-3"><label>Pick</label><input type="number" name="pick" id="pick" class="form-control calc-input comma-input" step="any" min="0.01"></div>
               <div class="col-md-2 mb-3"><label>Width</label><input type="number" name="width" id="width" class="form-control calc-input comma-input" step="any" min="0.01"></div>
               <div class="col-md-2 mb-3"><label>Reed Count</label><input type="number" name="reed_count" id="reed_count" class="form-control comma-input calc-input" step="any" min="0.01"></div>
-              <div class="col-md-2 mb-3"><label>Reed Space</label><input type="number" name="reed_space" id="reed_space" class="form-control comma-input calc-input" step="any" min="0.01"></div>              
-              <div class="col-md-3 mb-3"><label>Warp Conversion %</label><input type="number" name="warp_conversion_pct" id="warp_conversion_pct" class="form-control calc-input comma-input" step="any" min="0" value="0"></div>
-              <div class="col-md-3 mb-3"><label>Weft Conversion %</label><input type="number" name="weft_conversion_pct" id="weft_conversion_pct" class="form-control calc-input comma-input" step="any" min="0" value="0"></div>
-              <div class="col-md-3 mb-3"><label>Rate per Pick</label><input type="number" name="rate_per_pick" id="rate_per_pick" class="form-control calc-input comma-input" step="any" min="0"></div>
-              <div class="col-md-3 mb-3"><label>Sizing (lbs) / Warping</label><input type="number" name="sizing_lbs" id="sizing_lbs" class="form-control calc-input comma-input" step="any" min="0" value="0"></div>
-              <div class="col-md-2 mb-3"><label>Total Meters</label><input type="number" name="total_meters_required" id="total_meters_required" class="form-control comma-input calc-input" step="any" min="0.001"></div>
 
+              <div class="col-md-2 mb-3"><label>Reed Space <small class="text-muted">(auto/editable)</small></label><input type="number" name="reed_space" id="reed_space" class="form-control comma-input calc-input" step="any" min="0.01" placeholder="Auto-calculated"></div>
+              <div class="col-md-2 mb-3"><label>Total Meters</label><input type="number" name="total_meters_required" id="total_meters_required" class="form-control comma-input calc-input" step="any" min="0.001"></div>
+              <div class="col-md-2 mb-3"><label>Rate per Pick</label><input type="number" name="rate_per_pick" id="rate_per_pick" class="form-control calc-input comma-input" step="any" min="0"></div>
+              <div class="col-md-2 mb-3"><label>Sizing (lbs)</label><input type="number" name="sizing_lbs" id="sizing_lbs" class="form-control calc-input comma-input" step="any" min="0" value="0"></div>
+              <div class="col-md-2 mb-3"><label>Warping</label><input type="number" name="warping" id="warping" class="form-control calc-input comma-input" step="any" min="0.01" value="1"></div>
+
+              <div class="col-md-3 mb-3"><label>Warp Shrinkage %</label><input type="number" name="warp_conversion_pct" id="warp_conversion_pct" class="form-control calc-input comma-input" step="any" min="0" value="0"></div>
+              <div class="col-md-3 mb-3"><label>Weft Shrinkage %</label><input type="number" name="weft_conversion_pct" id="weft_conversion_pct" class="form-control calc-input comma-input" step="any" min="0" value="0"></div>
+              <div class="col-md-3 mb-3"><label>Warp Yarn Cost Price</label><input type="number" name="warp_yarn_cost_price" id="warp_yarn_cost_price" class="form-control calc-input comma-input" step="any" min="0" value="0"></div>
+              <div class="col-md-3 mb-3"><label>Weft Yarn Cost Price</label><input type="number" name="weft_yarn_cost_price" id="weft_yarn_cost_price" class="form-control calc-input comma-input" step="any" min="0" value="0"></div>
             </div>
 
             <h6>Calculated Preview</h6>
@@ -212,11 +215,16 @@
               <tbody>
                 <tr><td>Item Name</td><td id="p_item_name">—</td></tr>
                 <tr><td>GSM</td><td id="p_gsm">—</td></tr>
+                <tr><td>Reed Space</td><td id="p_reed_space">—</td></tr>
                 <tr><td>Warp Consumption (lbs/m)</td><td id="p_warp_consumption">—</td></tr>
                 <tr><td>Weft Consumption (lbs/m)</td><td id="p_weft_consumption">—</td></tr>
                 <tr><td><strong>Total Yarn Weight Consumed (lbs, rounded up)</strong></td><td id="p_total_yarn_weight_consumed">—</td></tr>
-                <tr><td>Weaving Rate (Rs/m)</td><td id="p_weaving_rate">—</td></tr>
-                <tr><td><strong>Weaving Cost</strong></td><td id="p_weaving_cost">—</td></tr>
+                <tr><td>Warp Yarn Rate (Rs/m)</td><td id="p_warp_yarn_rate">—</td></tr>
+                <tr><td>Weft Yarn Rate (Rs/m)</td><td id="p_weft_yarn_rate">—</td></tr>
+                <tr><td>Weaving Cost (Rs/m)</td><td id="p_weaving_cost_per_meter">—</td></tr>
+                <tr><td>Sizing Rate per Meter</td><td id="p_sizing_rate_per_meter">—</td></tr>
+                <tr><td><strong>Actual Cost per Meter</strong></td><td id="p_actual_cost_per_meter">—</td></tr>
+                <tr><td><strong>Weaving Cost (Total)</strong></td><td id="p_weaving_cost">—</td></tr>
                 <tr><td>GST</td><td id="p_gst_amount">—</td></tr>
                 <tr class="fw-bold"><td>Net Amount</td><td id="p_net_amount">—</td></tr>
               </tbody>
@@ -233,6 +241,10 @@
   let rowIndex = 0;
   let categoryProducts = [];
   const units = @json($units->map(fn($u) => ['id' => $u->id, 'label' => $u->name . ' (' . $u->shortcode . ')']));
+
+  function unformatNumber(value) {
+    return parseFloat((value || '').toString().replace(/,/g, '')) || 0;
+  }
 
   $(document).ready(function () { $('.select2-js').select2({ width: '100%' }); });
 
@@ -317,8 +329,7 @@
     $('#paymentNoteField').toggle(val === 'other');
   });
 
-  // ── THIS WAS MISSING — toggles the custom-days input when "Custom" is picked ──
-  $(document).on('change', 'select[name="payment_term_days"]', function () {
+  $(document).on('change', '#payment_term_days_select', function () {
     const isCustom = $(this).val() === '0';
     $('#paymentDaysField input[name="payment_term_days_custom"]').toggle(isCustom);
   });
@@ -376,10 +387,6 @@
     if (shortfall !== undefined) $(this).closest('tr').find('.qty-input').val(shortfall).trigger('input');
   });
 
-  function unformatNumber(value) {
-    return parseFloat((value || '').toString().replace(/,/g, '')) || 0;
-  }
-
   $(document).on('input', '.qty-input, .rate-input', function () {
     const row = $(this).closest('tr');
     const qty = unformatNumber(row.find('.qty-input').val());
@@ -412,18 +419,28 @@
   $(document).on('input change', '.calc-input', function () { clearTimeout(calcTimer); calcTimer = setTimeout(recalcCpo, 300); });
 
   function recalcCpo() {
-    const required = ['warp_count','weft_count','reed_count','pick','width','total_meters_required','rate_per_pick'];
+    const required = ['reed_input','reed_count','warp_count','weft_count','pick','width','total_meters_required','rate_per_pick'];
     for (const f of required) if (!$('#' + f).val()) return;
 
     const gstApplicable = $('#gst_applicable').val() === '1';
     const gstRate = gstApplicable ? (parseFloat($('#tax_select').find('option:selected').data('rate')) || 0) : 0;
 
     const payload = {
-      warp_count: unformatNumber($('#warp_count').val()), weft_count: unformatNumber($('#weft_count').val()),
-      reed_count: unformatNumber($('#reed_count').val()), pick: unformatNumber($('#pick').val()),
-      width: unformatNumber($('#width').val()), total_meters_required: unformatNumber($('#total_meters_required').val()),
-      rate_per_pick: unformatNumber($('#rate_per_pick').val()), sizing_lbs: unformatNumber($('#sizing_lbs').val()) || 0,
-      warp_conversion_pct: unformatNumber($('#warp_conversion_pct').val()) || 0,
+      reed: unformatNumber($('#reed_input').val()),
+      reed_count: unformatNumber($('#reed_count').val()),
+      reed_space: $('#reed_space').val() ? unformatNumber($('#reed_space').val()) : '',
+      warp_count: unformatNumber($('#warp_count').val()),
+      weft_count: unformatNumber($('#weft_count').val()),
+      pick: unformatNumber($('#pick').val()),
+      width: unformatNumber($('#width').val()),
+      total_meters_required: unformatNumber($('#total_meters_required').val()),
+      rate_per_pick: unformatNumber($('#rate_per_pick').val()),
+      sizing_lbs: unformatNumber($('#sizing_lbs').val()) || 0,
+      warping: unformatNumber($('#warping').val()) || 1,
+      warp_shrinkage_pct: unformatNumber($('#warp_conversion_pct').val()) || 0,
+      weft_shrinkage_pct: unformatNumber($('#weft_conversion_pct').val()) || 0,
+      warp_yarn_cost_price: unformatNumber($('#warp_yarn_cost_price').val()) || 0,
+      weft_yarn_cost_price: unformatNumber($('#weft_yarn_cost_price').val()) || 0,
       gst_applicable: gstApplicable ? 1 : 0, gst_rate: gstRate, _token: '{{ csrf_token() }}',
     };
 
@@ -434,10 +451,16 @@
     }).then(r => r.json()).then(data => {
       $('#p_item_name').text(data.item_name);
       $('#p_gsm').text(data.gsm);
+      $('#p_reed_space').text(data.reed_space);
+      if (!$('#reed_space').val()) $('#reed_space').attr('placeholder', data.reed_space);
       $('#p_warp_consumption').text(data.warp_consumption);
       $('#p_weft_consumption').text(data.weft_consumption);
       $('#p_total_yarn_weight_consumed').text(data.total_yarn_weight_consumed);
-      $('#p_weaving_rate').text(data.weaving_rate);
+      $('#p_warp_yarn_rate').text(data.warp_yarn_rate);
+      $('#p_weft_yarn_rate').text(data.weft_yarn_rate);
+      $('#p_weaving_cost_per_meter').text(data.weaving_cost_per_meter);
+      $('#p_sizing_rate_per_meter').text(data.sizing_rate_per_meter);
+      $('#p_actual_cost_per_meter').text(data.actual_cost_per_meter);
       $('#p_weaving_cost').text(data.weaving_cost);
       $('#p_gst_amount').text(data.gst_amount);
       $('#p_net_amount').text(data.net_amount);
@@ -447,8 +470,8 @@
   $('form').on('submit', function () {
     const $customInput = $('input[name="payment_term_days_custom"]:visible');
     if ($customInput.length && $customInput.val()) {
-      const customVal = $customInput.val();
-      const $select = $('select[name="payment_term_days"]');
+      const customVal = unformatNumber($customInput.val());
+      const $select = $('#payment_term_days_select');
       if ($select.find(`option[value="${customVal}"]`).length === 0) {
         $select.append(`<option value="${customVal}"></option>`);
       }
