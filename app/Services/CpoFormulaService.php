@@ -75,7 +75,7 @@ class CpoFormulaService
             'gsm_kg'                       => round($gsmKg, 4),
             'warp_consumption'             => round($warpConsumption, 4),
             'weft_consumption'             => round($weftConsumption, 4),
-            'total_yarn_weight_consumed'   => $totalYarnWeightConsumed,
+            'total_yarn_weight_consumed'   => round($totalYarnWeightConsumed, 4),
             'warp_yarn_rate'               => round($warpYarnRate, 2),
             'weft_yarn_rate'               => round($weftYarnRate, 2),
             'weaving_cost_per_meter'       => round($weavingCostPerMeter, 2),
