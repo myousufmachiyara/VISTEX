@@ -214,7 +214,9 @@
             <table class="table table-bordered table-sm">
               <tbody>
                 <tr><td>Item Name</td><td id="p_item_name">—</td></tr>
-                <tr><td>GSM</td><td id="p_gsm">—</td></tr>
+                <tr><td>Warp GSM</td><td id="p_warp_gsm">—</td></tr>
+                <tr><td>Weft GSM</td><td id="p_weft_gsm">—</td></tr>
+                <tr><td><strong>Total GSM</strong></td><td id="p_gsm">—</td></tr>
                 <tr><td>Reed Space</td><td id="p_reed_space">—</td></tr>
                 <tr><td>Warp Consumption (lbs/m)</td><td id="p_warp_consumption">—</td></tr>
                 <tr><td>Weft Consumption (lbs/m)</td><td id="p_weft_consumption">—</td></tr>
@@ -450,6 +452,8 @@
       body: new URLSearchParams(payload),
     }).then(r => r.json()).then(data => {
       $('#p_item_name').text(data.item_name);
+      $('#p_warp_gsm').text(data.warp_gsm);
+      $('#p_weft_gsm').text(data.weft_gsm);
       $('#p_gsm').text(data.gsm);
       $('#p_reed_space').text(data.reed_space);
       if (!$('#reed_space').val()) $('#reed_space').attr('placeholder', data.reed_space);
