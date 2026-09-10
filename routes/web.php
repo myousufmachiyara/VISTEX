@@ -249,8 +249,7 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('purchase-orders')->name('purchase_orders.')->group(function () {
         Route::get('/',                                 [PurchaseOrderController::class, 'index'])              ->name('index')  ->middleware('check.permission:purchase_orders.index');
         Route::get('create',                            [PurchaseOrderController::class, 'create'])             ->name('create') ->middleware('check.permission:purchase_orders.create');
-        Route::post('calculate',                        [ConversionPurchaseOrderController::class, 'calculate'])->name('calculate')->middleware('check.permission:purchase_orders.create');
-        Route::get('vendor-locations/{vendorId}',       [PurchaseOrderController::class, 'vendorLocations'])    ->name('vendor_locations')->middleware('check.permission:purchase_orders.index');
+        Route::post('calculate',                        [PurchaseOrderController::class, 'calculate'])->name('calculate')->middleware('check.permission:purchase_orders.create');        Route::get('vendor-locations/{vendorId}',       [PurchaseOrderController::class, 'vendorLocations'])    ->name('vendor_locations')->middleware('check.permission:purchase_orders.index');
         Route::get('category-products/{categoryId}',    [PurchaseOrderController::class, 'categoryProducts'])   ->name('category_products')->middleware('check.permission:purchase_orders.index');
         Route::get('forecasts-for-product/{productId}', [PurchaseOrderController::class, 'forecastsForProduct'])->name('forecasts_for_product')->middleware('check.permission:purchase_orders.index');
         Route::get('job-items/{jobId}',                 [PurchaseOrderController::class, 'jobItems'])           ->name('job_items')->middleware('check.permission:purchase_orders.index');
