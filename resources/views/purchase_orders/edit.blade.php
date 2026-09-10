@@ -454,6 +454,8 @@
       width: unformatNumber($('#width').val()),
       total_meters_required: unformatNumber($('#total_meters_required').val()),
       rate_per_pick: unformatNumber($('#rate_per_pick').val()),
+      warping: unformatNumber($('#warping').val()),
+      sizing_lbs: unformatNumber($('#sizing_lbs').val()) || 0,
       warp_shrinkage_pct: unformatNumber($('#warp_conversion_pct').val()) || 0,
       weft_shrinkage_pct: unformatNumber($('#weft_conversion_pct').val()) || 0,
       warp_yarn_cost_price: unformatNumber($('#warp_yarn_cost_price').val()) || 0,

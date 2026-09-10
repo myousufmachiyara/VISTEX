@@ -470,6 +470,8 @@
       weft_count: unformatNumber($('#weft_count').val()),
       pick: unformatNumber($('#pick').val()),
       width: unformatNumber($('#width').val()),
+      warping: unformatNumber($('#warping').val()),
+      sizing_lbs: unformatNumber($('#sizing_lbs').val()) || 0,
       total_meters_required: unformatNumber($('#total_meters_required').val()),
       rate_per_pick: unformatNumber($('#rate_per_pick').val()),
       warp_shrinkage_pct: unformatNumber($('#warp_conversion_pct').val()) || 0,
