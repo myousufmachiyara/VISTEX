@@ -475,7 +475,7 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
       body: new URLSearchParams(payload),
-    }).then(r => r.json()).then(data => {
+          }).then(r => r.json()).then(data => {
       $('#p_item_name').text(data.item_name);
       $('#p_warp_gsm').text(data.warp_gsm);
       $('#p_weft_gsm').text(data.weft_gsm);
@@ -486,16 +486,16 @@
       $('#p_warp_consumption').text(data.warp_consumption);
       $('#p_weft_consumption').text(data.weft_consumption);
       $('#p_total_yarn_weight_consumed').text(data.total_yarn_weight_consumed);
-      $('#p_warp_yarn_rate').text('Rs.'.data.warp_yarn_rate);
-      $('#p_weft_yarn_rate').text('Rs.'.data.weft_yarn_rate);
-      $('#p_total_yarn_cost_per_meter').text('Rs.'data.total_yarn_cost_per_meter);
-      $('#p_weaving_cost_per_meter').text('Rs.'data.weaving_cost_per_meter);
-      $('#p_sizing_rate_per_meter').text('Rs.'data.sizing_rate_per_meter);
-      $('#p_weaving_per_meter').text('Rs.'data.weaving_per_meter);
-      $('#p_fabric_cost').text('Rs.'data.fabric_cost);
-      $('#p_weaving_cost').text('Rs.'data.weaving_cost);
-      $('#p_gst_amount').text('Rs.'data.gst_amount);
-      $('#p_net_amount').text('Rs.'data.net_amount);
+      $('#p_warp_yarn_rate').text('Rs.' + data.warp_yarn_rate);
+      $('#p_weft_yarn_rate').text('Rs.' + data.weft_yarn_rate);
+      $('#p_total_yarn_cost_per_meter').text('Rs.' + data.total_yarn_cost_per_meter);
+      $('#p_weaving_cost_per_meter').text('Rs.' + data.weaving_cost_per_meter);
+      $('#p_sizing_rate_per_meter').text('Rs.' + data.sizing_rate_per_meter);
+      $('#p_weaving_per_meter').text('Rs.' + data.weaving_per_meter);
+      $('#p_fabric_cost').text('Rs.' + data.fabric_cost);
+      $('#p_weaving_cost').text('Rs.' + data.weaving_cost);
+      $('#p_gst_amount').text('Rs.' + data.gst_amount);
+      $('#p_net_amount').text('Rs.' + data.net_amount);
     });
   }
 
