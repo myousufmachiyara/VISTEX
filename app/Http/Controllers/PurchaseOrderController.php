@@ -457,7 +457,7 @@ class PurchaseOrderController extends Controller
 
         $pdf->SetFont('helvetica', 'B', 18);
         $pdf->SetXY(120, 10);
-        $pdf->Cell(80, 8, 'WEAVING ORDER', 0, 1, 'R');
+        $pdf->Cell(80, 8, 'CONVERSION PURCHASE ORDER', 0, 1, 'R');
 
         $pdf->SetFont('helvetica', 'B', 10);
         $pdf->SetXY(120, 20);
@@ -469,7 +469,7 @@ class PurchaseOrderController extends Controller
         <table cellpadding="6" cellspacing="0" width="100%">
         <tr>
             <td width="50%" style="border:1px solid #333; vertical-align:top;">
-            <b style="font-size:11px;">WEAVING MILL</b><br><br>
+            <b style="font-size:11px;">SUPPLIER / VENDOR</b><br><br>
             <b>' . e($order->vendor->name ?? '-') . '</b><br>
             NTN: ' . e($order->vendor->ntn_number ?? '-') . '<br>
             STRN: ' . e($order->vendor->tax_id_number ?? '-') . '<br>
@@ -505,21 +505,27 @@ class PurchaseOrderController extends Controller
         $specsHtml = '
         <table cellpadding="4" cellspacing="0" width="100%" style="border:1px solid #333; font-size:10px;">
         <tr style="font-weight:bold; background-color:#f0f0f0;">
-            <td colspan="6">Fabric Specification — ' . e($order->item_name ?? '') . '</td>
+            <td colspan="6">ITEM DESCRIPTION — ' . e($order->item_name ?? '') . '</td>
+            // show total meters at right corner
         </tr>
         <tr>
-            <td width="16%"><b>Warp Yarn</b><br>' . e($order->warpProduct->name ?? '-') . '</td>
-            <td width="16%"><b>Weft Yarn</b><br>' . e($order->weftProduct->name ?? '-') . '</td>
-            <td width="16%"><b>Warp Count</b><br>' . e($order->warp_count) . '</td>
-            <td width="16%"><b>Weft Count</b><br>' . e($order->weft_count) . '</td>
-            <td width="16%"><b>Reed / Reed Count</b><br>' . e($order->reed) . ' / ' . e($order->reed_count) . '</td>
-            <td width="20%"><b>Pick / Width</b><br>' . e($order->pick) . ' / ' . e($order->width) . '</td>
+            <td width="16%"><b>Warp Wt.</b><br>' . e($order->warpProduct->name ?? '-') . '</td>
+            <td width="16%"><b>Weft Wt.</b><br>' . e($order->weftProduct->name ?? '-') . '</td>
+            <td width="16%"><b>Total Wt.</b><br>' . e($order->warp_count) . '</td>
         </tr>
         <tr>
-            <td><b>Total Meters</b><br>' . number_format($order->total_meters_required, 3) . '</td>
-            <td><b>GSM</b><br>' . number_format($order->gsm, 2) . '</td>
-            <td><b>Output Greige</b><br>' . e($order->greigeProduct->name ?? 'Not specified') . '</td>
-            <td colspan="3"></td>
+            <td width="16%"><b>Warp Required (Lbs)</b><br>' . e($order->weft_count) . '</td>
+            <td width="16%"><b>Weft Required (Lbs)</b><br>' . e($order->weft_count) . '</td>
+            <td><b>Total lbs Required</b><br>' . number_format($order->total_meters_required, 3) . '</td>
+        </tr>
+        <tr>
+            <td><b>Rate / pick</b><br>' . number_format($order->total_meters_required, 3) . '</td>
+            <td><b>Sizing / lbs</b><br>' . number_format($order->total_meters_required, 3) . '</td>
+            <td><b>Total Weaving Rate</b><br>' . number_format($order->total_meters_required, 3) . '</td>
+        </tr>
+        <tr>
+            <td><b>GSM (Kg)</b><br>' . number_format($order->gsm, 2) . '</td>
+            <td><b>GSM Kg/meter</b><br>' . e($order->greigeProduct->name ?? 'Not specified') . '</td>
         </tr>
         </table>';
 

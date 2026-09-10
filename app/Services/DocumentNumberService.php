@@ -73,7 +73,7 @@ class DocumentNumberService
             'voucher_contra'   => 'CV',
             'voucher_system'   => 'SV',
             'purchase_order'   => 'PO',   // type=purchase
-            'weaving_order'    => 'WPO',  // type=weaving
+            'weaving_order'    => 'CPO',  // type=weaving
             'processing_order' => 'PPO',  // type=processing
             'purchase_receiving' => 'GRN',
             'yarn_issue'       => 'YI',
