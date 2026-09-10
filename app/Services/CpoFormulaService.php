@@ -15,60 +15,48 @@ class CpoFormulaService
         $totalMeters  = (float) $inputs['total_meters_required'];
         $ratePerPick  = (float) $inputs['rate_per_pick'];
         $sizingLbs    = (float) ($inputs['sizing_lbs'] ?? 0);
-        $warping      = (float) ($inputs['warping'] ?? 1); // avoid div-by-zero
+        $warping      = (float) ($inputs['warping'] ?? 0);
         $warpShrinkagePct = (float) ($inputs['warp_shrinkage_pct'] ?? 0);
         $weftShrinkagePct = (float) ($inputs['weft_shrinkage_pct'] ?? 0);
         $warpYarnCostPrice = (float) ($inputs['warp_yarn_cost_price'] ?? 0);
         $weftYarnCostPrice = (float) ($inputs['weft_yarn_cost_price'] ?? 0);
 
-        // 1. Reed Space — calculated, but editable (user override respected if provided)
         $reedSpace = isset($inputs['reed_space']) && $inputs['reed_space'] !== ''
             ? (float) $inputs['reed_space']
             : ($reed * $width / $reedCount);
 
-        // 2. GSM — broken into Warp GSM + Weft GSM
         $warpGsm = ($reed * 25.4) / $warpCount;
         $weftGsm = ($pick * 25.4) / $weftCount;
         $gsm = $warpGsm + $weftGsm;
 
-        // Linear Meter = Width (inches) / 39.37
         $linearMeter = $width / 39.37;
-
-        // GSM in Kg (per linear meter) = Linear Meter × GSM / 1000
         $gsmKg = $linearMeter * $gsm / 1000;
 
-        // 3, 4. Warp & Weft Consumption — shrinkage inflates the base consumption
         $warpConsumptionBase = ($reed * $width * 1.0936 / 840) / $warpCount;
         $weftConsumptionBase = ($reedSpace * $pick * 1.0936 / 840) / $weftCount;
 
         $warpConsumption = $warpConsumptionBase * (1 + $warpShrinkagePct / 100);
         $weftConsumption = $weftConsumptionBase * (1 + $weftShrinkagePct / 100);
 
-        // 5. Total Yarn Weight Consumed (per meter, summed)
         $totalYarnWeightConsumed = $warpConsumption + $weftConsumption;
 
-        // 6. Warp Yarn Rate (Rs/m)
         $warpYarnRate = $warpYarnCostPrice * $warpConsumption;
-
-        // 7. Weft Yarn Rate (Rs/m)
         $weftYarnRate = $weftYarnCostPrice * $weftConsumption;
-
-        // Total Yarn Cost per Meter = Warp Yarn Rate + Weft Yarn Rate
         $totalYarnCostPerMeter = $warpYarnRate + $weftYarnRate;
 
-        // 8. Weaving Cost (per meter, from per-pick rate)
         $weavingCostPerMeter = $ratePerPick * $pick;
 
-        // 9. Sizing Rate per Meter
-        $sizingRatePerMeter = $warping > 0 ? ($sizingLbs / $warping) * $warpConsumption : 0;
+        // 9. Sizing Rate per Meter — mutually exclusive: Sizing (lbs) OR Warping
+        if ($sizingLbs > 0) {
+            $sizingRatePerMeter = $sizingLbs * $warpConsumption;
+        } elseif ($warping > 0) {
+            $sizingRatePerMeter = $warping * $warpConsumption;
+        } else {
+            $sizingRatePerMeter = 0;
+        }
 
-        // 10. Weaving Per Meter = Weaving Cost + Sizing Rate (yarn NOT included here)
         $weavingPerMeter = $weavingCostPerMeter + $sizingRatePerMeter;
-
-        // 11. Fabric Cost (per meter) = Weaving Per Meter + Warp Yarn Rate + Weft Yarn Rate
         $fabricCost = $weavingPerMeter + $warpYarnRate + $weftYarnRate;
-
-        // Total cost across all meters ordered — based on Fabric Cost (includes yarn)
         $weavingCost = $fabricCost * $totalMeters;
 
         $itemName = sprintf('%sx%s/%s-%s-%s', $warpCount, $weftCount, $reed, $pick, $width);
@@ -94,7 +82,6 @@ class CpoFormulaService
         ];
     }
 
-    // 12. Net Amount = Weaving Cost + GST
     public function withGst(array $calc, bool $gstApplicable, float $gstRate): array
     {
         $gstAmount = $gstApplicable ? round($calc['weaving_cost'] * ($gstRate / 100), 2) : 0;
@@ -102,4 +89,5 @@ class CpoFormulaService
         $calc['net_amount'] = round($calc['weaving_cost'] + $gstAmount, 2);
         return $calc;
     }
+
 }
