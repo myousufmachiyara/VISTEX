@@ -251,6 +251,16 @@
     return parseFloat((value || '').toString().replace(/,/g, '')) || 0;
   }
 
+  // Formats a number with thousands separators, e.g. 1234567.8 -> "1,234,567.80"
+  function formatMoney(value, decimals = 2) {
+    const num = unformatNumber(value);
+    return num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  }
+
+  function rs(value, decimals = 2) {
+    return 'Rs. ' + formatMoney(value, decimals);
+  }
+
   $(document).ready(function () { $('.select2-js').select2({ width: '100%' }); });
 
   $('#category_select').on('change', function () {
@@ -411,10 +421,10 @@
     const gst = subtotal * (rate / 100);
     const brokerAmt = $('#broker_select').val() ? unformatNumber($('#broker_commission_amount').val()) : 0;
 
-    $('#subtotalDisplay').text(subtotal.toFixed(2));
-    $('#gstDisplay').text(gst.toFixed(2));
-    $('#brokerDisplay').text(brokerAmt.toFixed(2));
-    $('#totalDisplay').text((subtotal + gst + brokerAmt).toFixed(2));
+    $('#subtotalDisplay').text(formatMoney(subtotal));
+    $('#gstDisplay').text(formatMoney(gst));
+    $('#brokerDisplay').text(formatMoney(brokerAmt));
+    $('#totalDisplay').text(formatMoney(subtotal + gst + brokerAmt));
   }
 
   $(document).on('click', '.remove-row', function () { if ($('.item-row').length > 1) { $(this).closest('tr').remove(); recalcPurchaseTotal(); } });
@@ -475,27 +485,27 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
       body: new URLSearchParams(payload),
-          }).then(r => r.json()).then(data => {
+    }).then(r => r.json()).then(data => {
       $('#p_item_name').text(data.item_name);
-      $('#p_warp_gsm').text(data.warp_gsm);
-      $('#p_weft_gsm').text(data.weft_gsm);
-      $('#p_gsm').text(data.gsm);
-      $('#p_gsm_kg').text(data.gsm_kg);
-      $('#p_reed_space').text(data.reed_space);
+      $('#p_warp_gsm').text(formatMoney(data.warp_gsm));
+      $('#p_weft_gsm').text(formatMoney(data.weft_gsm));
+      $('#p_gsm').text(formatMoney(data.gsm));
+      $('#p_gsm_kg').text(formatMoney(data.gsm_kg, 4));
+      $('#p_reed_space').text(formatMoney(data.reed_space));
       if (!$('#reed_space').val()) $('#reed_space').attr('placeholder', data.reed_space);
-      $('#p_warp_consumption').text(data.warp_consumption);
-      $('#p_weft_consumption').text(data.weft_consumption);
-      $('#p_total_yarn_weight_consumed').text(data.total_yarn_weight_consumed);
-      $('#p_warp_yarn_rate').text('Rs.' + data.warp_yarn_rate);
-      $('#p_weft_yarn_rate').text('Rs.' + data.weft_yarn_rate);
-      $('#p_total_yarn_cost_per_meter').text('Rs.' + data.total_yarn_cost_per_meter);
-      $('#p_weaving_cost_per_meter').text('Rs.' + data.weaving_cost_per_meter);
-      $('#p_sizing_rate_per_meter').text('Rs.' + data.sizing_rate_per_meter);
-      $('#p_weaving_per_meter').text('Rs.' + data.weaving_per_meter);
-      $('#p_fabric_cost').text('Rs.' + data.fabric_cost);
-      $('#p_weaving_cost').text('Rs.' + data.weaving_cost);
-      $('#p_gst_amount').text('Rs.' + data.gst_amount);
-      $('#p_net_amount').text('Rs.' + data.net_amount);
+      $('#p_warp_consumption').text(formatMoney(data.warp_consumption, 4));
+      $('#p_weft_consumption').text(formatMoney(data.weft_consumption, 4));
+      $('#p_total_yarn_weight_consumed').text(formatMoney(data.total_yarn_weight_consumed, 4));
+      $('#p_warp_yarn_rate').text(rs(data.warp_yarn_rate));
+      $('#p_weft_yarn_rate').text(rs(data.weft_yarn_rate));
+      $('#p_total_yarn_cost_per_meter').text(rs(data.total_yarn_cost_per_meter));
+      $('#p_weaving_cost_per_meter').text(rs(data.weaving_cost_per_meter));
+      $('#p_sizing_rate_per_meter').text(rs(data.sizing_rate_per_meter));
+      $('#p_weaving_per_meter').text(rs(data.weaving_per_meter));
+      $('#p_fabric_cost').text(rs(data.fabric_cost));
+      $('#p_weaving_cost').text(rs(data.weaving_cost));
+      $('#p_gst_amount').text(rs(data.gst_amount));
+      $('#p_net_amount').text(rs(data.net_amount));
     });
   }
 
