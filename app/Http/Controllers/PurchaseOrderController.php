@@ -513,7 +513,7 @@ class PurchaseOrderController extends Controller
             <td width="20%"><b>Weft Yarn</b><br>' . e($order->weftProduct->name ?? '-') . '</td>
             <td width="20%"><b>Warp Wt. (lbs/m)</b><br>' . number_format($order->warp_consumption, 4) . '</td>
             <td width="20%"><b>Weft Wt. (lbs/m)</b><br>' . number_format($order->weft_consumption, 4) . '</td>
-            <td colspan="2" width="36%"><b>Total Wt. (lbs/m)</b><br>' . number_format($order->total_yarn_weight_consumed, 4) . '</td>
+            <td width="20%"><b>Total Wt. (lbs/m)</b><br>' . number_format($order->total_yarn_weight_consumed, 4) . '</td>
         </tr>
         <tr>
             <td width="30%"><b>Warp Required (Lbs)</b><br>' . number_format($order->warp_consumption * $order->total_meters_required, 3) . '</td>
