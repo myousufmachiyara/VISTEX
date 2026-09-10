@@ -53,6 +53,9 @@ class CpoFormulaService
         // 7. Weft Yarn Rate (Rs/m)
         $weftYarnRate = $weftYarnCostPrice * $weftConsumption;
 
+        // Total Yarn Cost per Meter = Warp Yarn Rate + Weft Yarn Rate
+        $totalYarnCostPerMeter = $warpYarnRate + $weftYarnRate;
+
         // 8. Weaving Cost (per meter, from per-pick rate)
         $weavingCostPerMeter = $ratePerPick * $pick;
 
@@ -66,7 +69,7 @@ class CpoFormulaService
         $fabricCost = $weavingPerMeter + $warpYarnRate + $weftYarnRate;
 
         // Total cost across all meters ordered — based on Fabric Cost (includes yarn)
-        $weavingCost = $fabricCost * $totalMeters;
+        $weavingCost = $weavingPerMeter * $totalMeters;
 
         $itemName = sprintf('%sx%s/%s-%s-%s', $warpCount, $weftCount, $reed, $pick, $width);
 
@@ -81,6 +84,7 @@ class CpoFormulaService
             'total_yarn_weight_consumed'   => round($totalYarnWeightConsumed, 4),
             'warp_yarn_rate'               => round($warpYarnRate, 2),
             'weft_yarn_rate'               => round($weftYarnRate, 2),
+            'total_yarn_cost_per_meter'    => round($totalYarnCostPerMeter, 2),
             'weaving_cost_per_meter'       => round($weavingCostPerMeter, 2),
             'sizing_rate_per_meter'        => round($sizingRatePerMeter, 2),
             'weaving_per_meter'            => round($weavingPerMeter, 2),

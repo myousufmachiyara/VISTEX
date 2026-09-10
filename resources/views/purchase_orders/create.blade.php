@@ -217,13 +217,14 @@
                 <tr><td>Warp GSM</td><td id="p_warp_gsm">—</td></tr>
                 <tr><td>Weft GSM</td><td id="p_weft_gsm">—</td></tr>
                 <tr><td><strong>Total GSM</strong></td><td id="p_gsm">—</td></tr>
-                <tr><td>GSM (Kg)</td><td id="p_gsm_kg">—</td></tr>
+                <tr><td><strong>Per Meter Kg</strong></td><td id="p_gsm_kg">—</td></tr>
                 <tr><td>Reed Space</td><td id="p_reed_space">—</td></tr>
                 <tr><td>Warp Consumption (lbs/m)</td><td id="p_warp_consumption">—</td></tr>
                 <tr><td>Weft Consumption (lbs/m)</td><td id="p_weft_consumption">—</td></tr>
                 <tr><td><strong>Total Yarn Weight Consumed (lbs)</strong></td><td id="p_total_yarn_weight_consumed">—</td></tr>
                 <tr><td>Warp Yarn Rate (Rs/m)</td><td id="p_warp_yarn_rate">—</td></tr>
                 <tr><td>Weft Yarn Rate (Rs/m)</td><td id="p_weft_yarn_rate">—</td></tr>
+                <tr><td><strong>Total Yarn Cost per Meter</strong></td><td id="p_total_yarn_cost_per_meter">—</td></tr>
                 <tr><td>Weaving Cost (Rs/m)</td><td id="p_weaving_cost_per_meter">—</td></tr>
                 <tr><td>Sizing Rate per Meter</td><td id="p_sizing_rate_per_meter">—</td></tr>
                 <tr><td><strong>Weaving Per Meter</strong></td><td id="p_weaving_per_meter">—</td></tr>
@@ -487,6 +488,7 @@
       $('#p_total_yarn_weight_consumed').text(data.total_yarn_weight_consumed);
       $('#p_warp_yarn_rate').text(data.warp_yarn_rate);
       $('#p_weft_yarn_rate').text(data.weft_yarn_rate);
+      $('#p_total_yarn_cost_per_meter').text(data.total_yarn_cost_per_meter);
       $('#p_weaving_cost_per_meter').text(data.weaving_cost_per_meter);
       $('#p_sizing_rate_per_meter').text(data.sizing_rate_per_meter);
       $('#p_weaving_per_meter').text(data.weaving_per_meter);
