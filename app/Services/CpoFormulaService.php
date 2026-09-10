@@ -59,11 +59,14 @@ class CpoFormulaService
         // 9. Sizing Rate per Meter
         $sizingRatePerMeter = ($sizingLbs / $warping) * $warpConsumption;
 
-        // 10. Weaving Per Meter
-        $weavingPerMeter = $weavingCostPerMeter + $sizingRatePerMeter + $warpYarnRate + $weftYarnRate;
+        // 10. Weaving Per Meter = Weaving Cost + Sizing Rate
+        $weavingPerMeter = $weavingCostPerMeter + $sizingRatePerMeter;
 
-        // Total weaving cost across all meters ordered
-        $weavingCost = $weavingPerMeter * $totalMeters;
+        // 11. Fabric Cost (per meter) = Weaving Per Meter + Warp Yarn Rate + Weft Yarn Rate
+        $fabricCost = $weavingPerMeter + $warpYarnRate + $weftYarnRate;
+
+        // Total cost across all meters ordered — based on Fabric Cost (includes yarn)
+        $weavingCost = $fabricCost * $totalMeters;
 
         $itemName = sprintf('%sx%s/%s-%s-%s', $warpCount, $weftCount, $reed, $pick, $width);
 
@@ -81,12 +84,13 @@ class CpoFormulaService
             'weaving_cost_per_meter'       => round($weavingCostPerMeter, 2),
             'sizing_rate_per_meter'        => round($sizingRatePerMeter, 2),
             'weaving_per_meter'            => round($weavingPerMeter, 2),
+            'fabric_cost'                  => round($fabricCost, 2),
             'weaving_cost'                 => round($weavingCost, 2),
             'item_name'                    => $itemName,
         ];
     }
 
-    // 11. Net Amount = Weaving Cost + GST
+    // 12. Net Amount = Weaving Cost + GST
     public function withGst(array $calc, bool $gstApplicable, float $gstRate): array
     {
         $gstAmount = $gstApplicable ? round($calc['weaving_cost'] * ($gstRate / 100), 2) : 0;

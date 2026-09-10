@@ -221,12 +221,13 @@
                 <tr><td>Reed Space</td><td id="p_reed_space">—</td></tr>
                 <tr><td>Warp Consumption (lbs/m)</td><td id="p_warp_consumption">—</td></tr>
                 <tr><td>Weft Consumption (lbs/m)</td><td id="p_weft_consumption">—</td></tr>
-                <tr><td><strong>Total Yarn Weight Consumed (lbs, rounded up)</strong></td><td id="p_total_yarn_weight_consumed">—</td></tr>
+                <tr><td><strong>Total Yarn Weight Consumed (lbs)</strong></td><td id="p_total_yarn_weight_consumed">—</td></tr>
                 <tr><td>Warp Yarn Rate (Rs/m)</td><td id="p_warp_yarn_rate">—</td></tr>
                 <tr><td>Weft Yarn Rate (Rs/m)</td><td id="p_weft_yarn_rate">—</td></tr>
                 <tr><td>Weaving Cost (Rs/m)</td><td id="p_weaving_cost_per_meter">—</td></tr>
                 <tr><td>Sizing Rate per Meter</td><td id="p_sizing_rate_per_meter">—</td></tr>
                 <tr><td><strong>Weaving Per Meter</strong></td><td id="p_weaving_per_meter">—</td></tr>
+                <tr><td><strong>Fabric Cost (per meter)</strong></td><td id="p_fabric_cost">—</td></tr>
                 <tr><td><strong>Weaving Cost (Total)</strong></td><td id="p_weaving_cost">—</td></tr>
                 <tr><td>GST</td><td id="p_gst_amount">—</td></tr>
                 <tr class="fw-bold"><td>Net Amount</td><td id="p_net_amount">—</td></tr>
@@ -489,6 +490,7 @@
       $('#p_weaving_cost_per_meter').text(data.weaving_cost_per_meter);
       $('#p_sizing_rate_per_meter').text(data.sizing_rate_per_meter);
       $('#p_weaving_per_meter').text(data.weaving_per_meter);
+      $('#p_fabric_cost').text(data.fabric_cost);
       $('#p_weaving_cost').text(data.weaving_cost);
       $('#p_gst_amount').text(data.gst_amount);
       $('#p_net_amount').text(data.net_amount);

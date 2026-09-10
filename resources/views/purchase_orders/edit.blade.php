@@ -240,28 +240,29 @@
             <div class="col-md-3 mb-3"><label>Weft Yarn Cost Price</label><input type="number" name="weft_yarn_cost_price" id="weft_yarn_cost_price" class="form-control calc-input comma-input" step="any" min="0" value="{{ $order->weft_yarn_cost_price ?? 0 }}"></div>
           </div>
 
-          <h6>Calculated Preview</h6>
-          <table class="table table-bordered table-sm">
-            <tbody>
-              <tr><td>Item Name</td><td id="p_item_name">{{ $order->item_name ?? '—' }}</td></tr>
-              <tr><td>Warp GSM</td><td id="p_warp_gsm">{{ $order->warp_gsm ?? '—' }}</td></tr>
-              <tr><td>Weft GSM</td><td id="p_weft_gsm">{{ $order->weft_gsm ?? '—' }}</td></tr>
-              <tr><td><strong>Total GSM</strong></td><td id="p_gsm">{{ $order->gsm ?? '—' }}</td></tr>
-              <tr><td>GSM (Kg)</td><td id="p_gsm_kg">{{ $order->gsm_kg ?? '—' }}</td></tr>
-              <tr><td>Reed Space</td><td id="p_reed_space">{{ $order->reed_space ?? '—' }}</td></tr>
-              <tr><td>Warp Consumption (lbs/m)</td><td id="p_warp_consumption">{{ $order->warp_consumption ?? '—' }}</td></tr>
-              <tr><td>Weft Consumption (lbs/m)</td><td id="p_weft_consumption">{{ $order->weft_consumption ?? '—' }}</td></tr>
-              <tr><td><strong>Total Yarn Weight Consumed (lbs, rounded up)</strong></td><td id="p_total_yarn_weight_consumed">{{ $order->total_yarn_weight_consumed ?? '—' }}</td></tr>
-              <tr><td>Warp Yarn Rate (Rs/m)</td><td id="p_warp_yarn_rate">{{ $order->warp_yarn_rate ?? '—' }}</td></tr>
-              <tr><td>Weft Yarn Rate (Rs/m)</td><td id="p_weft_yarn_rate">{{ $order->weft_yarn_rate ?? '—' }}</td></tr>
-              <tr><td>Weaving Cost (Rs/m)</td><td id="p_weaving_cost_per_meter">{{ $order->weaving_cost_per_meter ?? '—' }}</td></tr>
-              <tr><td>Sizing Rate per Meter</td><td id="p_sizing_rate_per_meter">{{ $order->sizing_rate_per_meter ?? '—' }}</td></tr>
-              <tr><td><strong>Weaving Per Meter</strong></td><td id="p_weaving_per_meter">{{ $order->weaving_per_meter ?? '—' }}</td></tr>
-              <tr><td><strong>Weaving Cost (Total)</strong></td><td id="p_weaving_cost">{{ $order->weaving_cost ?? '—' }}</td></tr>
-              <tr><td>GST</td><td id="p_gst_amount">{{ $order->gst_amount ?? '—' }}</td></tr>
-              <tr class="fw-bold"><td>Net Amount</td><td id="p_net_amount">{{ $order->total_amount ?? '—' }}</td></tr>
-            </tbody>
-          </table>
+        <h6>Calculated Preview</h6>
+        <table class="table table-bordered table-sm">
+          <tbody>
+            <tr><td>Item Name</td><td id="p_item_name">{{ $order->item_name ?? '—' }}</td></tr>
+            <tr><td>Warp GSM</td><td id="p_warp_gsm">{{ $order->warp_gsm ?? '—' }}</td></tr>
+            <tr><td>Weft GSM</td><td id="p_weft_gsm">{{ $order->weft_gsm ?? '—' }}</td></tr>
+            <tr><td><strong>Total GSM</strong></td><td id="p_gsm">{{ $order->gsm ?? '—' }}</td></tr>
+            <tr><td>GSM (Kg)</td><td id="p_gsm_kg">{{ $order->gsm_kg ?? '—' }}</td></tr>
+            <tr><td>Reed Space</td><td id="p_reed_space">{{ $order->reed_space ?? '—' }}</td></tr>
+            <tr><td>Warp Consumption (lbs/m)</td><td id="p_warp_consumption">{{ $order->warp_consumption ?? '—' }}</td></tr>
+            <tr><td>Weft Consumption (lbs/m)</td><td id="p_weft_consumption">{{ $order->weft_consumption ?? '—' }}</td></tr>
+            <tr><td><strong>Total Yarn Weight Consumed (lbs)</strong></td><td id="p_total_yarn_weight_consumed">{{ $order->total_yarn_weight_consumed ?? '—' }}</td></tr>
+            <tr><td>Warp Yarn Rate (Rs/m)</td><td id="p_warp_yarn_rate">{{ $order->warp_yarn_rate ?? '—' }}</td></tr>
+            <tr><td>Weft Yarn Rate (Rs/m)</td><td id="p_weft_yarn_rate">{{ $order->weft_yarn_rate ?? '—' }}</td></tr>
+            <tr><td>Weaving Cost (Rs/m)</td><td id="p_weaving_cost_per_meter">{{ $order->weaving_cost_per_meter ?? '—' }}</td></tr>
+            <tr><td>Sizing Rate per Meter</td><td id="p_sizing_rate_per_meter">{{ $order->sizing_rate_per_meter ?? '—' }}</td></tr>
+            <tr><td><strong>Weaving Per Meter</strong></td><td id="p_weaving_per_meter">{{ $order->weaving_per_meter ?? '—' }}</td></tr>
+            <tr><td><strong>Fabric Cost (per meter)</strong></td><td id="p_fabric_cost">{{ $order->fabric_cost ?? '—' }}</td></tr>
+            <tr><td><strong>Weaving Cost (Total)</strong></td><td id="p_weaving_cost">{{ $order->weaving_cost ?? '—' }}</td></tr>
+            <tr><td>GST</td><td id="p_gst_amount">{{ $order->gst_amount ?? '—' }}</td></tr>
+            <tr class="fw-bold"><td>Net Amount</td><td id="p_net_amount">{{ $order->total_amount ?? '—' }}</td></tr>
+          </tbody>
+        </table>
         </div>
         @endif
 
@@ -377,20 +378,58 @@
     recalcTotal();
   });
 
-  function recalcTotal() {
-    let subtotal = 0;
-    $('.item-row').each(function () {
-      subtotal += unformatNumber($(this).find('.amount-cell').text());
-    });
-    const gstApplicable = $('#gst_applicable').val() === '1';
-    const rate = gstApplicable ? (parseFloat($('#tax_select').find('option:selected').data('rate')) || 0) : 0;
-    const gst = subtotal * (rate / 100);
-    const brokerAmt = $('#broker_select').val() ? unformatNumber($('#broker_commission_amount').val()) : 0;
+  function recalcCpo() {
+    if ($('#reed_input').length === 0) return;
+    const required = ['reed_input','reed_count','warp_count','weft_count','pick','width','total_meters_required','rate_per_pick'];
+    for (const f of required) if (!$('#' + f).val()) return;
 
-    $('#subtotalDisplay').text(subtotal.toFixed(2));
-    $('#gstDisplay').text(gst.toFixed(2));
-    $('#brokerDisplay').text(brokerAmt.toFixed(2));
-    $('#totalDisplay').text((subtotal + gst + brokerAmt).toFixed(2));
+    const gstApplicable = $('#gst_applicable').val() === '1';
+    const gstRate = gstApplicable ? (parseFloat($('#tax_select').find('option:selected').data('rate')) || 0) : 0;
+
+    const payload = {
+      reed: unformatNumber($('#reed_input').val()),
+      reed_count: unformatNumber($('#reed_count').val()),
+      reed_space: $('#reed_space').val() ? unformatNumber($('#reed_space').val()) : '',
+      warp_count: unformatNumber($('#warp_count').val()),
+      weft_count: unformatNumber($('#weft_count').val()),
+      pick: unformatNumber($('#pick').val()),
+      width: unformatNumber($('#width').val()),
+      total_meters_required: unformatNumber($('#total_meters_required').val()),
+      rate_per_pick: unformatNumber($('#rate_per_pick').val()),
+      sizing_lbs: unformatNumber($('#sizing_lbs').val()) || 0,
+      warping: unformatNumber($('#warping').val()) || 1,
+      warp_shrinkage_pct: unformatNumber($('#warp_conversion_pct').val()) || 0,
+      weft_shrinkage_pct: unformatNumber($('#weft_conversion_pct').val()) || 0,
+      warp_yarn_cost_price: unformatNumber($('#warp_yarn_cost_price').val()) || 0,
+      weft_yarn_cost_price: unformatNumber($('#weft_yarn_cost_price').val()) || 0,
+      gst_applicable: gstApplicable ? 1 : 0, gst_rate: gstRate, _token: '{{ csrf_token() }}',
+    };
+
+    fetch('{{ route("purchase_orders.calculate") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+      body: new URLSearchParams(payload),
+    }).then(r => r.json()).then(data => {
+      $('#p_item_name').text(data.item_name);
+      $('#p_warp_gsm').text(data.warp_gsm);
+      $('#p_weft_gsm').text(data.weft_gsm);
+      $('#p_gsm').text(data.gsm);
+      $('#p_gsm_kg').text(data.gsm_kg);
+      $('#p_reed_space').text(data.reed_space);
+      if (!$('#reed_space').val()) $('#reed_space').attr('placeholder', data.reed_space);
+      $('#p_warp_consumption').text(data.warp_consumption);
+      $('#p_weft_consumption').text(data.weft_consumption);
+      $('#p_total_yarn_weight_consumed').text(data.total_yarn_weight_consumed);
+      $('#p_warp_yarn_rate').text(data.warp_yarn_rate);
+      $('#p_weft_yarn_rate').text(data.weft_yarn_rate);
+      $('#p_weaving_cost_per_meter').text(data.weaving_cost_per_meter);
+      $('#p_sizing_rate_per_meter').text(data.sizing_rate_per_meter);
+      $('#p_weaving_per_meter').text(data.weaving_per_meter);
+      $('#p_fabric_cost').text(data.fabric_cost);
+      $('#p_weaving_cost').text(data.weaving_cost);
+      $('#p_gst_amount').text(data.gst_amount);
+      $('#p_net_amount').text(data.net_amount);
+    });
   }
 
   $(document).on('change', '#tax_select', function () { recalcTotal(); recalcCpo(); });
