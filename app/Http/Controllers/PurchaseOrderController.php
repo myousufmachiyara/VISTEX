@@ -272,6 +272,10 @@ class PurchaseOrderController extends Controller
             'broker', 'tax', 'items.product.measurementUnit', 'terms',
         ])->findOrFail($id);
 
+        if ($order->type === 'weaving') {
+            return $this->printWeaving($order);
+        }
+
         $pdf = new \App\Services\myPDF();
 
         $pdf->setPrintHeader(false);
@@ -392,6 +396,166 @@ class PurchaseOrderController extends Controller
         </table>';
 
         $pdf->writeHTML($summaryHtml, true, false, false, false, '');
+        $pdf->Ln(4);
+
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->MultiCell(0, 6, 'Amount in Words: ' . $pdf->convertCurrencyToWords(round($order->total_amount)), 0, 'L');
+        $pdf->SetFont('helvetica', '', 10);
+
+        if ($order->terms->isNotEmpty()) {
+            $pdf->Ln(3);
+            $pdf->SetFont('helvetica', 'B', 9);
+            $pdf->Cell(0, 6, 'Terms & Conditions:', 0, 1, 'L');
+            $pdf->SetFont('helvetica', '', 8);
+            foreach ($order->terms as $i => $term) {
+                $pdf->MultiCell(0, 4, ($i + 1) . '. ' . $term->title . ' — ' . $term->description, 0, 'L');
+            }
+        }
+
+        if ($order->remarks) {
+            $pdf->Ln(2);
+            $pdf->SetFont('helvetica', 'B', 9);
+            $pdf->Cell(0, 6, 'Remarks:', 0, 1, 'L');
+            $pdf->SetFont('helvetica', '', 9);
+            $pdf->MultiCell(0, 5, $order->remarks, 0, 'L');
+        }
+
+        $pdf->SetFont('helvetica', 'B', 12);
+        $pdf->Ln(15);
+        $lineWidth = 60;
+        $yPosition = $pdf->GetY();
+        $pdf->Line(28, $yPosition, 20 + $lineWidth, $yPosition);
+        $pdf->Line(130, $yPosition, 120 + $lineWidth, $yPosition);
+        $pdf->Ln(5);
+        $pdf->SetXY(23, $yPosition);
+        $pdf->Cell($lineWidth, 10, 'Prepared By', 0, 0, 'C');
+        $pdf->SetXY(125, $yPosition);
+        $pdf->Cell($lineWidth, 10, 'Approved By', 0, 0, 'C');
+
+        return $pdf->Output($order->order_no . '.pdf', 'I');
+    }
+
+    private function printWeaving(PurchaseOrder $order)
+    {
+        $pdf = new \App\Services\myPDF();
+
+        $pdf->setPrintHeader(false);
+        $pdf->setPrintFooter(true);
+        $pdf->SetCreator(PDF_CREATOR);
+        $pdf->SetMargins(10, 10, 10);
+        $pdf->SetAuthor('VISTEX (Private) Limited');
+        $pdf->SetTitle($order->order_no);
+        $pdf->SetSubject('Weaving Purchase Order');
+
+        $pdf->AddPage();
+        $pdf->SetFont('helvetica', '', 10);
+
+        $logoPath = public_path('assets/img/vistex-logo.png');
+        if (file_exists($logoPath)) {
+            $pdf->Image($logoPath, 6, 8, 60);
+        }
+
+        $pdf->SetFont('helvetica', 'B', 18);
+        $pdf->SetXY(120, 10);
+        $pdf->Cell(80, 8, 'WEAVING ORDER', 0, 1, 'R');
+
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->SetXY(120, 20);
+        $pdf->Cell(80, 6, $order->order_no, 0, 1, 'R');
+
+        $pdf->Ln(10);
+
+        $vendorBox = '
+        <table cellpadding="6" cellspacing="0" width="100%">
+        <tr>
+            <td width="50%" style="border:1px solid #333; vertical-align:top;">
+            <b style="font-size:11px;">WEAVING MILL</b><br><br>
+            <b>' . e($order->vendor->name ?? '-') . '</b><br>
+            NTN: ' . e($order->vendor->ntn_number ?? '-') . '<br>
+            STRN: ' . e($order->vendor->tax_id_number ?? '-') . '<br>
+            ' . nl2br(e($order->vendor->address ?? '-')) . '
+            </td>
+            <td width="4%"></td>
+            <td width="46%" style="border:1px solid #333; vertical-align:top;">
+            <b style="font-size:11px;">BUYER</b><br><br>
+            <b>VISTEX (Private) Limited</b><br>
+            NTN: 1234567-8<br>
+            STRN: 12-34-5678-901-23<br>
+            F-128, Hub River Road, SITE Area, Karachi 75600, Pakistan
+            </td>
+        </tr>
+        </table>';
+
+        $pdf->writeHTML($vendorBox, true, false, false, false, '');
+        $pdf->Ln(4);
+
+        $detailsHtml = '
+        <table cellpadding="4" cellspacing="0" width="100%" style="border:1px solid #333; font-size:10px;">
+        <tr>
+            <td width="25%"><b>PO Date</b><br>' . \Carbon\Carbon::parse($order->order_date)->format('d-M-Y') . '</td>
+            <td width="25%"><b>Expected Date</b><br>' . ($order->expected_date ? \Carbon\Carbon::parse($order->expected_date)->format('d-M-Y') : '-') . '</td>
+            <td width="25%"><b>Broker</b><br>' . e($order->broker->name ?? '-') . '</td>
+            <td width="25%"><b>Payment Terms</b><br>' . e(ucfirst($order->payment_term_type)) . ($order->payment_term_days ? ' (' . $order->payment_term_days . ' days)' : '') . '</td>
+        </tr>
+        </table>';
+
+        $pdf->writeHTML($detailsHtml, true, false, false, false, '');
+        $pdf->Ln(4);
+
+        $specsHtml = '
+        <table cellpadding="4" cellspacing="0" width="100%" style="border:1px solid #333; font-size:10px;">
+        <tr style="font-weight:bold; background-color:#f0f0f0;">
+            <td colspan="6">Fabric Specification — ' . e($order->item_name ?? '') . '</td>
+        </tr>
+        <tr>
+            <td width="16%"><b>Warp Yarn</b><br>' . e($order->warpProduct->name ?? '-') . '</td>
+            <td width="16%"><b>Weft Yarn</b><br>' . e($order->weftProduct->name ?? '-') . '</td>
+            <td width="16%"><b>Warp Count</b><br>' . e($order->warp_count) . '</td>
+            <td width="16%"><b>Weft Count</b><br>' . e($order->weft_count) . '</td>
+            <td width="16%"><b>Reed / Reed Count</b><br>' . e($order->reed) . ' / ' . e($order->reed_count) . '</td>
+            <td width="20%"><b>Pick / Width</b><br>' . e($order->pick) . ' / ' . e($order->width) . '</td>
+        </tr>
+        <tr>
+            <td><b>Total Meters</b><br>' . number_format($order->total_meters_required, 3) . '</td>
+            <td><b>GSM</b><br>' . number_format($order->gsm, 2) . '</td>
+            <td><b>Output Greige</b><br>' . e($order->greigeProduct->name ?? 'Not specified') . '</td>
+            <td colspan="3"></td>
+        </tr>
+        </table>';
+
+        $pdf->writeHTML($specsHtml, true, false, false, false, '');
+        $pdf->Ln(3);
+
+        $costHtml = '
+        <table cellpadding="4" cellspacing="0" width="100%">
+        <tr>
+            <td width="55%"></td>
+            <td width="45%">
+            <table cellpadding="4" cellspacing="0" width="100%" style="border:1px solid #333; font-size:10px;">
+                <tr><td width="60%">Weaving Rate (Rs/m)</td><td width="40%" style="text-align:right;">' . number_format($order->weaving_cost_per_meter, 2) . '</td></tr>
+                <tr><td>Sizing Rate (Rs/m)</td><td style="text-align:right;">' . number_format($order->sizing_rate_per_meter, 2) . '</td></tr>
+                <tr><td>Yarn Cost (Rs/m)</td><td style="text-align:right;">' . number_format($order->total_yarn_cost_per_meter, 2) . '</td></tr>
+                <tr><td><b>Fabric Cost (Rs/m)</b></td><td style="text-align:right;"><b>' . number_format($order->fabric_cost, 2) . '</b></td></tr>
+                <tr><td>Total Meters</td><td style="text-align:right;">' . number_format($order->total_meters_required, 3) . '</td></tr>
+                <tr><td>Weaving Amount</td><td style="text-align:right;">' . number_format($order->weaving_cost, 2) . '</td></tr>';
+
+        if ($order->gst_applicable && $order->gst_amount > 0) {
+            $costHtml .= '<tr><td>GST (' . number_format($order->gst_rate, 2) . '%)</td><td style="text-align:right;">' . number_format($order->gst_amount, 2) . '</td></tr>';
+        }
+        if ($order->broker_commission_amount > 0) {
+            $costHtml .= '<tr><td>Broker Commission</td><td style="text-align:right;">' . number_format($order->broker_commission_amount, 2) . '</td></tr>';
+        }
+
+        $costHtml .= '
+                <tr style="font-weight:bold; background-color:#f0f0f0;">
+                <td>Net Total</td><td style="text-align:right;">' . number_format($order->total_amount, 2) . '</td>
+                </tr>
+            </table>
+            </td>
+        </tr>
+        </table>';
+
+        $pdf->writeHTML($costHtml, true, false, false, false, '');
         $pdf->Ln(4);
 
         $pdf->SetFont('helvetica', 'B', 10);
