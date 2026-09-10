@@ -1,9 +1,8 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use App\Models\{PurchaseOrder, Vendor, ProductCategory, Product, Location, TaxMaster, Broker, ServiceType, Forecast, MeasurementUnit, Job};
-use App\Services\PurchaseOrderService;
+use App\Services\{PurchaseOrderService, CpoFormulaService};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -78,6 +77,20 @@ class PurchaseOrderController extends Controller
         ]);
     }
 
+    // Preview endpoint used by both create.blade.php and edit.blade.php's
+    // live "Calculated Preview" table. The Blade's JS payload already sends
+    // the key as "reed" directly, so no remapping is needed here.
+    public function calculate(Request $request)
+    {
+        $data = $request->all();
+
+        $formulaService = app(CpoFormulaService::class);
+        $calc = $formulaService->calculate($data);
+        $calc = $formulaService->withGst($calc, $request->boolean('gst_applicable'), (float) $request->input('gst_rate', 0));
+
+        return response()->json($calc);
+    }
+
     private function rules(string $type): array
     {
         $base = [
@@ -103,6 +116,7 @@ class PurchaseOrderController extends Controller
                 'items.*.measurement_unit' => 'nullable|exists:measurement_units,id', 'items.*.forecast_id' => 'nullable|exists:forecasts,id',
             ]);
         }
+
         if ($type === 'weaving') {
             return array_merge($base, [
                 'warp_product_id' => 'required|exists:products,id',
@@ -125,6 +139,7 @@ class PurchaseOrderController extends Controller
                 'weft_yarn_cost_price' => 'nullable|numeric|min:0',
             ]);
         }
+
         return array_merge($base, [
             'job_id' => 'required|exists:jobs,id', 'program' => 'nullable|string|max:255', 'fabric_specs' => 'nullable|array',
             'items' => 'required|array|min:1', 'items.*.collection' => 'nullable|string|max:255',
@@ -132,6 +147,18 @@ class PurchaseOrderController extends Controller
             'items.*.job_item_id' => 'nullable|exists:job_items,id', 'items.*.quantity' => 'required|numeric|min:0.001',
             'items.*.rate' => 'required|numeric|min:0', 'items.*.measurement_unit' => 'nullable|exists:measurement_units,id',
         ]);
+    }
+
+    // The Blade's form field is named "reed_input" (to avoid clashing with
+    // reed_count / reed_space naming in the same section), but the column
+    // and CpoFormulaService both expect "reed". This bridges that gap
+    // before the data reaches the service layer.
+    private function normalizeWeavingData(array $data): array
+    {
+        if (isset($data['reed_input'])) {
+            $data['reed'] = $data['reed_input'];
+        }
+        return $data;
     }
 
     public function store(Request $request)
@@ -145,9 +172,7 @@ class PurchaseOrderController extends Controller
 
             $data = $request->all();
             if ($request->type === 'weaving') {
-                // Blade posts the field as "reed_input" (to avoid clashing with the reed_count/reed_space
-                // naming), but the column and CpoFormulaService both expect "reed".
-                $data['reed'] = $request->input('reed_input');
+                $data = $this->normalizeWeavingData($data);
             }
 
             $order = $this->service->create(array_merge($data, ['attachments' => $attachments ?: null]), $request->input('items', []), auth()->id());
@@ -177,7 +202,7 @@ class PurchaseOrderController extends Controller
 
             $data = $request->all();
             if ($order->type === 'weaving') {
-                $data['reed'] = $request->input('reed_input');
+                $data = $this->normalizeWeavingData($data);
             }
 
             $this->service->update(

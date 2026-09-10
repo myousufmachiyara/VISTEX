@@ -31,7 +31,7 @@ class PurchaseOrderService
         foreach ($items as $item) $subtotal += (float) $item['quantity'] * (float) $item['rate'];
 
         [$taxRate, $gstAmount] = $this->calcTax($data, $subtotal);
-        $brokerAmount = $this->calcBrokerAmount($data, $subtotal);
+        $brokerAmount = $this->calcBrokerAmount($data);
 
         $order = PurchaseOrder::create($this->baseHeaderPayload($data, $userId, 'PO', [
             'subtotal' => $subtotal, 'gst_amount' => $gstAmount, 'gst_rate' => $taxRate,
@@ -53,7 +53,7 @@ class PurchaseOrderService
             $taxRate = $tax ? (float) $tax->rate : 0;
         }
         $calc = $this->formulaService->withGst($calc, $taxApplicable, $taxRate);
-        $brokerAmount = $this->calcBrokerAmount($data, $calc['weaving_cost']);
+        $brokerAmount = $this->calcBrokerAmount($data);
 
         $order = PurchaseOrder::create(array_merge(
             $this->baseHeaderPayload($data, $userId, 'WPO', [
@@ -61,20 +61,11 @@ class PurchaseOrderService
                 'total_amount' => $calc['net_amount'] + $brokerAmount,
                 'broker_commission_amount' => $brokerAmount,
             ]),
-            [
-                'warp_product_id' => $data['warp_product_id'], 'weft_product_id' => $data['weft_product_id'],
-                'greige_product_id' => $data['greige_product_id'] ?? null,
-                'warp_count' => $data['warp_count'], 'weft_count' => $data['weft_count'], 'reed_count' => $data['reed_count'],
-                'pick' => $data['pick'], 'width' => $data['width'], 'total_meters_required' => $data['total_meters_required'],
-                'rate_per_pick' => $data['rate_per_pick'], 'sizing_lbs' => $data['sizing_lbs'] ?? 0,
-                'warp_conversion_pct' => $data['warp_conversion_pct'] ?? 0,
-                'warp_shrinkage_pct' => $data['warp_shrinkage_pct'] ?? 0,
-                'weft_shrinkage_pct' => $data['weft_shrinkage_pct'] ?? 0,
-            ],
+            $this->weavingFieldsPayload($data),
             $calc
         ));
 
-        return $order->load('vendor', 'category', 'warpProduct', 'weftProduct', 'broker', 'tax');
+        return $order->load('vendor', 'category', 'warpProduct', 'weftProduct', 'greigeProduct', 'broker', 'tax');
     }
 
     private function createProcessingType(array $data, array $items, ?int $userId): PurchaseOrder
@@ -119,7 +110,7 @@ class PurchaseOrderService
                 $subtotal = 0;
                 foreach ($items as $item) $subtotal += (float) $item['quantity'] * (float) $item['rate'];
                 [$taxRate, $gstAmount] = $this->calcTax($data, $subtotal);
-                $brokerAmount = $this->calcBrokerAmount($data, $subtotal);
+                $brokerAmount = $this->calcBrokerAmount($data);
 
                 $order->update($this->updateHeaderPayload($data, $userId, [
                     'subtotal' => $subtotal, 'gst_amount' => $gstAmount, 'gst_rate' => $taxRate,
@@ -136,23 +127,14 @@ class PurchaseOrderService
                     $tax = TaxMaster::find($data['tax_id']); $taxRate = $tax ? (float) $tax->rate : 0;
                 }
                 $calc = $this->formulaService->withGst($calc, $taxApplicable, $taxRate);
-                $brokerAmount = $this->calcBrokerAmount($data, $calc['weaving_cost']);
+                $brokerAmount = $this->calcBrokerAmount($data);
 
                 $order->update(array_merge(
                     $this->updateHeaderPayload($data, $userId, [
                         'subtotal' => $calc['weaving_cost'], 'gst_amount' => $calc['gst_amount'], 'gst_rate' => $taxRate,
                         'total_amount' => $calc['net_amount'] + $brokerAmount, 'broker_commission_amount' => $brokerAmount,
                     ]),
-                    [
-                        'warp_product_id' => $data['warp_product_id'], 'weft_product_id' => $data['weft_product_id'],
-                        'greige_product_id' => $data['greige_product_id'] ?? null,
-                        'warp_count' => $data['warp_count'], 'weft_count' => $data['weft_count'], 'reed_count' => $data['reed_count'],
-                        'pick' => $data['pick'], 'width' => $data['width'], 'total_meters_required' => $data['total_meters_required'],
-                        'rate_per_pick' => $data['rate_per_pick'], 'sizing_lbs' => $data['sizing_lbs'] ?? 0,
-                        'warp_conversion_pct' => $data['warp_conversion_pct'] ?? 0,
-                        'warp_shrinkage_pct' => $data['warp_shrinkage_pct'] ?? 0,
-                        'weft_shrinkage_pct' => $data['weft_shrinkage_pct'] ?? 0,
-                    ],
+                    $this->weavingFieldsPayload($data),
                     $calc
                 ));
 
@@ -183,6 +165,32 @@ class PurchaseOrderService
 
             return $order->fresh(['items', 'vendor', 'category']);
         });
+    }
+
+    // Shared between createWeavingType() and update()'s weaving branch —
+    // stores every raw formula INPUT as its own column (so Edit can pre-fill
+    // correctly), separate from $calc which holds the derived OUTPUTS.
+    private function weavingFieldsPayload(array $data): array
+    {
+        return [
+            'warp_product_id' => $data['warp_product_id'],
+            'weft_product_id' => $data['weft_product_id'],
+            'greige_product_id' => $data['greige_product_id'] ?? null,
+            'reed' => $data['reed'],
+            'reed_count' => $data['reed_count'],
+            'warp_count' => $data['warp_count'],
+            'weft_count' => $data['weft_count'],
+            'pick' => $data['pick'],
+            'width' => $data['width'],
+            'total_meters_required' => $data['total_meters_required'],
+            'rate_per_pick' => $data['rate_per_pick'],
+            'sizing_lbs' => $data['sizing_lbs'] ?? 0,
+            'warping' => $data['warping'] ?? 1,
+            'warp_conversion_pct' => $data['warp_conversion_pct'] ?? 0,
+            'weft_conversion_pct' => $data['weft_conversion_pct'] ?? 0,
+            'warp_yarn_cost_price' => $data['warp_yarn_cost_price'] ?? 0,
+            'weft_yarn_cost_price' => $data['weft_yarn_cost_price'] ?? 0,
+        ];
     }
 
     private function syncItems(PurchaseOrder $order, array $items): void
