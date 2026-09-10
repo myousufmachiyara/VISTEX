@@ -509,13 +509,11 @@ class PurchaseOrderController extends Controller
             <td colspan="2" style="text-align:right;">Total Meters: ' . number_format($order->total_meters_required, 3) . '</td>
         </tr>
         <tr>
-            <td width="30%"><b>Warp Yarn</b><br>' . e($order->warpProduct->name ?? '-') . '</td>
-            <td width="30%"><b>Weft Yarn</b><br>' . e($order->weftProduct->name ?? '-') . '</td>
-            <td width="30%"><b>Warp Wt. (lbs/m)</b><br>' . number_format($order->warp_consumption, 4) . '</td>
+            <td width="33%"><b>Warp Wt. (lbs/m)</b><br>' . number_format($order->warp_consumption, 4) . '</td>
+            <td width="33%"><b>Weft Wt. (lbs/m)</b><br>' . number_format($order->weft_consumption, 4) . '</td>
+            <td width="33%"><b>Total Wt. (lbs/m)</b><br>' . number_format($order->total_yarn_weight_consumed, 4) . '</td>
         </tr>
         <tr>
-            <td width="30%"><b>Weft Wt. (lbs/m)</b><br>' . number_format($order->weft_consumption, 4) . '</td>
-            <td width="30%"><b>Total Wt. (lbs/m)</b><br>' . number_format($order->total_yarn_weight_consumed, 4) . '</td>
             <td width="30%"><b>Warp Required (Lbs)</b><br>' . number_format($order->warp_consumption * $order->total_meters_required, 3) . '</td>
         </tr>
         <tr>
