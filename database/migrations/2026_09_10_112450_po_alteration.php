@@ -46,7 +46,7 @@ return new class extends Migration
                 $table->decimal('reed_space', 12, 4)->nullable()->after('reed_count');
             }
             if (!Schema::hasColumn('purchase_orders', 'warping')) {
-                $table->decimal('warping', 10, 4)->nullable()->default(1)->after('sizing_lbs');
+                $table->decimal('warping', 10, 4)->nullable()->default(0)->after('sizing_lbs');
             }
             if (!Schema::hasColumn('purchase_orders', 'warp_yarn_cost_price')) {
                 $table->decimal('warp_yarn_cost_price', 15, 4)->nullable()->after('weft_conversion_pct');

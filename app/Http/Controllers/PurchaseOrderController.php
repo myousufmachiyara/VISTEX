@@ -132,7 +132,7 @@ class PurchaseOrderController extends Controller
                 'total_meters_required' => 'required|numeric|min:0.001',
                 'rate_per_pick' => 'required|numeric|min:0',
                 'sizing_lbs' => 'nullable|numeric|min:0',
-                'warping' => 'nullable|numeric|min:0.01',
+                'warping' => 'nullable|numeric|min:0',
                 'warp_conversion_pct' => 'nullable|numeric|min:0|max:100',
                 'weft_conversion_pct' => 'nullable|numeric|min:0|max:100',
                 'warp_yarn_cost_price' => 'nullable|numeric|min:0',
