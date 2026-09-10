@@ -516,19 +516,19 @@ class PurchaseOrderController extends Controller
         <tr>
             <td width="30%"><b>Weft Wt. (lbs/m)</b><br>' . number_format($order->weft_consumption, 4) . '</td>
             <td width="30%"><b>Total Wt. (lbs/m)</b><br>' . number_format($order->total_yarn_weight_consumed, 4) . '</td>
+            <td width="30%"><b>Warp Required (Lbs)</b><br>' . number_format($order->warp_consumption * $order->total_meters_required, 3) . '</td>
         </tr>
         <tr>
-            <td width="30%"><b>Warp Required (Lbs)</b><br>' . number_format($order->warp_consumption * $order->total_meters_required, 3) . '</td>
             <td width="30%"> <b>Weft Required (Lbs)</b><br>' . number_format($order->weft_consumption * $order->total_meters_required, 3) . '</td>
             <td width="40%"><b>Total Lbs Required</b><br>' . number_format($order->total_yarn_weight_consumed * $order->total_meters_required, 3) . '</td>
+            <td><b>Rate / Pick</b><br>' . number_format($order->rate_per_pick, 4) . '</td>
         </tr>
         <tr>
-            <td><b>Rate / Pick</b><br>' . number_format($order->rate_per_pick, 4) . '</td>
             <td><b>Sizing (lbs)</b><br>' . number_format($order->sizing_lbs ?? 0, 4) . '</td>
             <td colspan="4"><b>Total Weaving Rate (Rs/m)</b><br>' . number_format($order->weaving_per_meter, 2) . '</td>
+            <td><b>GSM</b><br>' . number_format($order->gsm, 2) . '</td>
         </tr>
         <tr>
-            <td><b>GSM</b><br>' . number_format($order->gsm, 2) . '</td>
             <td><b>GSM (Kg/m)</b><br>' . number_format($order->gsm_kg, 4) . '</td>
             <td colspan="4"><b>Output Greige</b><br>' . e($order->greigeProduct->name ?? 'Not specified') . '</td>
         </tr>
