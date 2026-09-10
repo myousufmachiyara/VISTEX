@@ -225,12 +225,12 @@
                 <tr><td>Warp Yarn Cost (pr/mtr)</td><td id="p_warp_yarn_rate">—</td></tr>
                 <tr><td>Weft Yarn Cost (pr/mtr)</td><td id="p_weft_yarn_rate">—</td></tr>
                 <tr><td><strong>Total Yarn Cost per Meter</strong></td><td id="p_total_yarn_cost_per_meter">—</td></tr>
-                <tr><td>Weaving Cost (Rs/m)</td><td id="p_weaving_cost_per_meter">—</td></tr>
+                <tr><td>Weaving Rate per Meter</td><td id="p_weaving_cost_per_meter">—</td></tr>
                 <tr><td>Sizing Rate per Meter</td><td id="p_sizing_rate_per_meter">—</td></tr>
-                <tr><td><strong>Weaving Per Meter</strong></td><td id="p_weaving_per_meter">—</td></tr>
+                <tr><td><strong>Total Weaving Per Meter</strong></td><td id="p_weaving_per_meter">—</td></tr>
                 <tr><td><strong>Fabric Cost (per meter)</strong></td><td id="p_fabric_cost">—</td></tr>
-                <tr><td><strong>Weaving Cost (Total)</strong></td><td id="p_weaving_cost">—</td></tr>
-                <tr><td>GST</td><td id="p_gst_amount">—</td></tr>
+                <tr><td><strong>Weaving Amount</strong></td><td id="p_weaving_cost">—</td></tr>
+                <tr><td>GST Amount</td><td id="p_gst_amount">—</td></tr>
                 <tr class="fw-bold"><td>Net Amount</td><td id="p_net_amount">—</td></tr>
               </tbody>
             </table>
@@ -489,13 +489,13 @@
       $('#p_warp_yarn_rate').text('Rs.'.data.warp_yarn_rate);
       $('#p_weft_yarn_rate').text('Rs.'.data.weft_yarn_rate);
       $('#p_total_yarn_cost_per_meter').text('Rs.'data.total_yarn_cost_per_meter);
-      $('#p_weaving_cost_per_meter').text(data.weaving_cost_per_meter);
-      $('#p_sizing_rate_per_meter').text(data.sizing_rate_per_meter);
-      $('#p_weaving_per_meter').text(data.weaving_per_meter);
-      $('#p_fabric_cost').text(data.fabric_cost);
-      $('#p_weaving_cost').text(data.weaving_cost);
-      $('#p_gst_amount').text(data.gst_amount);
-      $('#p_net_amount').text(data.net_amount);
+      $('#p_weaving_cost_per_meter').text('Rs.'data.weaving_cost_per_meter);
+      $('#p_sizing_rate_per_meter').text('Rs.'data.sizing_rate_per_meter);
+      $('#p_weaving_per_meter').text('Rs.'data.weaving_per_meter);
+      $('#p_fabric_cost').text('Rs.'data.fabric_cost);
+      $('#p_weaving_cost').text('Rs.'data.weaving_cost);
+      $('#p_gst_amount').text('Rs.'data.gst_amount);
+      $('#p_net_amount').text('Rs.'data.net_amount);
     });
   }
 
