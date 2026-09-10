@@ -28,6 +28,7 @@ class PurchaseOrder extends Model
         'warp_yarn_cost_price', 'weft_yarn_cost_price',
         'warp_yarn_rate', 'weft_yarn_rate',
         'warp_gsm', 'weft_gsm', 'gsm', 'gsm_kg',
+        'warp_consumption', 'weft_consumption',
         'weaving_cost_per_meter', 'sizing_rate_per_meter', 'weaving_per_meter',
         'total_greige_qty_required', 'total_yarn_weight_consumed',
         'weaving_cost', 'item_name',

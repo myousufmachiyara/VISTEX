@@ -16,8 +16,8 @@ class CpoFormulaService
         $ratePerPick  = (float) $inputs['rate_per_pick'];
         $sizingLbs    = (float) ($inputs['sizing_lbs'] ?? 0);
         $warping      = (float) ($inputs['warping'] ?? 1);
-        $warpShrinkagePct = (float) ($inputs['warp_shrinkage_pct'] ?? 0);
-        $weftShrinkagePct = (float) ($inputs['weft_shrinkage_pct'] ?? 0);
+        $warpConversionPct = (float) ($inputs['warp_conversion_pct'] ?? 0);
+        $weftConversionPct = (float) ($inputs['weft_conversion_pct'] ?? 0);
         $warpYarnCostPrice = (float) ($inputs['warp_yarn_cost_price'] ?? 0);
         $weftYarnCostPrice = (float) ($inputs['weft_yarn_cost_price'] ?? 0);
 
@@ -41,8 +41,8 @@ class CpoFormulaService
         $warpConsumptionBase = ($reed * $width * 1.0936 / 840) / $warpCount;
         $weftConsumptionBase = ($reedSpace * $pick * 1.0936 / 840) / $weftCount;
 
-        $warpConsumption = $warpConsumptionBase * (1 + $warpShrinkagePct / 100);
-        $weftConsumption = $weftConsumptionBase * (1 + $weftShrinkagePct / 100);
+        $warpConsumption = $warpConsumptionBase * (1 + $warpConversionPct / 100);
+        $weftConsumption = $weftConsumptionBase * (1 + $weftConversionPct / 100);
 
         // 5. Total Yarn Weight Consumed
         $totalYarnWeightConsumed = $warpConsumption + $weftConsumption;

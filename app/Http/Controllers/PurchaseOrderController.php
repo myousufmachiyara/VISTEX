@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Models\{PurchaseOrder, Vendor, ProductCategory, Product, Location, TaxMaster, Broker, ServiceType, Forecast, MeasurementUnit, Job};
@@ -104,13 +105,24 @@ class PurchaseOrderController extends Controller
         }
         if ($type === 'weaving') {
             return array_merge($base, [
-                'warp_product_id' => 'required|exists:products,id', 'weft_product_id' => 'required|exists:products,id',
+                'warp_product_id' => 'required|exists:products,id',
+                'weft_product_id' => 'required|exists:products,id',
                 'greige_product_id' => 'nullable|exists:products,id',
-                'warp_count' => 'required|numeric|min:0.01', 'weft_count' => 'required|numeric|min:0.01',
-                'reed_count' => 'required|numeric|min:0.01', 'pick' => 'required|numeric|min:0.01', 'width' => 'required|numeric|min:0.01',
-                'total_meters_required' => 'required|numeric|min:0.001', 'rate_per_pick' => 'required|numeric|min:0',
-                'sizing_lbs' => 'nullable|numeric|min:0', 'warp_conversion_pct' => 'nullable|numeric|min:0',
-                'warp_shrinkage_pct' => 'nullable|numeric|min:0|max:100', 'weft_shrinkage_pct' => 'nullable|numeric|min:0|max:100',
+                'warp_count' => 'required|numeric|min:0.01',
+                'weft_count' => 'required|numeric|min:0.01',
+                'reed_input' => 'required|numeric|min:0.01',
+                'reed_count' => 'required|numeric|min:0.01',
+                'pick' => 'required|numeric|min:0.01',
+                'width' => 'required|numeric|min:0.01',
+                'reed_space' => 'nullable|numeric|min:0.01',
+                'total_meters_required' => 'required|numeric|min:0.001',
+                'rate_per_pick' => 'required|numeric|min:0',
+                'sizing_lbs' => 'nullable|numeric|min:0',
+                'warping' => 'nullable|numeric|min:0.01',
+                'warp_conversion_pct' => 'nullable|numeric|min:0|max:100',
+                'weft_conversion_pct' => 'nullable|numeric|min:0|max:100',
+                'warp_yarn_cost_price' => 'nullable|numeric|min:0',
+                'weft_yarn_cost_price' => 'nullable|numeric|min:0',
             ]);
         }
         return array_merge($base, [
@@ -130,7 +142,15 @@ class PurchaseOrderController extends Controller
             if ($request->hasFile('attachments')) {
                 foreach ($request->file('attachments') as $file) $attachments[] = $file->store('purchase_order_attachments', 'public');
             }
-            $order = $this->service->create(array_merge($request->all(), ['attachments' => $attachments ?: null]), $request->input('items', []), auth()->id());
+
+            $data = $request->all();
+            if ($request->type === 'weaving') {
+                // Blade posts the field as "reed_input" (to avoid clashing with the reed_count/reed_space
+                // naming), but the column and CpoFormulaService both expect "reed".
+                $data['reed'] = $request->input('reed_input');
+            }
+
+            $order = $this->service->create(array_merge($data, ['attachments' => $attachments ?: null]), $request->input('items', []), auth()->id());
             Log::info('[PurchaseOrder] Created', ['id' => $order->id, 'type' => $order->type, 'by' => auth()->id()]);
             return redirect()->route('purchase_orders.index')->with('success', $order->order_no . ' created — pending superadmin approval.');
         } catch (\Exception $e) {
@@ -141,32 +161,37 @@ class PurchaseOrderController extends Controller
 
     public function update(Request $request, $id)
     {
-    $order = PurchaseOrder::findOrFail($id);
-    if (!$order->canBeEditedBy(auth()->user())) abort(403, 'Only the creator or a superadmin can edit a Pending PO.');
+        $order = PurchaseOrder::findOrFail($id);
+        if (!$order->canBeEditedBy(auth()->user())) abort(403, 'Only the creator or a superadmin can edit a Pending PO.');
 
-    $rules = $this->rules($order->type); unset($rules['type']);
-    $request->validate($rules);
+        $rules = $this->rules($order->type); unset($rules['type']);
+        $request->validate($rules);
 
-    try {
-        $attachments = $order->attachments ?? [];
-        if ($request->hasFile('attachments')) {
-            foreach ($request->file('attachments') as $file) {
-                $attachments[] = $file->store('purchase_order_attachments', 'public');
+        try {
+            $attachments = $order->attachments ?? [];
+            if ($request->hasFile('attachments')) {
+                foreach ($request->file('attachments') as $file) {
+                    $attachments[] = $file->store('purchase_order_attachments', 'public');
+                }
             }
+
+            $data = $request->all();
+            if ($order->type === 'weaving') {
+                $data['reed'] = $request->input('reed_input');
+            }
+
+            $this->service->update(
+                $order,
+                array_merge($data, ['attachments' => $attachments ?: null]),
+                $request->input('items', []),
+                auth()->id()
+            );
+
+            return redirect()->route('purchase_orders.show', $order->id)->with('success', 'Purchase Order updated successfully.');
+
+        } catch (\Exception $e) {
+            return back()->withInput()->with('error', $e->getMessage());
         }
-
-        $this->service->update(
-            $order,
-            array_merge($request->all(), ['attachments' => $attachments ?: null]),
-            $request->input('items', []),
-            auth()->id()
-        );
-
-        return redirect()->route('purchase_orders.show', $order->id)->with('success', 'Purchase Order updated successfully.');
-
-    } catch (\Exception $e) {
-        return back()->withInput()->with('error', $e->getMessage());
-    }
     }
 
     public function show($id)
@@ -176,7 +201,7 @@ class PurchaseOrderController extends Controller
             'approver', 'creator', 'job', 'items.product.measurementUnit', 'items.forecast', 'items.jobItem',
             'warpProduct', 'weftProduct', 'greigeProduct', 'openObjections.raisedBy',
             'yarnIssues.items.product', 'processingIssues.items.product',
-            'receivings.items.product', 'receivings.challan', // ← make sure this line is present
+            'receivings.items.product', 'receivings.challan',
             'amendments',
         ])->findOrFail($id);
         return view('purchase_orders.show', compact('order'));
@@ -250,7 +275,6 @@ class PurchaseOrderController extends Controller
 
         $pdf->Ln(10);
 
-        // ── Vendor (left) / Company (right) — single bordered boxes, not tables ──
         $vendorBox = '
         <table cellpadding="6" cellspacing="0" width="100%">
         <tr>
@@ -275,7 +299,6 @@ class PurchaseOrderController extends Controller
         $pdf->writeHTML($vendorBox, true, false, false, false, '');
         $pdf->Ln(4);
 
-        // ── PO Details section ──
         $detailsHtml = '
         <table cellpadding="4" cellspacing="0" width="100%" style="border:1px solid #333; font-size:10px;">
         <tr>
@@ -289,7 +312,6 @@ class PurchaseOrderController extends Controller
         $pdf->writeHTML($detailsHtml, true, false, false, false, '');
         $pdf->Ln(4);
 
-        // ── Items table — clean borders, no footer totals here ──
         $itemsHtml = '
         <table cellpadding="4" cellspacing="0" width="100%" style="border:1px solid #333; font-size:10px;">
         <tr style="font-weight:bold; background-color:#f0f0f0;">
@@ -320,7 +342,6 @@ class PurchaseOrderController extends Controller
         $pdf->writeHTML($itemsHtml, true, false, false, false, '');
         $pdf->Ln(3);
 
-        // ── Summary — right-aligned, professional ──
         $summaryHtml = '
         <table cellpadding="4" cellspacing="0" width="100%">
         <tr>
@@ -348,12 +369,10 @@ class PurchaseOrderController extends Controller
         $pdf->writeHTML($summaryHtml, true, false, false, false, '');
         $pdf->Ln(4);
 
-        // ── Amount in words — bold, readable ──
         $pdf->SetFont('helvetica', 'B', 10);
         $pdf->MultiCell(0, 6, 'Amount in Words: ' . $pdf->convertCurrencyToWords(round($order->total_amount)), 0, 'L');
         $pdf->SetFont('helvetica', '', 10);
 
-        // ── Terms & Conditions ──
         if ($order->terms->isNotEmpty()) {
             $pdf->Ln(3);
             $pdf->SetFont('helvetica', 'B', 9);
