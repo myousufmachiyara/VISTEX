@@ -202,7 +202,7 @@
               <div class="col-md-2 mb-3"><label>Total Meters</label><input type="number" name="total_meters_required" id="total_meters_required" class="form-control comma-input calc-input" step="any" min="0.001"></div>
               <div class="col-md-2 mb-3"><label>Rate per Pick</label><input type="number" name="rate_per_pick" id="rate_per_pick" class="form-control calc-input comma-input" step="any" min="0"></div>
               <div class="col-md-2 mb-3"><label>Sizing (lbs)</label><input type="number" name="sizing_lbs" id="sizing_lbs" class="form-control calc-input comma-input" step="any" min="0" value="0"></div>
-              <div class="col-md-2 mb-3"><label>Warping</label><input type="number" name="warping" id="warping" class="form-control calc-input comma-input" step="any" min="0.01" value="0"></div>
+              <div class="col-md-2 mb-3"><label>Warping</label><input type="number" name="warping" id="warping" class="form-control calc-input comma-input" step="any" min="0" value="0"></div>
 
               <div class="col-md-3 mb-3"><label>Warp Shrinkage %</label><input type="number" name="warp_conversion_pct" id="warp_conversion_pct" class="form-control calc-input comma-input" step="any" min="0" value="0"></div>
               <div class="col-md-3 mb-3"><label>Weft Shrinkage %</label><input type="number" name="weft_conversion_pct" id="weft_conversion_pct" class="form-control calc-input comma-input" step="any" min="0" value="0"></div>
@@ -473,7 +473,7 @@
       total_meters_required: unformatNumber($('#total_meters_required').val()),
       rate_per_pick: unformatNumber($('#rate_per_pick').val()),
       sizing_lbs: unformatNumber($('#sizing_lbs').val()) || 0,
-      warping: unformatNumber($('#warping').val()) || 1,
+      warping: unformatNumber($('#warping').val()) || 0,
       warp_shrinkage_pct: unformatNumber($('#warp_conversion_pct').val()) || 0,
       weft_shrinkage_pct: unformatNumber($('#weft_conversion_pct').val()) || 0,
       warp_yarn_cost_price: unformatNumber($('#warp_yarn_cost_price').val()) || 0,
