@@ -62,14 +62,14 @@ class CpoFormulaService
         // 9. Sizing Rate per Meter
         $sizingRatePerMeter = ($sizingLbs / $warping) * $warpConsumption;
 
-        // 10. Weaving Per Meter = Weaving Cost + Sizing Rate
+        // 10. Weaving Per Meter = Weaving Cost + Sizing Rate (weaving-only, excludes yarn)
         $weavingPerMeter = $weavingCostPerMeter + $sizingRatePerMeter;
 
         // 11. Fabric Cost (per meter) = Weaving Per Meter + Warp Yarn Rate + Weft Yarn Rate
         $fabricCost = $weavingPerMeter + $warpYarnRate + $weftYarnRate;
 
         // Total cost across all meters ordered — based on Fabric Cost (includes yarn)
-        $weavingCost = $weavingPerMeter * $totalMeters;
+        $weavingCost = $fabricCost * $totalMeters;
 
         $itemName = sprintf('%sx%s/%s-%s-%s', $warpCount, $weftCount, $reed, $pick, $width);
 
