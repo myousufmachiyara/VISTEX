@@ -57,7 +57,7 @@ class CpoFormulaService
 
         $weavingPerMeter = $weavingCostPerMeter + $sizingRatePerMeter;
         $fabricCost = $weavingPerMeter + $warpYarnRate + $weftYarnRate;
-        $weavingCost = $fabricCost * $totalMeters;
+        $weavingCost = $weavingPerMeter * $totalMeters;
 
         $itemName = sprintf('%sx%s/%s-%s-%s', $warpCount, $weftCount, $reed, $pick, $width);
 
