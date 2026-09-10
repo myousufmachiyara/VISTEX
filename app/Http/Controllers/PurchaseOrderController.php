@@ -516,9 +516,9 @@ class PurchaseOrderController extends Controller
             <td colspan="2" width="36%"><b>Total Wt. (lbs/m)</b><br>' . number_format($order->total_yarn_weight_consumed, 4) . '</td>
         </tr>
         <tr>
-            <td><b>Warp Required (Lbs)</b><br>' . number_format($order->warp_consumption * $order->total_meters_required, 3) . '</td>
-            <td><b>Weft Required (Lbs)</b><br>' . number_format($order->weft_consumption * $order->total_meters_required, 3) . '</td>
-            <td colspan="4"><b>Total Lbs Required</b><br>' . number_format($order->total_yarn_weight_consumed * $order->total_meters_required, 3) . '</td>
+            <td width="30%"><b>Warp Required (Lbs)</b><br>' . number_format($order->warp_consumption * $order->total_meters_required, 3) . '</td>
+            <td width="30%"> <b>Weft Required (Lbs)</b><br>' . number_format($order->weft_consumption * $order->total_meters_required, 3) . '</td>
+            <td width="40%"><b>Total Lbs Required</b><br>' . number_format($order->total_yarn_weight_consumed * $order->total_meters_required, 3) . '</td>
         </tr>
         <tr>
             <td><b>Rate / Pick</b><br>' . number_format($order->rate_per_pick, 4) . '</td>
