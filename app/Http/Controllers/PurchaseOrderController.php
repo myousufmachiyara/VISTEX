@@ -468,9 +468,12 @@ class PurchaseOrderController extends Controller
         // ── Revise stub + boxed contract title ─────────────────────────────
         $reviseHtml = '
         <table cellpadding="0" cellspacing="0" width="100%">
-            <tr><td height="16" valign="middle" style="border:1.5px solid #000; text-align:center;">
-                <b style="font-size:16px;">CONVERSION PURCHASE ORDER</b>
-            </td></tr>
+            <tr>
+                <td height="30" valign="middle" 
+                    style="border:1.5px solid #000; text-align:center;">
+                    <b style="font-size:16px;">CONVERSION PURCHASE ORDER</b>
+                </td>
+            </tr>
         </table>';
 
         $pdf->writeHTML($reviseHtml, true, false, false, false, '');
