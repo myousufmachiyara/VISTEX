@@ -470,13 +470,6 @@ class PurchaseOrderController extends Controller
         <tr>
             <td width="22%" style="vertical-align:top;">';
 
-        if ((int) $order->revision_no > 0) {
-            $reviseHtml .= '<b style="font-size:10px;">REVISE ' . str_pad($order->revision_no, 2, '0', STR_PAD_LEFT) . '</b><br>'
-                . '<span style="font-size:9px;">' . optional($order->updated_at)->format('d-M') . '</span>';
-        } else {
-            $reviseHtml .= '<span style="font-size:9px;">ORIGINAL</span>';
-        }
-
         $reviseHtml .= '</td>
             <td width="78%">
                 <table cellpadding="6" cellspacing="0" width="100%">
