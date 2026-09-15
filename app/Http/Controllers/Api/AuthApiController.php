@@ -12,11 +12,11 @@ class AuthApiController extends Controller
     public function login(Request $request)
     {
         $request->validate([
-            'email'    => 'required|email',
+            'username' => 'required|string',
             'password' => 'required|string',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        $user = User::where('username', $request->username)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json(['message' => 'Invalid credentials.'], 401);
@@ -26,13 +26,11 @@ class AuthApiController extends Controller
             return response()->json(['message' => 'This account has been deactivated.'], 403);
         }
 
-        // Revoke previous mobile tokens (single active device session, optional)
         $user->tokens()->where('name', 'mobile')->delete();
 
         $token = $user->createToken('mobile')->plainTextToken;
 
         $permissions = $user->getAllPermissions()->pluck('name') ?? collect();
-        // If not using spatie/permission, replace with your own permission resolution logic
 
         return response()->json([
             'token' => $token,
