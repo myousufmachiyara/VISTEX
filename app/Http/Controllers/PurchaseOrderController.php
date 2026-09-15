@@ -467,8 +467,8 @@ class PurchaseOrderController extends Controller
 
         // ── Revise stub + boxed contract title ─────────────────────────────
         $reviseHtml = '
-        <table cellpadding="6" cellspacing="6" width="100%">
-            <tr><td style="border:1.5px solid #000; text-align:center;">
+        <table cellpadding="0" cellspacing="0" width="100%">
+            <tr><td height="16" valign="middle" style="border:1.5px solid #000; text-align:center;">
                 <b style="font-size:16px;">CONVERSION PURCHASE ORDER</b>
             </td></tr>
         </table>';
