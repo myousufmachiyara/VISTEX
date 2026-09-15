@@ -469,7 +469,7 @@ class PurchaseOrderController extends Controller
         $reviseHtml = '
         <table cellpadding="0" cellspacing="0" width="100%">
             <tr>
-                <td height="30" valign="middle" 
+                <td height="20" valign="middle" 
                     style="border:1.5px solid #000; text-align:center;">
                     <b style="font-size:16px;">CONVERSION PURCHASE ORDER</b>
                 </td>
