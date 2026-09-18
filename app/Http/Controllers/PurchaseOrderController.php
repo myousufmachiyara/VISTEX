@@ -531,8 +531,6 @@ class PurchaseOrderController extends Controller
             <td style="border:0.75px solid #000;">' . number_format($order->total_yarn_weight_consumed, 4) . '</td>
         </tr>
 
-
-
         <tr>
             <td width="17%" style="border:0.75px solid #000;"><b>Conversion Rate</b></td>
             <td width="83%" style="border:0.75px solid #000;">' . $conversionRate . '</td>
@@ -540,7 +538,7 @@ class PurchaseOrderController extends Controller
 
         <tr>
             <td style="border:0.75px solid #000;"><b>Total Amount</b></td>
-            <td colspan="2" style="border:0.75px solid #000;">' . number_format($order->subtotal, 2) . '</td>
+            <td style="border:0.75px solid #000;">' . number_format($order->subtotal, 2) . '</td>
         </tr>
         <tr>
             <td style="border:0.75px solid #000;"><b>Total Gst Amount</b></td>
@@ -552,7 +550,7 @@ class PurchaseOrderController extends Controller
         </tr>
 
         <tr style="background-color:#d9d9d9;">
-            <td colspan="3" style="border:0.75px solid #000; text-align:center;"><b>Other Terms</b></td>
+            <td colspan="2" style="border:0.75px solid #000; text-align:center;"><b>Other Terms</b></td>
         </tr>
         <tr>
             <td colspan="3" style="border:0.75px solid #000; height:28px; vertical-align:top;">';
