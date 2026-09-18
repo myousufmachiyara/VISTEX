@@ -517,7 +517,6 @@ class PurchaseOrderController extends Controller
         </tr>
 
         <tr style="background-color:#f0f0f0;">
-            <td width="17%" style="border:0.75px solid #000;"><b>Looms Width</b></td>
             <td width="17%" style="border:0.75px solid #000;"><b>Rate Per Pick</b></td>
             <td width="17%" style="border:0.75px solid #000;"><b>Sizing Rate (Rs/m)</b></td>
             <td width="16%" style="border:0.75px solid #000;"><b>Warp Wt.</b></td>
@@ -525,7 +524,6 @@ class PurchaseOrderController extends Controller
             <td width="17%" style="border:0.75px solid #000;"><b>Total Wt.</b></td>
         </tr>
         <tr>
-            <td style="border:0.75px solid #000;">' . $this->fmtNum($order->width) . '"</td>
             <td style="border:0.75px solid #000;">' . number_format($order->rate_per_pick, 2) . '</td>
             <td style="border:0.75px solid #000;">' . number_format($order->sizing_rate_per_meter, 2) . '</td>
             <td style="border:0.75px solid #000;">' . number_format($order->warp_consumption, 4) . '</td>
