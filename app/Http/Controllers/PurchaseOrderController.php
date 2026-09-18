@@ -542,18 +542,18 @@ class PurchaseOrderController extends Controller
         </tr>
         <tr>
             <td style="border:0.75px solid #000;"><b>Total Gst Amount</b></td>
-            <td colspan="2" style="border:0.75px solid #000;">' . number_format($order->gst_amount, 2) . '</td>
+            <td style="border:0.75px solid #000;">' . number_format($order->gst_amount, 2) . '</td>
         </tr>
         <tr>
             <td style="border:0.75px solid #000;"><b>Total Net Amount</b></td>
-            <td colspan="2" style="border:0.75px solid #000;"><b>' . number_format($order->total_amount, 2) . '</b></td>
+            <td style="border:0.75px solid #000;"><b>' . number_format($order->total_amount, 2) . '</b></td>
         </tr>
 
         <tr style="background-color:#d9d9d9;">
-            <td colspan="2" style="border:0.75px solid #000; text-align:center;"><b>Other Terms</b></td>
+            <td style="border:0.75px solid #000; text-align:center;"><b>Other Terms</b></td>
         </tr>
         <tr>
-            <td colspan="3" style="border:0.75px solid #000; height:28px; vertical-align:top;">';
+            <td style="border:0.75px solid #000; height:28px; vertical-align:top;">';
 
         if ($order->terms->isNotEmpty()) {
             foreach ($order->terms as $i => $term) {
@@ -566,7 +566,7 @@ class PurchaseOrderController extends Controller
 
         <tr>
             <td style="border:0.75px solid #000;"><b>Remarks:</b></td>
-            <td colspan="2" style="border:0.75px solid #000;">' . e($order->remarks ?: '-') . '</td>
+            <td style="border:0.75px solid #000;">' . e($order->remarks ?: '-') . '</td>
         </tr>
 
         </table>';
