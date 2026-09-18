@@ -435,345 +435,357 @@ class PurchaseOrderController extends Controller
         return $pdf->Output($order->order_no . '.pdf', 'I');
     }
 
-    private function printWeaving(PurchaseOrder $order)
-    {
-        $pdf = new \App\Services\myPDF();
 
-        $pdf->setPrintHeader(false);
-        $pdf->setPrintFooter(true);
-        $pdf->SetCreator(PDF_CREATOR);
-        $pdf->SetMargins(10, 10, 10);
-        $pdf->SetAuthor('VISTEX (Private) Limited');
-        $pdf->SetTitle($order->order_no);
-        $pdf->SetSubject('Weaving Purchase Order');
+/**
+ * ─────────────────────────────────────────────────────────────────────────
+ * Greige Weaving PO print — 2-page grid layout (matches the reference
+ * spreadsheet: Page 1 = PO / Page 2 = Cost Sheet)
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Drop-in replacement for PurchaseOrderController::printWeaving().
+ * Also add the three private helpers below it to the same controller —
+ * they're only used by this method (qualityString/fmtNum are unchanged
+ * from the earlier letterhead version if you already added them).
+ *
+ * Notes on field mapping (per your latest answers):
+ *   - "No Of Looms" row is printed with the label but a blank value —
+ *     there's no no_of_looms column on PurchaseOrder yet.
+ *   - Cost Sheet (page 2) Rate/Cost/Amount columns:
+ *       Warp/Weft Yarn : Rate = *_yarn_cost_price, Cost = *_yarn_rate (Rs/m),
+ *                         Amount = Cost × total_meters_required
+ *       Sizing         : Rate = "-" (no per-lb rate stored), Cost = sizing_rate_per_meter,
+ *                         Amount = Cost × total_meters_required
+ *       Warping        : Rate = Cost = warping,               Amount = Cost × total_meters_required
+ *       Conversion     : Rate = rate_per_pick, Cost = weaving_cost_per_meter,
+ *                         Amount = Cost × total_meters_required
+ *       Total Cost     : sum of the five Amount values (should reconcile with
+ *                         fabric_cost × total_meters_required / weaving_cost)
+ */
 
-        $logoPath = public_path('assets/img/vistex-logo.png');
+private function printWeaving(PurchaseOrder $order)
+{
+    $pdf = new \App\Services\myPDF();
 
-        $quality = $this->qualityString($order);
+    $pdf->setPrintHeader(false);
+    $pdf->setPrintFooter(true);
+    $pdf->SetCreator(PDF_CREATOR);
+    $pdf->SetMargins(10, 10, 10);
+    $pdf->SetAuthor('VISTEX (Private) Limited');
+    $pdf->SetTitle($order->order_no);
+    $pdf->SetSubject('Weaving Purchase Order');
 
-        $paymentTerm = match ($order->payment_term_type) {
-            'cash' => 'Cash',
-            'credit' => ($order->payment_term_days ? $order->payment_term_days . ' days after invoice' : 'Credit'),
-            'pdc' => ($order->payment_term_days ? 'PDC — ' . $order->payment_term_days . ' days after invoice' : 'PDC'),
-            'other' => e($order->payment_term_note ?: 'As agreed'),
-            default => '-',
-        };
+    $logoPath = public_path('assets/img/vistex-logo.png');
 
-        $conversionRate = 'Rs.' . number_format($order->weaving_per_meter, 2) . ' /- Per Mtr'
-            . ($order->gst_applicable ? ' + Gst' : '')
-            . ' ( Pick Rate ' . number_format($order->rate_per_pick, 2)
-            . ' + Sizing Rs ' . number_format($order->sizing_rate_per_meter, 2) . ')';
+    $quality = $this->qualityString($order);
 
-        // ═════════════════════════════════════════════════════════════════
-        // PAGE 1 — Purchase Order
-        // ═════════════════════════════════════════════════════════════════
-        $pdf->AddPage();
-        $pdf->SetFont('helvetica', '', 9);
+    $paymentTerm = match ($order->payment_term_type) {
+        'cash' => 'Cash',
+        'credit' => ($order->payment_term_days ? $order->payment_term_days . ' days after invoice' : 'Credit'),
+        'pdc' => ($order->payment_term_days ? 'PDC — ' . $order->payment_term_days . ' days after invoice' : 'PDC'),
+        'other' => e($order->payment_term_note ?: 'As agreed'),
+        default => '-',
+    };
 
-        if (file_exists($logoPath)) {
-            $pdf->Image($logoPath, 10, 10, 40);
-        }
+    $conversionRate = 'Rs.' . number_format($order->weaving_per_meter, 2) . ' /- Per Mtr'
+        . ($order->gst_applicable ? ' + Gst' : '')
+        . ' ( Pick Rate ' . number_format($order->rate_per_pick, 2)
+        . ' + Sizing Rs ' . number_format($order->sizing_rate_per_meter, 2) . ')';
 
-        $pdf->SetFont('helvetica', 'B', 11);
-        $pdf->SetXY(130, 10);
-        $pdf->Cell(70, 5, $order->order_no, 0, 1, 'R');
-        $pdf->SetFont('helvetica', '', 9);
-        $pdf->SetXY(130, 15);
-        $pdf->Cell(70, 5, 'P.O Date: ' . \Carbon\Carbon::parse($order->order_date)->format('d-M-Y'), 0, 1, 'R');
+    // ═════════════════════════════════════════════════════════════════
+    // PAGE 1 — Purchase Order
+    // ═════════════════════════════════════════════════════════════════
+    $pdf->AddPage();
+    $pdf->SetFont('helvetica', '', 9);
 
-        $pdf->SetY(30);
-
-        $partiesHtml = '
-        <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
-        <tr>
-            <td width="50%" style="border:0.75px solid #000;">
-                <b>Supplier Details</b><br>
-                ' . e($order->vendor->name ?? '-') . '<br>
-                ' . nl2br(e($order->vendor->address ?? '-')) . '
-            </td>
-            <td width="50%" style="border:0.75px solid #000;">
-                <b>Vistex(Pvt)Ltd Details</b><br>
-                F-128, Hub River Road, SITE Area, Karachi 75600, Pakistan<br>
-                NTN: 1234567-8 &nbsp; STRN: 12-34-5678-901-23
-            </td>
-        </tr>
-        </table>';
-        $pdf->writeHTML($partiesHtml, true, false, false, false, '');
-        $pdf->Ln(2);
-
-        $gridHtml = '
-        <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
-
-        <tr>
-            <td width="20%" style="border:0.75px solid #000;"><b>No Of Looms</b></td>
-            <td width="80%" style="border:0.75px solid #000;">&nbsp;</td>
-        </tr>
-
-        <tr style="background-color:#f0f0f0;">
-            <td width="20%" style="border:0.75px solid #000;"><b>Looms Width</b></td>
-            <td width="20%" style="border:0.75px solid #000;"><b>Rate Per Pick</b></td>
-            <td width="60%" style="border:0.75px solid #000;"><b>Sizing Rate (Rs/m)</b></td>
-        </tr>
-        <tr>
-            <td style="border:0.75px solid #000;">' . $this->fmtNum($order->width) . '"</td>
-            <td style="border:0.75px solid #000;">' . number_format($order->rate_per_pick, 2) . '</td>
-            <td style="border:0.75px solid #000;">' . number_format($order->sizing_rate_per_meter, 2) . '</td>
-        </tr>
-
-        <tr>
-            <td style="border:0.75px solid #000;"><b>Quality</b></td>
-            <td colspan="2" style="border:0.75px solid #000;">' . e($quality) . '</td>
-        </tr>
-
-        <tr>
-            <td style="border:0.75px solid #000;"><b>P.O Quantity</b></td>
-            <td colspan="2" style="border:0.75px solid #000;">' . number_format($order->total_meters_required, 3) . ' Mtr</td>
-        </tr>
-
-        <tr>
-            <td style="border:0.75px solid #000;"><b>Conversion Rate</b></td>
-            <td colspan="2" style="border:0.75px solid #000;">' . $conversionRate . '</td>
-        </tr>
-
-        <tr style="background-color:#f0f0f0;">
-            <td style="border:0.75px solid #000;"><b>Yarn Weight</b></td>
-            <td style="border:0.75px solid #000; text-align:center;"><b>Warp</b></td>
-            <td style="border:0.75px solid #000; text-align:center;"><b>Weft</b></td>
-        </tr>
-        <tr>
-            <td style="border:0.75px solid #000;">&nbsp;</td>
-            <td style="border:0.75px solid #000; text-align:center;">' . number_format($order->warp_consumption, 4) . '</td>
-            <td style="border:0.75px solid #000; text-align:center;">' . number_format($order->weft_consumption, 4) . '</td>
-        </tr>
-        <tr>
-            <td style="border:0.75px solid #000;">&nbsp;</td>
-            <td colspan="2" style="border:0.75px solid #000; text-align:center;"><b>Total Weight: ' . number_format($order->total_yarn_weight_consumed, 4) . '</b></td>
-        </tr>
-
-        <tr>
-            <td style="border:0.75px solid #000;"><b>Delivery</b></td>
-            <td colspan="2" style="border:0.75px solid #000;">' . ($order->expected_date ? \Carbon\Carbon::parse($order->expected_date)->format('d-M-Y') : '-') . '</td>
-        </tr>
-
-        <tr>
-            <td style="border:0.75px solid #000;"><b>Payment</b></td>
-            <td colspan="2" style="border:0.75px solid #000;">' . $paymentTerm . '</td>
-        </tr>
-
-        <tr>
-            <td style="border:0.75px solid #000;"><b>Total Amount</b></td>
-            <td colspan="2" style="border:0.75px solid #000;">' . number_format($order->subtotal, 2) . '</td>
-        </tr>
-        <tr>
-            <td style="border:0.75px solid #000;"><b>Total Gst Amount</b></td>
-            <td colspan="2" style="border:0.75px solid #000;">' . number_format($order->gst_amount, 2) . '</td>
-        </tr>
-        <tr>
-            <td style="border:0.75px solid #000;"><b>Total Net Amount</b></td>
-            <td colspan="2" style="border:0.75px solid #000;"><b>' . number_format($order->total_amount, 2) . '</b></td>
-        </tr>
-
-        <tr style="background-color:#d9d9d9;">
-            <td colspan="3" style="border:0.75px solid #000; text-align:center;"><b>Other Terms</b></td>
-        </tr>
-        <tr>
-            <td colspan="3" style="border:0.75px solid #000; height:28px; vertical-align:top;">';
-
-        if ($order->terms->isNotEmpty()) {
-            foreach ($order->terms as $i => $term) {
-                $gridHtml .= ($i + 1) . '. ' . e($term->title) . ' — ' . e($term->description) . '<br>';
-            }
-        }
-
-        $gridHtml .= '</td>
-        </tr>
-
-        <tr>
-            <td style="border:0.75px solid #000;"><b>Remarks:</b></td>
-            <td colspan="2" style="border:0.75px solid #000;">' . e($order->remarks ?: '-') . '</td>
-        </tr>
-
-        </table>';
-
-        $pdf->writeHTML($gridHtml, true, false, false, false, '');
-
-        $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->Ln(12);
-        $yPosition = $pdf->GetY();
-        $pdf->Line(15, $yPosition, 55, $yPosition);
-        $pdf->Line(85, $yPosition, 125, $yPosition);
-        $pdf->Line(155, $yPosition, 195, $yPosition);
-        $pdf->Ln(2);
-        $pdf->SetXY(15, $yPosition + 2);
-        $pdf->Cell(40, 6, 'Prepared By', 0, 0, 'C');
-        $pdf->SetXY(85, $yPosition + 2);
-        $pdf->Cell(40, 6, 'Received By', 0, 0, 'C');
-        $pdf->SetXY(155, $yPosition + 2);
-        $pdf->Cell(40, 6, 'Approved By', 0, 0, 'C');
-
-        // ═════════════════════════════════════════════════════════════════
-        // PAGE 2 — Cost Sheet
-        // ═════════════════════════════════════════════════════════════════
-        $pdf->AddPage();
-        $pdf->SetFont('helvetica', '', 9);
-
-        if (file_exists($logoPath)) {
-            $pdf->Image($logoPath, 10, 10, 40);
-        }
-
-        $pdf->SetFont('helvetica', 'B', 11);
-        $pdf->SetXY(0, 10);
-        $pdf->Cell(210, 5, 'Page No : 2', 0, 1, 'C');
-
-        $pdf->SetFont('helvetica', '', 9);
-        $pdf->SetXY(130, 10);
-        $pdf->Cell(70, 5, $order->order_no, 0, 1, 'R');
-        $pdf->SetXY(130, 15);
-        $pdf->Cell(70, 5, 'P.O Date: ' . \Carbon\Carbon::parse($order->order_date)->format('d-M-Y'), 0, 1, 'R');
-
-        $pdf->SetY(28);
-
-        $partiesHtml2 = '
-        <table cellpadding="3" cellspacing="0" width="100%" style="font-size:9px;">
-        <tr>
-            <td width="50%"><b>Supplier</b> &nbsp; ' . e($order->vendor->name ?? '-') . '</td>
-            <td width="50%"><b>Vistex(Pvt)Ltd</b></td>
-        </tr>
-        </table>';
-        $pdf->writeHTML($partiesHtml2, true, false, false, false, '');
-
-        $pdf->SetFont('helvetica', 'B', 12);
-        $pdf->Cell(0, 8, 'Cost Sheet', 0, 1, 'C');
-        $pdf->SetFont('helvetica', '', 9);
-
-        $topHtml = '
-        <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
-        <tr>
-            <td width="20%" style="border:0.75px solid #000;"><b>Quality</b></td>
-            <td width="80%" style="border:0.75px solid #000;">' . e($quality) . '</td>
-        </tr>
-        <tr>
-            <td style="border:0.75px solid #000;"><b>P.O Quantity</b></td>
-            <td style="border:0.75px solid #000;">' . number_format($order->total_meters_required, 3) . '</td>
-        </tr>
-        </table>';
-        $pdf->writeHTML($topHtml, true, false, false, false, '');
-        $pdf->Ln(3);
-
-        $warpAmount = $order->warp_yarn_rate * $order->total_meters_required;
-        $weftAmount = $order->weft_yarn_rate * $order->total_meters_required;
-        $sizingAmount = $order->sizing_rate_per_meter * $order->total_meters_required;
-        $warpingAmount = (float) $order->warping * $order->total_meters_required;
-        $conversionAmount = $order->weaving_cost_per_meter * $order->total_meters_required;
-        $totalCost = $warpAmount + $weftAmount + $sizingAmount + $warpingAmount + $conversionAmount;
-
-        $costHtml = '
-        <table cellpadding="0" cellspacing="0" width="100%">
-        <tr>
-            <td width="48%" style="vertical-align:top;">
-                <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
-                    <tr><td width="60%" style="border:0.75px solid #000;">Warp Yarn Count</td><td width="40%" style="border:0.75px solid #000;">' . $this->fmtNum($order->warp_count) . '</td></tr>
-                    <tr><td style="border:0.75px solid #000;">Weft Yarn Count</td><td style="border:0.75px solid #000;">' . $this->fmtNum($order->weft_count) . '</td></tr>
-                    <tr><td style="border:0.75px solid #000;">Reed</td><td style="border:0.75px solid #000;">' . $this->fmtNum($order->reed) . '</td></tr>
-                    <tr><td style="border:0.75px solid #000;">Pick</td><td style="border:0.75px solid #000;">' . $this->fmtNum($order->pick) . '</td></tr>
-                    <tr><td style="border:0.75px solid #000;">Width</td><td style="border:0.75px solid #000;">' . $this->fmtNum($order->width) . '</td></tr>
-                    <tr><td style="border:0.75px solid #000;">Reed Count</td><td style="border:0.75px solid #000;">' . $this->fmtNum($order->reed_count) . '</td></tr>
-                    <tr><td style="border:0.75px solid #000;">Reed Space</td><td style="border:0.75px solid #000;">' . number_format($order->reed_space, 2) . '</td></tr>
-                    <tr><td style="border:0.75px solid #000;">Warp Shrinkage%</td><td style="border:0.75px solid #000;">' . number_format($order->warp_conversion_pct, 2) . '</td></tr>
-                    <tr><td style="border:0.75px solid #000;">Weft Shrinkage%</td><td style="border:0.75px solid #000;">' . number_format($order->weft_conversion_pct, 2) . '</td></tr>
-                    <tr><td style="border:0.75px solid #000;">Warp Weight</td><td style="border:0.75px solid #000;">' . number_format($order->warp_consumption, 4) . '</td></tr>
-                    <tr><td style="border:0.75px solid #000;">Weft Weight</td><td style="border:0.75px solid #000;">' . number_format($order->weft_consumption, 4) . '</td></tr>
-                    <tr><td style="border:0.75px solid #000;"><b>Total Weight</b></td><td style="border:0.75px solid #000;"><b>' . number_format($order->total_yarn_weight_consumed, 4) . '</b></td></tr>
-                </table>
-            </td>
-            <td width="4%"></td>
-            <td width="48%" style="vertical-align:top;">
-                <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
-                    <tr style="background-color:#f0f0f0;">
-                        <td width="34%" style="border:0.75px solid #000;">&nbsp;</td>
-                        <td width="22%" style="border:0.75px solid #000;"><b>Rate</b></td>
-                        <td width="22%" style="border:0.75px solid #000;"><b>Cost</b></td>
-                        <td width="22%" style="border:0.75px solid #000;"><b>Amount</b></td>
-                    </tr>
-                    <tr>
-                        <td style="border:0.75px solid #000;">Warp Yarn</td>
-                        <td style="border:0.75px solid #000;">' . number_format($order->warp_yarn_cost_price, 2) . '</td>
-                        <td style="border:0.75px solid #000;">' . number_format($order->warp_yarn_rate, 2) . '</td>
-                        <td style="border:0.75px solid #000;">' . number_format($warpAmount, 2) . '</td>
-                    </tr>
-                    <tr>
-                        <td style="border:0.75px solid #000;">Weft Yarn</td>
-                        <td style="border:0.75px solid #000;">' . number_format($order->weft_yarn_cost_price, 2) . '</td>
-                        <td style="border:0.75px solid #000;">' . number_format($order->weft_yarn_rate, 2) . '</td>
-                        <td style="border:0.75px solid #000;">' . number_format($weftAmount, 2) . '</td>
-                    </tr>
-                    <tr>
-                        <td style="border:0.75px solid #000;">Sizing</td>
-                        <td style="border:0.75px solid #000;">-</td>
-                        <td style="border:0.75px solid #000;">' . number_format($order->sizing_rate_per_meter, 2) . '</td>
-                        <td style="border:0.75px solid #000;">' . number_format($sizingAmount, 2) . '</td>
-                    </tr>
-                    <tr>
-                        <td style="border:0.75px solid #000;">Warping</td>
-                        <td style="border:0.75px solid #000;">' . number_format($order->warping, 2) . '</td>
-                        <td style="border:0.75px solid #000;">' . number_format($order->warping, 2) . '</td>
-                        <td style="border:0.75px solid #000;">' . number_format($warpingAmount, 2) . '</td>
-                    </tr>
-                    <tr>
-                        <td style="border:0.75px solid #000;">Conversion</td>
-                        <td style="border:0.75px solid #000;">' . number_format($order->rate_per_pick, 2) . '</td>
-                        <td style="border:0.75px solid #000;">' . number_format($order->weaving_cost_per_meter, 2) . '</td>
-                        <td style="border:0.75px solid #000;">' . number_format($conversionAmount, 2) . '</td>
-                    </tr>
-                    <tr style="background-color:#f0f0f0;">
-                        <td colspan="2" style="border:0.75px solid #000;"><b>Total Cost</b></td>
-                        <td style="border:0.75px solid #000;">Rs</td>
-                        <td style="border:0.75px solid #000;"><b>' . number_format($totalCost, 2) . '</b></td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-        </table>';
-
-        $pdf->writeHTML($costHtml, true, false, false, false, '');
-
-        return $pdf->Output($order->order_no . '.pdf', 'I');
+    if (file_exists($logoPath)) {
+        $pdf->Image($logoPath, 10, 10, 40);
     }
 
-    /**
-     * Builds the "QUALITY" line, e.g. "20*20/60*60 - 51" Fabric Name".
-     * Falls back gracefully when a component is missing.
-     */
-    private function qualityString(PurchaseOrder $order): string
-    {
-        $parts = [];
+    $pdf->SetFont('helvetica', 'B', 11);
+    $pdf->SetXY(130, 10);
+    $pdf->Cell(70, 5, $order->order_no, 0, 1, 'R');
+    $pdf->SetFont('helvetica', '', 9);
+    $pdf->SetXY(130, 15);
+    $pdf->Cell(70, 5, 'P.O Date: ' . \Carbon\Carbon::parse($order->order_date)->format('d-M-Y'), 0, 1, 'R');
+    $pdf->SetXY(130, 20);
+    $pdf->Cell(70, 5, 'Delivery: ' . ($order->expected_date ? \Carbon\Carbon::parse($order->expected_date)->format('d-M-Y') : '-'), 0, 1, 'R');
+    $pdf->SetXY(130, 25);
+    $pdf->Cell(70, 5, 'Payment Terms: ' . $paymentTerm, 0, 1, 'R');
 
-        if ($order->warp_count && $order->weft_count) {
-            $parts[] = $this->fmtNum($order->warp_count) . '*' . $this->fmtNum($order->weft_count);
+    $pdf->SetY(38);
+
+    $partiesHtml = '
+    <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
+    <tr>
+        <td width="50%" style="border:0.75px solid #000;">
+            <b>Supplier Details</b><br>
+            ' . e($order->vendor->name ?? '-') . '<br>
+            ' . nl2br(e($order->vendor->address ?? '-')) . '
+        </td>
+        <td width="50%" style="border:0.75px solid #000;">
+            <b>Vistex(Pvt)Ltd Details</b><br>
+            F-128, Hub River Road, SITE Area, Karachi 75600, Pakistan<br>
+            NTN: 1234567-8 &nbsp; STRN: 12-34-5678-901-23
+        </td>
+    </tr>
+    </table>';
+    $pdf->writeHTML($partiesHtml, true, false, false, false, '');
+    $pdf->Ln(2);
+
+    $gridHtml = '
+    <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
+
+    <tr>
+        <td width="20%" style="border:0.75px solid #000;"><b>No Of Looms</b></td>
+        <td width="80%" style="border:0.75px solid #000;">&nbsp;</td>
+    </tr>
+
+    <tr style="background-color:#f0f0f0;">
+        <td width="17%" style="border:0.75px solid #000;"><b>Looms Width</b></td>
+        <td width="17%" style="border:0.75px solid #000;"><b>Rate Per Pick</b></td>
+        <td width="17%" style="border:0.75px solid #000;"><b>Sizing Rate (Rs/m)</b></td>
+        <td width="16%" style="border:0.75px solid #000;"><b>Warp Wt.</b></td>
+        <td width="16%" style="border:0.75px solid #000;"><b>Weft Wt.</b></td>
+        <td width="17%" style="border:0.75px solid #000;"><b>Total Wt.</b></td>
+    </tr>
+    <tr>
+        <td style="border:0.75px solid #000;">' . $this->fmtNum($order->width) . '"</td>
+        <td style="border:0.75px solid #000;">' . number_format($order->rate_per_pick, 2) . '</td>
+        <td style="border:0.75px solid #000;">' . number_format($order->sizing_rate_per_meter, 2) . '</td>
+        <td style="border:0.75px solid #000;">' . number_format($order->warp_consumption, 4) . '</td>
+        <td style="border:0.75px solid #000;">' . number_format($order->weft_consumption, 4) . '</td>
+        <td style="border:0.75px solid #000;">' . number_format($order->total_yarn_weight_consumed, 4) . '</td>
+    </tr>
+
+    <tr>
+        <td style="border:0.75px solid #000;"><b>Quality</b></td>
+        <td colspan="2" style="border:0.75px solid #000;">' . e($quality) . '</td>
+    </tr>
+
+    <tr>
+        <td style="border:0.75px solid #000;"><b>P.O Quantity</b></td>
+        <td colspan="2" style="border:0.75px solid #000;">' . number_format($order->total_meters_required, 3) . ' Mtr</td>
+    </tr>
+
+    <tr>
+        <td style="border:0.75px solid #000;"><b>Conversion Rate</b></td>
+        <td colspan="2" style="border:0.75px solid #000;">' . $conversionRate . '</td>
+    </tr>
+
+    <tr>
+        <td style="border:0.75px solid #000;"><b>Total Amount</b></td>
+        <td colspan="2" style="border:0.75px solid #000;">' . number_format($order->subtotal, 2) . '</td>
+    </tr>
+    <tr>
+        <td style="border:0.75px solid #000;"><b>Total Gst Amount</b></td>
+        <td colspan="2" style="border:0.75px solid #000;">' . number_format($order->gst_amount, 2) . '</td>
+    </tr>
+    <tr>
+        <td style="border:0.75px solid #000;"><b>Total Net Amount</b></td>
+        <td colspan="2" style="border:0.75px solid #000;"><b>' . number_format($order->total_amount, 2) . '</b></td>
+    </tr>
+
+    <tr style="background-color:#d9d9d9;">
+        <td colspan="3" style="border:0.75px solid #000; text-align:center;"><b>Other Terms</b></td>
+    </tr>
+    <tr>
+        <td colspan="3" style="border:0.75px solid #000; height:28px; vertical-align:top;">';
+
+    if ($order->terms->isNotEmpty()) {
+        foreach ($order->terms as $i => $term) {
+            $gridHtml .= ($i + 1) . '. ' . e($term->title) . ' — ' . e($term->description) . '<br>';
         }
-
-        if ($order->reed && $order->pick) {
-            $parts[] = $this->fmtNum($order->reed) . '*' . $this->fmtNum($order->pick);
-        }
-
-        $construction = implode('/', $parts);
-
-        $widthPart = $order->width ? $this->fmtNum($order->width) . '"' : null;
-        $namePart = $order->greigeProduct->name ?? $order->item_name ?? null;
-
-        return trim(implode(' - ', array_filter([$construction, trim(($widthPart ?? '') . ' ' . ($namePart ?? ''))])));
     }
 
-    /**
-     * Formats a decimal for display, trimming trailing zeros
-     * (e.g. 60.0000 -> "60", 20.5000 -> "20.5").
-     */
-    private function fmtNum($value): string
-    {
-        $value = (float) $value;
-        $formatted = number_format($value, 4, '.', '');
-        $formatted = rtrim(rtrim($formatted, '0'), '.');
+    $gridHtml .= '</td>
+    </tr>
 
-        return $formatted === '' ? '0' : $formatted;
+    <tr>
+        <td style="border:0.75px solid #000;"><b>Remarks:</b></td>
+        <td colspan="2" style="border:0.75px solid #000;">' . e($order->remarks ?: '-') . '</td>
+    </tr>
+
+    </table>';
+
+    $pdf->writeHTML($gridHtml, true, false, false, false, '');
+
+    $pdf->SetFont('helvetica', 'B', 10);
+    $pdf->Ln(12);
+    $yPosition = $pdf->GetY();
+    $pdf->Line(15, $yPosition, 55, $yPosition);
+    $pdf->Line(85, $yPosition, 125, $yPosition);
+    $pdf->Line(155, $yPosition, 195, $yPosition);
+    $pdf->Ln(2);
+    $pdf->SetXY(15, $yPosition + 2);
+    $pdf->Cell(40, 6, 'Prepared By', 0, 0, 'C');
+    $pdf->SetXY(85, $yPosition + 2);
+    $pdf->Cell(40, 6, 'Received By', 0, 0, 'C');
+    $pdf->SetXY(155, $yPosition + 2);
+    $pdf->Cell(40, 6, 'Approved By', 0, 0, 'C');
+
+    // ═════════════════════════════════════════════════════════════════
+    // PAGE 2 — Cost Sheet
+    // ═════════════════════════════════════════════════════════════════
+    $pdf->AddPage();
+    $pdf->SetFont('helvetica', '', 9);
+
+    if (file_exists($logoPath)) {
+        $pdf->Image($logoPath, 10, 10, 40);
     }
+
+    $pdf->SetFont('helvetica', 'B', 11);
+    $pdf->SetXY(0, 10);
+    $pdf->Cell(210, 5, 'Page No : 2', 0, 1, 'C');
+
+    $pdf->SetFont('helvetica', '', 9);
+    $pdf->SetXY(130, 10);
+    $pdf->Cell(70, 5, $order->order_no, 0, 1, 'R');
+    $pdf->SetXY(130, 15);
+    $pdf->Cell(70, 5, 'P.O Date: ' . \Carbon\Carbon::parse($order->order_date)->format('d-M-Y'), 0, 1, 'R');
+
+    $pdf->SetY(28);
+
+    $partiesHtml2 = '
+    <table cellpadding="3" cellspacing="0" width="100%" style="font-size:9px;">
+    <tr>
+        <td width="50%"><b>Supplier</b> &nbsp; ' . e($order->vendor->name ?? '-') . '</td>
+        <td width="50%"><b>Vistex(Pvt)Ltd</b></td>
+    </tr>
+    </table>';
+    $pdf->writeHTML($partiesHtml2, true, false, false, false, '');
+
+    $pdf->SetFont('helvetica', 'B', 12);
+    $pdf->Cell(0, 8, 'Cost Sheet', 0, 1, 'C');
+    $pdf->SetFont('helvetica', '', 9);
+
+    $topHtml = '
+    <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
+    <tr>
+        <td width="20%" style="border:0.75px solid #000;"><b>Quality</b></td>
+        <td width="80%" style="border:0.75px solid #000;">' . e($quality) . '</td>
+    </tr>
+    <tr>
+        <td style="border:0.75px solid #000;"><b>P.O Quantity</b></td>
+        <td style="border:0.75px solid #000;">' . number_format($order->total_meters_required, 3) . '</td>
+    </tr>
+    </table>';
+    $pdf->writeHTML($topHtml, true, false, false, false, '');
+    $pdf->Ln(3);
+
+    $warpAmount = $order->warp_yarn_rate * $order->total_meters_required;
+    $weftAmount = $order->weft_yarn_rate * $order->total_meters_required;
+    $sizingAmount = $order->sizing_rate_per_meter * $order->total_meters_required;
+    $warpingAmount = (float) $order->warping * $order->total_meters_required;
+    $conversionAmount = $order->weaving_cost_per_meter * $order->total_meters_required;
+    $totalCost = $warpAmount + $weftAmount + $sizingAmount + $warpingAmount + $conversionAmount;
+
+    $costHtml = '
+    <table cellpadding="0" cellspacing="0" width="100%">
+    <tr>
+        <td width="48%" style="vertical-align:top;">
+            <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
+                <tr><td width="60%" style="border:0.75px solid #000;">Warp Yarn Count</td><td width="40%" style="border:0.75px solid #000;">' . $this->fmtNum($order->warp_count) . '</td></tr>
+                <tr><td style="border:0.75px solid #000;">Weft Yarn Count</td><td style="border:0.75px solid #000;">' . $this->fmtNum($order->weft_count) . '</td></tr>
+                <tr><td style="border:0.75px solid #000;">Reed</td><td style="border:0.75px solid #000;">' . $this->fmtNum($order->reed) . '</td></tr>
+                <tr><td style="border:0.75px solid #000;">Pick</td><td style="border:0.75px solid #000;">' . $this->fmtNum($order->pick) . '</td></tr>
+                <tr><td style="border:0.75px solid #000;">Width</td><td style="border:0.75px solid #000;">' . $this->fmtNum($order->width) . '</td></tr>
+                <tr><td style="border:0.75px solid #000;">Reed Count</td><td style="border:0.75px solid #000;">' . $this->fmtNum($order->reed_count) . '</td></tr>
+                <tr><td style="border:0.75px solid #000;">Reed Space</td><td style="border:0.75px solid #000;">' . number_format($order->reed_space, 2) . '</td></tr>
+                <tr><td style="border:0.75px solid #000;">Warp Shrinkage%</td><td style="border:0.75px solid #000;">' . number_format($order->warp_conversion_pct, 2) . '</td></tr>
+                <tr><td style="border:0.75px solid #000;">Weft Shrinkage%</td><td style="border:0.75px solid #000;">' . number_format($order->weft_conversion_pct, 2) . '</td></tr>
+                <tr><td style="border:0.75px solid #000;">Warp Weight</td><td style="border:0.75px solid #000;">' . number_format($order->warp_consumption, 4) . '</td></tr>
+                <tr><td style="border:0.75px solid #000;">Weft Weight</td><td style="border:0.75px solid #000;">' . number_format($order->weft_consumption, 4) . '</td></tr>
+                <tr><td style="border:0.75px solid #000;"><b>Total Weight</b></td><td style="border:0.75px solid #000;"><b>' . number_format($order->total_yarn_weight_consumed, 4) . '</b></td></tr>
+            </table>
+        </td>
+        <td width="4%"></td>
+        <td width="48%" style="vertical-align:top;">
+            <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
+                <tr style="background-color:#f0f0f0;">
+                    <td width="34%" style="border:0.75px solid #000;">&nbsp;</td>
+                    <td width="22%" style="border:0.75px solid #000;"><b>Rate</b></td>
+                    <td width="22%" style="border:0.75px solid #000;"><b>Cost</b></td>
+                    <td width="22%" style="border:0.75px solid #000;"><b>Amount</b></td>
+                </tr>
+                <tr>
+                    <td style="border:0.75px solid #000;">Warp Yarn</td>
+                    <td style="border:0.75px solid #000;">' . number_format($order->warp_yarn_cost_price, 2) . '</td>
+                    <td style="border:0.75px solid #000;">' . number_format($order->warp_yarn_rate, 2) . '</td>
+                    <td style="border:0.75px solid #000;">' . number_format($warpAmount, 2) . '</td>
+                </tr>
+                <tr>
+                    <td style="border:0.75px solid #000;">Weft Yarn</td>
+                    <td style="border:0.75px solid #000;">' . number_format($order->weft_yarn_cost_price, 2) . '</td>
+                    <td style="border:0.75px solid #000;">' . number_format($order->weft_yarn_rate, 2) . '</td>
+                    <td style="border:0.75px solid #000;">' . number_format($weftAmount, 2) . '</td>
+                </tr>
+                <tr>
+                    <td style="border:0.75px solid #000;">Sizing</td>
+                    <td style="border:0.75px solid #000;">-</td>
+                    <td style="border:0.75px solid #000;">' . number_format($order->sizing_rate_per_meter, 2) . '</td>
+                    <td style="border:0.75px solid #000;">' . number_format($sizingAmount, 2) . '</td>
+                </tr>
+                <tr>
+                    <td style="border:0.75px solid #000;">Warping</td>
+                    <td style="border:0.75px solid #000;">' . number_format($order->warping, 2) . '</td>
+                    <td style="border:0.75px solid #000;">' . number_format($order->warping, 2) . '</td>
+                    <td style="border:0.75px solid #000;">' . number_format($warpingAmount, 2) . '</td>
+                </tr>
+                <tr>
+                    <td style="border:0.75px solid #000;">Conversion</td>
+                    <td style="border:0.75px solid #000;">' . number_format($order->rate_per_pick, 2) . '</td>
+                    <td style="border:0.75px solid #000;">' . number_format($order->weaving_cost_per_meter, 2) . '</td>
+                    <td style="border:0.75px solid #000;">' . number_format($conversionAmount, 2) . '</td>
+                </tr>
+                <tr style="background-color:#f0f0f0;">
+                    <td colspan="2" style="border:0.75px solid #000;"><b>Total Cost</b></td>
+                    <td style="border:0.75px solid #000;">Rs</td>
+                    <td style="border:0.75px solid #000;"><b>' . number_format($totalCost, 2) . '</b></td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+    </table>';
+
+    $pdf->writeHTML($costHtml, true, false, false, false, '');
+
+    return $pdf->Output($order->order_no . '.pdf', 'I');
+}
+
+/**
+ * Builds the "QUALITY" line, e.g. "20*20/60*60 - 51" Fabric Name".
+ * Falls back gracefully when a component is missing.
+ */
+private function qualityString(PurchaseOrder $order): string
+{
+    $parts = [];
+
+    if ($order->warp_count && $order->weft_count) {
+        $parts[] = $this->fmtNum($order->warp_count) . '*' . $this->fmtNum($order->weft_count);
+    }
+
+    if ($order->reed && $order->pick) {
+        $parts[] = $this->fmtNum($order->reed) . '*' . $this->fmtNum($order->pick);
+    }
+
+    $construction = implode('/', $parts);
+
+    $widthPart = $order->width ? $this->fmtNum($order->width) . '"' : null;
+    $namePart = $order->greigeProduct->name ?? $order->item_name ?? null;
+
+    return trim(implode(' - ', array_filter([$construction, trim(($widthPart ?? '') . ' ' . ($namePart ?? ''))])));
+}
+
+/**
+ * Formats a decimal for display, trimming trailing zeros
+ * (e.g. 60.0000 -> "60", 20.5000 -> "20.5").
+ */
+private function fmtNum($value): string
+{
+    $value = (float) $value;
+    $formatted = number_format($value, 4, '.', '');
+    $formatted = rtrim(rtrim($formatted, '0'), '.');
+
+    return $formatted === '' ? '0' : $formatted;
+}
 }
