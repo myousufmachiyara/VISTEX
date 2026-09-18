@@ -472,7 +472,7 @@ class PurchaseOrderController extends Controller
         $pdf->SetFont('helvetica', '', 9);
 
         if (file_exists($logoPath)) {
-            $pdf->Image($logoPath, 10, 10, 40);
+            $pdf->Image($logoPath, 10, 10, 60);
         }
 
         $pdf->SetFont('helvetica', 'B', 11);
@@ -523,7 +523,7 @@ class PurchaseOrderController extends Controller
             <td width="17%" style="border:0.75px solid #000;"><b>Total Wt.</b></td>
         </tr>
         <tr>
-            <td style="border:0.75px solid #000;"   >' . number_format($order->total_meters_required, 3) . ' Mtr</td>
+            <td style="border:0.75px solid #000;">' . number_format($order->total_meters_required, 3) . ' Mtr</td>
             <td style="border:0.75px solid #000;">' . number_format($order->rate_per_pick, 2) . '</td>
             <td style="border:0.75px solid #000;">' . number_format($order->sizing_rate_per_meter, 2) . '</td>
             <td style="border:0.75px solid #000;">' . number_format($order->warp_consumption, 4) . '</td>
