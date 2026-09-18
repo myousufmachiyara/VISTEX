@@ -536,39 +536,7 @@ class PurchaseOrderController extends Controller
             <td width="83%" style="border:0.75px solid #000;">' . $conversionRate . '</td>
         </tr>
 
-        // <tr>
-        //     <td style="border:0.75px solid #000;"><b>Total Amount</b></td>
-        //     <td style="border:0.75px solid #000;">' . number_format($order->subtotal, 2) . '</td>
-        // </tr>
-        // <tr>
-        //     <td style="border:0.75px solid #000;"><b>Total Gst Amount</b></td>
-        //     <td style="border:0.75px solid #000;">' . number_format($order->gst_amount, 2) . '</td>
-        // </tr>
-        // <tr>
-        //     <td style="border:0.75px solid #000;"><b>Total Net Amount</b></td>
-        //     <td style="border:0.75px solid #000;"><b>' . number_format($order->total_amount, 2) . '</b></td>
-        // </tr>
-
-        <tr style="background-color:#d9d9d9;">
-            <td style="border:0.75px solid #000; text-align:center;"><b>Other Terms</b></td>
-        </tr>
-        <tr>
-            <td style="border:0.75px solid #000; height:28px; vertical-align:top;">';
-
-        if ($order->terms->isNotEmpty()) {
-            foreach ($order->terms as $i => $term) {
-                $gridHtml .= ($i + 1) . '. ' . e($term->title) . ' — ' . e($term->description) . '<br>';
-            }
-        }
-
-        $gridHtml .= '</td>
-        </tr>
-
-        <tr>
-            <td style="border:0.75px solid #000;"><b>Remarks:</b></td>
-            <td style="border:0.75px solid #000;">' . e($order->remarks ?: '-') . '</td>
-        </tr>
-
+        
         </table>';
 
         $pdf->writeHTML($gridHtml, true, false, false, false, '');
