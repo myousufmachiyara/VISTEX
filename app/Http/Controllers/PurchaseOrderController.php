@@ -510,7 +510,7 @@ class PurchaseOrderController extends Controller
         <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
 
         <tr>
-            <td width="15%" style="border:0.75px solid #000;background-color:#f0f0f0;"><b>Fabric Quality</b></td>
+            <td width="17%" style="border:0.75px solid #000;background-color:#f0f0f0;"><b>Fabric Quality</b></td>
             <td width="50%" style="border:0.75px solid #000;">' . e($quality) . '</td>
             <td width="15%" style="border:0.75px solid #000;background-color:#f0f0f0;"><b>P.O Quantity</b></td>
             <td width="20%" style="border:0.75px solid #000;">' . number_format($order->total_meters_required, 3) . ' Mtr</td>
