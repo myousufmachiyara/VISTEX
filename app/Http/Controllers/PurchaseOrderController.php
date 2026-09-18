@@ -492,8 +492,7 @@ class PurchaseOrderController extends Controller
         <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
         <tr>
             <td width="50%" style="border:0.75px solid #000;">
-                <b style="font-size:12px">Supplier</b><br>
-                ' . e($order->vendor->name ?? '-') . '<br>
+                <b style="font-size:12px">Supplier: ' . e($order->vendor->name ?? '-') . '</b><br>
                 ' . nl2br(e($order->vendor->address ?? '-')) . '
             </td>
             <td width="50%" style="border:0.75px solid #000;">
