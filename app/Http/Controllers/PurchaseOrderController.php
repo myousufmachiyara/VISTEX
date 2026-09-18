@@ -558,18 +558,15 @@ private function printWeaving(PurchaseOrder $order)
     </tr>
 
     <tr>
-        <td style="border:0.75px solid #000;"><b>Quality</b></td>
-        <td colspan="2" style="border:0.75px solid #000;">' . e($quality) . '</td>
+        <td width="15%" style="border:0.75px solid #000;"><b>Quality</b></td>
+        <td width="35%" style="border:0.75px solid #000;">' . e($quality) . '</td>
+        <td width="15%" style="border:0.75px solid #000;"><b>P.O Quantity</b></td>
+        <td width="35%" style="border:0.75px solid #000;">' . number_format($order->total_meters_required, 3) . ' Mtr</td>
     </tr>
 
     <tr>
-        <td style="border:0.75px solid #000;"><b>P.O Quantity</b></td>
-        <td colspan="2" style="border:0.75px solid #000;">' . number_format($order->total_meters_required, 3) . ' Mtr</td>
-    </tr>
-
-    <tr>
-        <td style="border:0.75px solid #000;"><b>Conversion Rate</b></td>
-        <td colspan="2" style="border:0.75px solid #000;">' . $conversionRate . '</td>
+        <td width="20%" style="border:0.75px solid #000;"><b>Conversion Rate</b></td>
+        <td width="80%" style="border:0.75px solid #000;">' . $conversionRate . '</td>
     </tr>
 
     <tr>
@@ -788,4 +785,6 @@ private function fmtNum($value): string
 
     return $formatted === '' ? '0' : $formatted;
 }
+
+
 }
