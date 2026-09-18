@@ -13,13 +13,16 @@ class Challan extends Model
 
     protected $fillable = [
         'challan_no', 'entry_type', 'purchase_order_id', 'vendor_challan_no', 'vendor_id',
-        'received_date', 'challan_images', 'status', 'remarks',
-        'received_by', 'created_by', 'updated_by',
+        'received_date', 'challan_images', 'status',
+        'has_objection', 'objection_remarks', 'reviewed_by', 'reviewed_at',
+        'remarks', 'received_by', 'created_by', 'updated_by',
     ];
 
     protected $casts = [
         'received_date'  => 'date',
+        'reviewed_at'    => 'datetime',
         'challan_images' => 'array',
+        'has_objection'  => 'boolean',
     ];
 
     public function purchaseOrder() { return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id'); }
@@ -44,5 +47,9 @@ class Challan extends Model
             $q2->whereHas('purchaseOrder.category.incharges', fn($q3) => $q3->where('user_id', $user->id))
                ->orWhere('entry_type', 'direct'); // direct entries visible to all in-charges for now — refine later if needed
         });
+    }
+    public function items()
+    {
+        return $this->hasMany(ChallanItem::class, 'challan_id');
     }
 }
