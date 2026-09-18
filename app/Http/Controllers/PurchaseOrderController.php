@@ -491,13 +491,13 @@ class PurchaseOrderController extends Controller
         $partiesHtml = '
         <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
         <tr>
-            <td width="50%" style="border:0.75px solid #000;">
-                <b>Supplier Details</b><br>
+            <td width="50%" style="border:0.75px solid #000;font-size:12px">
+                <b>Supplier</b><br>
                 ' . e($order->vendor->name ?? '-') . '<br>
                 ' . nl2br(e($order->vendor->address ?? '-')) . '
             </td>
-            <td width="50%" style="border:0.75px solid #000;">
-                <b>Vistex(Pvt)Ltd Details</b><br>
+            <td width="50%" style="border:0.75px solid #000;font-size:12px">
+                <b>Vistex (Pvt.) Ltd.</b><br>
                 F-128, Hub River Road, SITE Area, Karachi 75600, Pakistan<br>
                 NTN: 1234567-8 &nbsp; STRN: 12-34-5678-901-23
             </td>
