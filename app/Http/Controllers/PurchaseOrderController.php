@@ -534,8 +534,8 @@ class PurchaseOrderController extends Controller
 
 
         <tr>
-            <td width="20%" style="border:0.75px solid #000;"><b>Conversion Rate</b></td>
-            <td width="80%" style="border:0.75px solid #000;">' . $conversionRate . '</td>
+            <td width="17%" style="border:0.75px solid #000;"><b>Conversion Rate</b></td>
+            <td width="83%" style="border:0.75px solid #000;">' . $conversionRate . '</td>
         </tr>
 
         <tr>
