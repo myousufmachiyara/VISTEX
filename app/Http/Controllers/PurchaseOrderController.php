@@ -516,7 +516,7 @@ class PurchaseOrderController extends Controller
         <tr style="background-color:#f0f0f0;">
             <td width="17%" style="border:0.75px solid #000;"><b>P.O Quantity</b></td>
             <td width="17%" style="border:0.75px solid #000;"><b>Rate Per Pick</b></td>
-            <td width="17%" style="border:0.75px solid #000;"><b>Sizing Rate (Rs/m)</b></td>
+            <td width="17%" style="border:0.75px solid #000;"><b>Sizing Rate (per Lbs)</b></td>
             <td width="16%" style="border:0.75px solid #000;"><b>Warp Wt.</b></td>
             <td width="16%" style="border:0.75px solid #000;"><b>Weft Wt.</b></td>
             <td width="17%" style="border:0.75px solid #000;"><b>Total Wt.</b></td>
@@ -609,12 +609,8 @@ class PurchaseOrderController extends Controller
         $pdf->SetFont('helvetica', '', 9);
 
         if (file_exists($logoPath)) {
-            $pdf->Image($logoPath, 10, 10, 40);
+            $pdf->Image($logoPath, 5, 10, 55);
         }
-
-        $pdf->SetFont('helvetica', 'B', 11);
-        $pdf->SetXY(0, 10);
-        $pdf->Cell(210, 5, 'Page No : 2', 0, 1, 'C');
 
         $pdf->SetFont('helvetica', '', 9);
         $pdf->SetXY(130, 10);
@@ -624,17 +620,8 @@ class PurchaseOrderController extends Controller
 
         $pdf->SetY(28);
 
-        $partiesHtml2 = '
-        <table cellpadding="3" cellspacing="0" width="100%" style="font-size:9px;">
-        <tr>
-            <td width="50%"><b>Supplier</b> &nbsp; ' . e($order->vendor->name ?? '-') . '</td>
-            <td width="50%"><b>Vistex(Pvt)Ltd</b></td>
-        </tr>
-        </table>';
-        $pdf->writeHTML($partiesHtml2, true, false, false, false, '');
-
         $pdf->SetFont('helvetica', 'B', 12);
-        $pdf->Cell(0, 8, 'Cost Sheet', 0, 1, 'C');
+        $pdf->Cell(0, 10, 'Cost Sheet', 0, 1, 'C');
         $pdf->SetFont('helvetica', '', 9);
 
         $topHtml = '
@@ -700,7 +687,7 @@ class PurchaseOrderController extends Controller
                     </tr>
                     <tr>
                         <td style="border:0.75px solid #000;">Sizing</td>
-                        <td style="border:0.75px solid #000;">-</td>
+                        <td style="border:0.75px solid #000;">' . number_format($order->sizing_rate_per_meter, 2) /  number_format($order->warp_consumption, 4). '</td>
                         <td style="border:0.75px solid #000;">' . number_format($order->sizing_rate_per_meter, 2) . '</td>
                         <td style="border:0.75px solid #000;">' . number_format($sizingAmount, 2) . '</td>
                     </tr>
