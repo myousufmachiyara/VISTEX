@@ -472,7 +472,7 @@ class PurchaseOrderController extends Controller
         $pdf->SetFont('helvetica', '', 9);
 
         if (file_exists($logoPath)) {
-            $pdf->Image($logoPath, 10, 10, 60);
+            $pdf->Image($logoPath, 5, 10, 55);
         }
 
         $pdf->SetFont('helvetica', 'B', 11);
