@@ -11,9 +11,9 @@ class ChallanService
 {
     public function __construct(private DocumentNumberService $numberService) {}
 
-    public function create(array $data, ?int $userId = null): Challan
+    public function create(array $data, array $items, ?int $userId = null): Challan
     {
-        return DB::transaction(function () use ($data, $userId) {
+        return DB::transaction(function () use ($data, $items, $userId) {
 
             $po = PurchaseOrder::findOrFail($data['purchase_order_id']);
 
@@ -24,7 +24,7 @@ class ChallanService
                 throw new \Exception('At least one photo of the challan is required.');
             }
 
-            return Challan::create([
+            $challan = Challan::create([
                 'challan_no'          => $this->numberService->next('challan', 'challans', 'challan_no', 'CHL'),
                 'entry_type'          => 'po',
                 'purchase_order_id'   => $po->id,
@@ -32,11 +32,26 @@ class ChallanService
                 'received_date'       => $data['received_date'],
                 'challan_images'      => $images,
                 'status'              => 'AwaitingInspection',
+                'has_objection'       => (bool) ($data['has_objection'] ?? false),
+                'objection_remarks'   => $data['objection_remarks'] ?? null,
                 'remarks'             => $data['remarks'] ?? null,
                 'received_by'         => $userId,
                 'created_by'          => $userId,
                 'updated_by'          => $userId,
             ]);
+
+            foreach ($items as $item) {
+                \App\Models\ChallanItem::create([
+                    'challan_id'              => $challan->id,
+                    'purchase_order_item_id'  => $item['purchase_order_item_id'] ?? null,
+                    'product_id'              => $item['product_id'] ?? null,
+                    'description'             => $item['description'] ?? null,
+                    'expected_qty'            => $item['expected_qty'] ?? 0,
+                    'received_qty'            => $item['received_qty'] ?? 0,
+                ]);
+            }
+
+            return $challan->load('items');
         });
     }
 
