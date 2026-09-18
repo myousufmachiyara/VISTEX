@@ -562,33 +562,7 @@ class PurchaseOrderController extends Controller
 
         $pdf->writeHTML($summaryHtml, true, false, false, false, '');
 
-        $summaryHtml = '
-        <table cellpadding="4" cellspacing="0" width="100%">
-        <tr>
-            <td width="60%"></td>
-            <td width="40%">
-            <table cellpadding="4" cellspacing="0" width="100%" style="border:1px solid #333; font-size:10px;">
-                <tr><td width="50%">Amount</td><td width="50%" style="text-align:right;">' . number_format($order->subtotal, 2) . '</td></tr>';
-
-        if ($order->gst_applicable && $order->gst_amount > 0) {
-            $summaryHtml .= '<tr><td>GST (' . number_format($order->gst_rate, 2) . '%)</td><td style="text-align:right;">' . number_format($order->gst_amount, 2) . '</td></tr>';
-        }
-        if ($order->broker_commission_amount > 0) {
-            $summaryHtml .= '<tr><td>Broker Commission</td><td style="text-align:right;">' . number_format($order->broker_commission_amount, 2) . '</td></tr>';
-        }
-
-        $summaryHtml .= '
-                <tr style="font-weight:bold; background-color:#f0f0f0;">
-                <td>Net Total</td><td style="text-align:right;">' . number_format($order->total_amount, 2) . '</td>
-                </tr>
-            </table>
-            </td>
-        </tr>
-        </table>';
-
-        $pdf->writeHTML($summaryHtml, true, false, false, false, '');
-
-
+    
         $gridHtml = '
         <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
 
