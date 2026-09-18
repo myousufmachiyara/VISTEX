@@ -546,16 +546,14 @@ class PurchaseOrderController extends Controller
 
 
         <tr style="background-color:#f0f0f0;">
-            <td width="25%" style="border:0.75px solid #000;"><b>Amount</b></td>
-            <td width="25%" style="border:0.75px solid #000;"><b>GST (' . number_format($order->gst_rate, 2) . '%)</b></td>
-            <td width="25%" style="border:0.75px solid #000;"><b>Broker Commission</b></td>
-            <td width="25%" style="border:0.75px solid #000;"><b>Net Amount</b></td>
+            <td width="33%" style="border:0.75px solid #000;"><b>Amount</b></td>
+            <td width="33%" style="border:0.75px solid #000;"><b>GST (' . number_format($order->gst_rate, 2) . '%)</b></td>
+            <td width="33%" style="border:0.75px solid #000;"><b>Net Amount</b></td>
         </tr>
         <tr>
-            <td width="25%" style="border:0.75px solid #000;">' . number_format($order->subtotal, 2) . '</td>
-            <td width="25%" style="border:0.75px solid #000;">' . number_format($order->gst_amount, 2) . '</td>
-            <td width="25%" style="border:0.75px solid #000;">' . number_format($order->broker_commission_amount, 2) . '</td>
-            <td width="25%" style="border:0.75px solid #000;">' . number_format($order->total_amount, 2) . '</td>
+            <td width="33%" style="border:0.75px solid #000;">' . number_format($order->subtotal, 2) . '</td>
+            <td width="33%" style="border:0.75px solid #000;">' . number_format($order->gst_amount, 2) . '</td>
+            <td width="33%" style="border:0.75px solid #000;">' . number_format($order->total_amount, 2) . '</td>
         </tr>
 
         </table>';
