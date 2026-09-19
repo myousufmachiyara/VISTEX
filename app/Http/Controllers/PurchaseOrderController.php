@@ -553,9 +553,9 @@ class PurchaseOrderController extends Controller
             <td width="33%" style="border:0.75px solid #000;"><b>Total Yarn Required</b></td>
         </tr>
         <tr>
-            <td style="border:0.75px solid #000;">' . number_format($order->warp_required_lbs, 4) . '</td>
-            <td style="border:0.75px solid #000;">' . number_format($order->weft_required_lbs, 4) . '</td>
-            <td style="border:0.75px solid #000;">' . number_format($order->total_yarn_required, 4) . '</td>
+            <td style="border:0.75px solid #000;">' . number_format($order->warp_required_lbs, 2) . '</td>
+            <td style="border:0.75px solid #000;">' . number_format($order->weft_required_lbs, 2) . '</td>
+            <td style="border:0.75px solid #000;">' . number_format($order->total_yarn_required, 2) . '</td>
         </tr>
  
         </table>';
