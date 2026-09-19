@@ -434,7 +434,7 @@ class PurchaseOrderController extends Controller
 
         return $pdf->Output($order->order_no . '.pdf', 'I');
     }
-
+    
     private function printWeaving(PurchaseOrder $order)
     {
         $pdf = new \App\Services\myPDF();
@@ -450,6 +450,41 @@ class PurchaseOrderController extends Controller
         $logoPath = public_path('assets/img/vistex-logo.png');
  
         $quality = $this->qualityString($order);
+ 
+        // FIX (yarn weight mismatch between blade and print): the blade's
+        // live "Calculated Preview" always POSTs the order's current inputs
+        // to CpoFormulaService::calculate() fresh, so it always reflects the
+        // warp/weft shrinkage% multiplier. The PDF, on the other hand, was
+        // reading the *stored* warp_consumption / weft_consumption /
+        // total_yarn_weight_consumed (and the new warp/weft/total yarn
+        // *required*) columns directly — and those don't reliably carry the
+        // shrinkage-adjusted value through to print. Recomputing here from
+        // the order's own saved inputs guarantees the PDF always matches the
+        // formula exactly, the same way the blade does.
+        //
+        // Note the key rename: the order's shrinkage % columns are named
+        // warp_conversion_pct / weft_conversion_pct (see rules() above), but
+        // CpoFormulaService expects warp_shrinkage_pct / weft_shrinkage_pct —
+        // the same kind of field-name bridge normalizeWeavingData() already
+        // does for reed_input -> reed.
+        $formulaService = app(CpoFormulaService::class);
+        $calc = $formulaService->calculate([
+            'reed'                  => $order->reed,
+            'reed_count'            => $order->reed_count,
+            'warp_count'            => $order->warp_count,
+            'weft_count'            => $order->weft_count,
+            'pick'                  => $order->pick,
+            'width'                 => $order->width,
+            'total_meters_required' => $order->total_meters_required,
+            'rate_per_pick'         => $order->rate_per_pick,
+            'sizing_lbs'            => $order->sizing_lbs,
+            'warping'               => $order->warping,
+            'warp_shrinkage_pct'    => $order->warp_conversion_pct,
+            'weft_shrinkage_pct'    => $order->weft_conversion_pct,
+            'warp_yarn_cost_price'  => $order->warp_yarn_cost_price,
+            'weft_yarn_cost_price'  => $order->weft_yarn_cost_price,
+            'reed_space'            => $order->reed_space,
+        ]);
  
         $paymentTerm = match ($order->payment_term_type) {
             'cash' => 'Cash',
@@ -524,9 +559,9 @@ class PurchaseOrderController extends Controller
             <td style="border:0.75px solid #000;">' . number_format($order->total_meters_required, 3) . ' Mtr</td>
             <td style="border:0.75px solid #000;">' . number_format($order->rate_per_pick, 2) . '</td>
             <td style="border:0.75px solid #000;">' . number_format($order->sizing_lbs, 2) . '</td>
-            <td style="border:0.75px solid #000;">' . number_format($order->warp_consumption, 4) . '</td>
-            <td style="border:0.75px solid #000;">' . number_format($order->weft_consumption, 4) . '</td>
-            <td style="border:0.75px solid #000;">' . number_format($order->total_yarn_weight_consumed, 4) . '</td>
+            <td style="border:0.75px solid #000;">' . number_format($calc['warp_consumption'], 4) . '</td>
+            <td style="border:0.75px solid #000;">' . number_format($calc['weft_consumption'], 4) . '</td>
+            <td style="border:0.75px solid #000;">' . number_format($calc['total_yarn_weight_consumed'], 4) . '</td>
         </tr>
  
         <tr>
@@ -538,12 +573,9 @@ class PurchaseOrderController extends Controller
  
         $pdf->writeHTML($gridHtml, true, false, false, false, '');
  
-        // NEW: Warp/Weft/Total Yarn Wt. Required — the 3 fields added to the
-        // blades/formula-service/backend. Sourced from CpoFormulaService's
-        // warp_required_lbs / weft_required_lbs / total_yarn_required, which
-        // are persisted on the order the same way warp_consumption etc. are.
-        // Kept as its own small block, styled to match the tables above/below
-        // it, so nothing else on this page (or Page 2) is touched.
+        // Warp/Weft/Total Yarn Wt. Required — same fix applied: sourced from
+        // the freshly-recalculated $calc rather than the order's stored
+        // warp_required_lbs / weft_required_lbs / total_yarn_required.
         $yarnRequiredHtml = '
         <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
  
@@ -553,9 +585,9 @@ class PurchaseOrderController extends Controller
             <td width="33%" style="border:0.75px solid #000;"><b>Total Yarn Required</b></td>
         </tr>
         <tr>
-            <td style="border:0.75px solid #000;">' . number_format($order->warp_required_lbs, 2) . '</td>
-            <td style="border:0.75px solid #000;">' . number_format($order->weft_required_lbs, 2) . '</td>
-            <td style="border:0.75px solid #000;">' . number_format($order->total_yarn_required, 2) . '</td>
+            <td style="border:0.75px solid #000;">' . number_format($calc['warp_required_lbs'], 4) . '</td>
+            <td style="border:0.75px solid #000;">' . number_format($calc['weft_required_lbs'], 4) . '</td>
+            <td style="border:0.75px solid #000;">' . number_format($calc['total_yarn_required'], 4) . '</td>
         </tr>
  
         </table>';
@@ -682,9 +714,9 @@ class PurchaseOrderController extends Controller
                     <tr><td style="border:0.75px solid #000;">Reed Space</td><td style="border:0.75px solid #000;">' . number_format($order->reed_space, 2) . '</td></tr>
                     <tr><td style="border:0.75px solid #000;">Warp Shrinkage%</td><td style="border:0.75px solid #000;">' . number_format($order->warp_conversion_pct, 2) . '</td></tr>
                     <tr><td style="border:0.75px solid #000;">Weft Shrinkage%</td><td style="border:0.75px solid #000;">' . number_format($order->weft_conversion_pct, 2) . '</td></tr>
-                    <tr><td style="border:0.75px solid #000;">Warp Weight</td><td style="border:0.75px solid #000;">' . number_format($order->warp_consumption, 4) . '</td></tr>
-                    <tr><td style="border:0.75px solid #000;">Weft Weight</td><td style="border:0.75px solid #000;">' . number_format($order->weft_consumption, 4) . '</td></tr>
-                    <tr><td style="border:0.75px solid #000;"><b>Total Weight</b></td><td style="border:0.75px solid #000;"><b>' . number_format($order->total_yarn_weight_consumed, 4) . '</b></td></tr>
+                    <tr><td style="border:0.75px solid #000;">Warp Weight</td><td style="border:0.75px solid #000;">' . number_format($calc['warp_consumption'], 4) . '</td></tr>
+                    <tr><td style="border:0.75px solid #000;">Weft Weight</td><td style="border:0.75px solid #000;">' . number_format($calc['weft_consumption'], 4) . '</td></tr>
+                    <tr><td style="border:0.75px solid #000;"><b>Total Weight</b></td><td style="border:0.75px solid #000;"><b>' . number_format($calc['total_yarn_weight_consumed'], 4) . '</b></td></tr>
                 </table>
             </td>
             <td width="4%"></td>
