@@ -703,7 +703,7 @@ class PurchaseOrderController extends Controller
         $costHtml = '
         <table cellpadding="0" cellspacing="0" width="100%">
         <tr>
-            <td width="40%" style="vertical-align:top;">
+            <td width="35%" style="vertical-align:top;">
                 <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
                     <tr><td width="60%" style="border:0.75px solid #000;">Warp Yarn Count</td><td width="40%" style="border:0.75px solid #000;">' . $this->fmtNum($order->warp_count) . '</td></tr>
                     <tr><td style="border:0.75px solid #000;">Weft Yarn Count</td><td style="border:0.75px solid #000;">' . $this->fmtNum($order->weft_count) . '</td></tr>
@@ -719,7 +719,7 @@ class PurchaseOrderController extends Controller
                     <tr><td style="border:0.75px solid #000;"><b>Total Weight</b></td><td style="border:0.75px solid #000;"><b>' . number_format($calc['total_yarn_weight_consumed'], 4) . '</b></td></tr>
                 </table>
             </td>
-            <td width="5%"></td>
+            <td width="3%"></td>
             <td width="60%" style="vertical-align:top;">
                 <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
                     <tr style="background-color:#f0f0f0;">
