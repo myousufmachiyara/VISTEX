@@ -738,13 +738,13 @@ class PurchaseOrderController extends Controller
                     <tr>
                         <td style="border:0.75px solid #000;">Weft Yarn</td>
                         <td style="border:0.75px solid #000;">' . number_format($order->weft_yarn_cost_price, 2) . '</td>
-                        <td style="border:0.75px solid #000;">'.  number_format($order->weft_yarn_cost_price, 2) * number_format($calc['weft_consumption'], 2). '</td>
+                        <td style="border:0.75px solid #000;">'.  number_format($order->weft_yarn_cost_price * $calc['weft_consumption'], 2). '</td>
                         <td style="border:0.75px solid #000;">' . number_format($weftAmount, 2) . '</td>
                     </tr>
                     <tr>
                         <td style="border:0.75px solid #000;">Sizing</td>
                         <td style="border:0.75px solid #000;">' . number_format($order->sizing_lbs, 2) . '</td>
-                        <td style="border:0.75px solid #000;">'.  number_format($order->sizing_lbs, 2) * number_format($calc['warp_consumption'], 2). '</td>
+                        <td style="border:0.75px solid #000;">'.  number_format($order->sizing_lbs* $calc['warp_consumption'], 2). '</td>
                         <td style="border:0.75px solid #000;">' . number_format($sizingAmount, 2) . '</td>
                     </tr>
                     <tr>
