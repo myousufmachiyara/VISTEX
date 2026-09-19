@@ -434,7 +434,7 @@ class PurchaseOrderController extends Controller
 
         return $pdf->Output($order->order_no . '.pdf', 'I');
     }
-    
+
     private function printWeaving(PurchaseOrder $order)
     {
         $pdf = new \App\Services\myPDF();
@@ -585,9 +585,9 @@ class PurchaseOrderController extends Controller
             <td width="33%" style="border:0.75px solid #000;"><b>Total Yarn Required</b></td>
         </tr>
         <tr>
-            <td style="border:0.75px solid #000;">' . number_format($calc['warp_required_lbs'], 4) . '</td>
-            <td style="border:0.75px solid #000;">' . number_format($calc['weft_required_lbs'], 4) . '</td>
-            <td style="border:0.75px solid #000;">' . number_format($calc['total_yarn_required'], 4) . '</td>
+            <td style="border:0.75px solid #000;">' . number_format($calc['warp_required_lbs'], 2) . '</td>
+            <td style="border:0.75px solid #000;">' . number_format($calc['weft_required_lbs'], 2) . '</td>
+            <td style="border:0.75px solid #000;">' . number_format($calc['total_yarn_required'], 2) . '</td>
         </tr>
  
         </table>';
@@ -682,8 +682,8 @@ class PurchaseOrderController extends Controller
         $topHtml = '
         <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
         <tr>
-            <td width="20%" style="border:0.75px solid #000;"><b>Quality</b></td>
-            <td width="80%" style="border:0.75px solid #000;">' . e($quality) . '</td>
+            <td width="20%" style="border:0.75px solid #000;"><b>Fabric Quality</b></td>
+            <td width="80%" style="border:0.75px solid #000;">' . $order->greigeProduct->name . '</td>
         </tr>
         <tr>
             <td style="border:0.75px solid #000;"><b>P.O Quantity</b></td>
@@ -703,7 +703,7 @@ class PurchaseOrderController extends Controller
         $costHtml = '
         <table cellpadding="0" cellspacing="0" width="100%">
         <tr>
-            <td width="48%" style="vertical-align:top;">
+            <td width="40%" style="vertical-align:top;">
                 <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
                     <tr><td width="60%" style="border:0.75px solid #000;">Warp Yarn Count</td><td width="40%" style="border:0.75px solid #000;">' . $this->fmtNum($order->warp_count) . '</td></tr>
                     <tr><td style="border:0.75px solid #000;">Weft Yarn Count</td><td style="border:0.75px solid #000;">' . $this->fmtNum($order->weft_count) . '</td></tr>
@@ -719,8 +719,8 @@ class PurchaseOrderController extends Controller
                     <tr><td style="border:0.75px solid #000;"><b>Total Weight</b></td><td style="border:0.75px solid #000;"><b>' . number_format($calc['total_yarn_weight_consumed'], 4) . '</b></td></tr>
                 </table>
             </td>
-            <td width="4%"></td>
-            <td width="48%" style="vertical-align:top;">
+            <td width="5%"></td>
+            <td width="60%" style="vertical-align:top;">
                 <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
                     <tr style="background-color:#f0f0f0;">
                         <td width="34%" style="border:0.75px solid #000;">&nbsp;</td>
