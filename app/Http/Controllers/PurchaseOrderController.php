@@ -435,11 +435,10 @@ class PurchaseOrderController extends Controller
         return $pdf->Output($order->order_no . '.pdf', 'I');
     }
 
-
     private function printWeaving(PurchaseOrder $order)
     {
         $pdf = new \App\Services\myPDF();
-
+ 
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(true);
         $pdf->SetCreator(PDF_CREATOR);
@@ -447,11 +446,11 @@ class PurchaseOrderController extends Controller
         $pdf->SetAuthor('VISTEX (Private) Limited');
         $pdf->SetTitle($order->order_no);
         $pdf->SetSubject('Weaving Purchase Order');
-
+ 
         $logoPath = public_path('assets/img/vistex-logo.png');
-
+ 
         $quality = $this->qualityString($order);
-
+ 
         $paymentTerm = match ($order->payment_term_type) {
             'cash' => 'Cash',
             'credit' => ($order->payment_term_days ? $order->payment_term_days . ' days after invoice' : 'Credit'),
@@ -459,22 +458,22 @@ class PurchaseOrderController extends Controller
             'other' => e($order->payment_term_note ?: 'As agreed'),
             default => '-',
         };
-
+ 
         $conversionRate = 'Rs.' . number_format($order->weaving_per_meter, 2) . ' /- Per Mtr'
             . ($order->gst_applicable ? ' + Gst' : '')
             . ' ( Pick Rate ' . number_format($order->rate_per_pick, 2)
             . ' + Sizing Rs ' . number_format($order->sizing_rate_per_meter, 2) . ')';
-
+ 
         // ═════════════════════════════════════════════════════════════════
         // PAGE 1 — Purchase Order
         // ═════════════════════════════════════════════════════════════════
         $pdf->AddPage();
         $pdf->SetFont('helvetica', '', 9);
-
+ 
         if (file_exists($logoPath)) {
             $pdf->Image($logoPath, 5, 10, 55);
         }
-
+ 
         $pdf->SetFont('helvetica', 'B', 11);
         $pdf->SetXY(130, 10);
         $pdf->Cell(70, 5, $order->order_no, 0, 1, 'R');
@@ -485,9 +484,9 @@ class PurchaseOrderController extends Controller
         $pdf->Cell(70, 5, 'Delivery: ' . ($order->expected_date ? \Carbon\Carbon::parse($order->expected_date)->format('d-M-Y') : '-'), 0, 1, 'R');
         $pdf->SetXY(130, 25);
         $pdf->Cell(70, 5, 'Payment Terms: ' . $paymentTerm, 0, 1, 'R');
-
+ 
         $pdf->SetY(38);
-
+ 
         $partiesHtml = '
         <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
         <tr>
@@ -504,15 +503,15 @@ class PurchaseOrderController extends Controller
         </table>';
         $pdf->writeHTML($partiesHtml, true, false, false, false, '');
         $pdf->Ln(2);
-
+ 
         $gridHtml = '
         <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
-
+ 
         <tr>
             <td width="17%" style="border:0.75px solid #000;background-color:#f0f0f0;"><b>Fabric Quality</b></td>
             <td width="83%" style="border:0.75px solid #000;">' . e($quality) . '</td>
         </tr>
-
+ 
         <tr style="background-color:#f0f0f0;">
             <td width="17%" style="border:0.75px solid #000;"><b>P.O Quantity</b></td>
             <td width="17%" style="border:0.75px solid #000;"><b>Rate Per Pick</b></td>
@@ -529,21 +528,45 @@ class PurchaseOrderController extends Controller
             <td style="border:0.75px solid #000;">' . number_format($order->weft_consumption, 4) . '</td>
             <td style="border:0.75px solid #000;">' . number_format($order->total_yarn_weight_consumed, 4) . '</td>
         </tr>
-
+ 
         <tr>
             <td width="17%" style="border:0.75px solid #000;"><b>Conversion Rate</b></td>
             <td width="83%" style="border:0.75px solid #000;">' . $conversionRate . '</td>
         </tr>
-
+ 
         </table>';
-
+ 
         $pdf->writeHTML($gridHtml, true, false, false, false, '');
-
-
+ 
+        // NEW: Warp/Weft/Total Yarn Wt. Required — the 3 fields added to the
+        // blades/formula-service/backend. Sourced from CpoFormulaService's
+        // warp_required_lbs / weft_required_lbs / total_yarn_required, which
+        // are persisted on the order the same way warp_consumption etc. are.
+        // Kept as its own small block, styled to match the tables above/below
+        // it, so nothing else on this page (or Page 2) is touched.
+        $yarnRequiredHtml = '
+        <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
+ 
+        <tr style="background-color:#f0f0f0;">
+            <td width="34%" style="border:0.75px solid #000;"><b>Warp Yarn Wt. Required</b></td>
+            <td width="33%" style="border:0.75px solid #000;"><b>Weft Yarn Wt. Required</b></td>
+            <td width="33%" style="border:0.75px solid #000;"><b>Total Yarn Required</b></td>
+        </tr>
+        <tr>
+            <td style="border:0.75px solid #000;">' . number_format($order->warp_required_lbs, 4) . '</td>
+            <td style="border:0.75px solid #000;">' . number_format($order->weft_required_lbs, 4) . '</td>
+            <td style="border:0.75px solid #000;">' . number_format($order->total_yarn_required, 4) . '</td>
+        </tr>
+ 
+        </table>';
+ 
+        $pdf->writeHTML($yarnRequiredHtml, true, false, false, false, '');
+ 
+ 
         $summaryHtml = '
         <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
-
-
+ 
+ 
         <tr style="background-color:#f0f0f0;">
             <td width="33%" style="border:0.75px solid #000;"><b>Amount</b></td>
             <td width="33%" style="border:0.75px solid #000;"><b>GST (' . number_format($order->gst_rate, 2) . '%)</b></td>
@@ -554,40 +577,40 @@ class PurchaseOrderController extends Controller
             <td width="33%" style="border:0.75px solid #000;">' . number_format($order->gst_amount, 2) . '</td>
             <td width="33%" style="border:0.75px solid #000;">' . number_format($order->total_amount, 2) . '</td>
         </tr>
-
+ 
         </table>';
-
+ 
         $pdf->writeHTML($summaryHtml, true, false, false, false, '');
-
-    
+ 
+ 
         $gridHtml = '
         <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
-
+ 
         <tr style="background-color:#d9d9d9;">
             <td style="border:0.75px solid #000; text-align:center;"><b>Other Terms</b></td>
         </tr>
         <tr>
             <td style="border:0.75px solid #000; height:28px; vertical-align:top;">';
-
+ 
         if ($order->terms->isNotEmpty()) {
             foreach ($order->terms as $i => $term) {
                 $gridHtml .= ($i + 1) . '. ' . e($term->title) . ' — ' . e($term->description) . '<br>';
             }
         }
-
+ 
         $gridHtml .= '</td>
         </tr>
-
+ 
         <tr>
             <td style="border:0.75px solid #000;"><b>Remarks:</b></td>
             <td style="border:0.75px solid #000;">' . e($order->remarks ?: '-') . '</td>
         </tr>
-
+ 
         </table>';
-
+ 
         $pdf->writeHTML($gridHtml, true, false, false, false, '');
-
-        
+ 
+ 
         $pdf->SetFont('helvetica', 'B', 10);
         $pdf->Ln(12);
         $yPosition = $pdf->GetY();
@@ -601,29 +624,29 @@ class PurchaseOrderController extends Controller
         $pdf->Cell(40, 6, 'Received By', 0, 0, 'C');
         $pdf->SetXY(155, $yPosition + 2);
         $pdf->Cell(40, 6, 'Approved By', 0, 0, 'C');
-
+ 
         // ═════════════════════════════════════════════════════════════════
         // PAGE 2 — Cost Sheet
         // ═════════════════════════════════════════════════════════════════
         $pdf->AddPage();
         $pdf->SetFont('helvetica', '', 9);
-
+ 
         if (file_exists($logoPath)) {
             $pdf->Image($logoPath, 5, 10, 55);
         }
-
+ 
         $pdf->SetFont('helvetica', '', 9);
         $pdf->SetXY(130, 10);
         $pdf->Cell(70, 5, $order->order_no, 0, 1, 'R');
         $pdf->SetXY(130, 15);
         $pdf->Cell(70, 5, 'P.O Date: ' . \Carbon\Carbon::parse($order->order_date)->format('d-M-Y'), 0, 1, 'R');
-
+ 
         $pdf->SetY(28);
-
+ 
         $pdf->SetFont('helvetica', 'B', 12);
         $pdf->Cell(0, 10, 'Cost Sheet', 0, 1, 'C');
         $pdf->SetFont('helvetica', '', 9);
-
+ 
         $topHtml = '
         <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
         <tr>
@@ -637,14 +660,14 @@ class PurchaseOrderController extends Controller
         </table>';
         $pdf->writeHTML($topHtml, true, false, false, false, '');
         $pdf->Ln(3);
-
+ 
         $warpAmount = $order->warp_yarn_rate * $order->total_meters_required;
         $weftAmount = $order->weft_yarn_rate * $order->total_meters_required;
         $sizingAmount = $order->sizing_rate_per_meter * $order->total_meters_required;
         $warpingAmount = (float) $order->warping * $order->total_meters_required;
         $conversionAmount = $order->weaving_cost_per_meter * $order->total_meters_required;
         $totalCost = $warpAmount + $weftAmount + $sizingAmount + $warpingAmount + $conversionAmount;
-
+ 
         $costHtml = '
         <table cellpadding="0" cellspacing="0" width="100%">
         <tr>
@@ -712,38 +735,39 @@ class PurchaseOrderController extends Controller
             </td>
         </tr>
         </table>';
-
+ 
         $pdf->writeHTML($costHtml, true, false, false, false, '');
-
+ 
         return $pdf->Output($order->order_no . '.pdf', 'I');
     }
-
+ 
     private function qualityString(PurchaseOrder $order): string
     {
         $parts = [];
-
+ 
         if ($order->warp_count && $order->weft_count) {
             $parts[] = $this->fmtNum($order->warp_count) . '*' . $this->fmtNum($order->weft_count);
         }
-
+ 
         if ($order->reed && $order->pick) {
             $parts[] = $this->fmtNum($order->reed) . '*' . $this->fmtNum($order->pick);
         }
-
+ 
         $construction = implode('/', $parts);
-
+ 
         $widthPart = $order->width ? $this->fmtNum($order->width) . '"' : null;
         $namePart = $order->greigeProduct->name ?? $order->item_name ?? null;
-
+ 
         return trim(implode(' - ', array_filter([$construction, trim(($widthPart ?? '') . ' ' . ($namePart ?? ''))])));
     }
-
+ 
     private function fmtNum($value): string
     {
         $value = (float) $value;
         $formatted = number_format($value, 4, '.', '');
         $formatted = rtrim(rtrim($formatted, '0'), '.');
-
+ 
         return $formatted === '' ? '0' : $formatted;
     }
+
 }
