@@ -723,10 +723,10 @@ class PurchaseOrderController extends Controller
             <td width="60%" style="vertical-align:top;">
                 <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
                     <tr style="background-color:#f0f0f0;">
-                        <td width="34%" style="border:0.75px solid #000;">&nbsp;</td>
-                        <td width="22%" style="border:0.75px solid #000;"><b>Rate</b></td>
-                        <td width="22%" style="border:0.75px solid #000;"><b>Cost</b></td>
-                        <td width="22%" style="border:0.75px solid #000;"><b>Amount</b></td>
+                        <td width="30%" style="border:0.75px solid #000;">&nbsp;</td>
+                        <td width="20%" style="border:0.75px solid #000;"><b>Rate</b></td>
+                        <td width="20%" style="border:0.75px solid #000;"><b>Cost</b></td>
+                        <td width="30%" style="border:0.75px solid #000;"><b>Amount</b></td>
                     </tr>
                     <tr>
                         <td style="border:0.75px solid #000;">Warp Yarn</td>
@@ -742,7 +742,7 @@ class PurchaseOrderController extends Controller
                     </tr>
                     <tr>
                         <td style="border:0.75px solid #000;">Sizing</td>
-                        <td style="border:0.75px solid #000;">-</td>
+                        <td style="border:0.75px solid #000;">' . number_format($order->sizing_lbs, 2) . '</td>
                         <td style="border:0.75px solid #000;">' . number_format($order->sizing_rate_per_meter, 2) . '</td>
                         <td style="border:0.75px solid #000;">' . number_format($sizingAmount, 2) . '</td>
                     </tr>
