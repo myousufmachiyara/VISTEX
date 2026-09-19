@@ -222,6 +222,8 @@
                 <tr><td>Warp Consumption (lbs/m)</td><td id="p_warp_consumption">—</td></tr>
                 <tr><td>Weft Consumption (lbs/m)</td><td id="p_weft_consumption">—</td></tr>
                 <tr><td><strong>Total Yarn Consumption (lbs)</strong></td><td id="p_total_yarn_weight_consumed">—</td></tr>
+                <tr><td>Warp Required (lbs)</td><td id="p_warp_required_lbs">—</td></tr>
+                <tr><td>Weft Required (lbs)</td><td id="p_weft_required_lbs">—</td></tr>
                 <tr><td><strong>Total Yarn Required (lbs)</strong></td><td id="p_total_yarn_required">—</td></tr>
                 <tr><td>Warp Yarn Cost (pr/mtr)</td><td id="p_warp_yarn_rate">—</td></tr>
                 <tr><td>Weft Yarn Cost (pr/mtr)</td><td id="p_weft_yarn_rate">—</td></tr>
@@ -497,6 +499,8 @@
       $('#p_warp_consumption').text(formatMoney(data.warp_consumption, 4));
       $('#p_weft_consumption').text(formatMoney(data.weft_consumption, 4));
       $('#p_total_yarn_weight_consumed').text(formatMoney(data.total_yarn_weight_consumed, 4));
+      $('#p_warp_required_lbs').text(formatMoney(data.warp_required_lbs, 4));
+      $('#p_weft_required_lbs').text(formatMoney(data.weft_required_lbs, 4));
       $('#p_total_yarn_required').text(formatMoney(data.total_yarn_required, 4));
       $('#p_warp_yarn_rate').text(rs(data.warp_yarn_rate));
       $('#p_weft_yarn_rate').text(rs(data.weft_yarn_rate));

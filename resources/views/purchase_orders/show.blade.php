@@ -74,7 +74,9 @@
             <tr><td>Item</td><td>{{ $order->item_name }}</td></tr>
             <tr><td>Warp / Weft Yarn</td><td>{{ $order->warpProduct->name ?? '' }} / {{ $order->weftProduct->name ?? '' }}</td></tr>
             <tr><td>Total Meters Required</td><td>{{ number_format($order->total_meters_required,3) }}</td></tr>
-            <tr><td><strong>Total Yarn Required (lbs)</strong></td><td>{{ number_format($order->total_yarn_weight_consumed,0) }}</td></tr>
+            <tr><td>Warp Required (lbs)</td><td>{{ number_format($order->warp_required_lbs, 4) }}</td></tr>
+            <tr><td>Weft Required (lbs)</td><td>{{ number_format($order->weft_required_lbs, 4) }}</td></tr>
+            <tr><td><strong>Total Yarn Required (lbs)</strong></td><td>{{ number_format($order->total_yarn_required, 4) }}</td></tr>
             <tr><td>Weaving Cost</td><td>{{ number_format($order->weaving_cost,2) }}</td></tr>
           </tbody>
         </table>

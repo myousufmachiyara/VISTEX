@@ -39,7 +39,13 @@ class CpoFormulaService
         $weftConsumption = $weftConsumptionBase * (1 + $weftShrinkagePct / 100);
 
         $totalYarnWeightConsumed = $warpConsumption + $weftConsumption;
-        $totalYarnRequired = ($warpConsumption * $totalMeters) + ($weftConsumption * $totalMeters);
+
+        // Warp/Weft Required (lbs) = each yarn's per-meter weight × total meters
+        $warpRequiredLbs = $warpConsumption * $totalMeters;
+        $weftRequiredLbs = $weftConsumption * $totalMeters;
+
+        // Total Yarn Required = Warp Required + Weft Required
+        $totalYarnRequired = $warpRequiredLbs + $weftRequiredLbs;
 
         $warpYarnRate = $warpYarnCostPrice * $warpConsumption;
         $weftYarnRate = $weftYarnCostPrice * $weftConsumption;
@@ -71,6 +77,8 @@ class CpoFormulaService
             'warp_consumption'             => round($warpConsumption, 4),
             'weft_consumption'             => round($weftConsumption, 4),
             'total_yarn_weight_consumed'   => round($totalYarnWeightConsumed, 4),
+            'warp_required_lbs'            => round($warpRequiredLbs, 4),
+            'weft_required_lbs'            => round($weftRequiredLbs, 4),
             'total_yarn_required'          => round($totalYarnRequired, 4),
             'warp_yarn_rate'               => round($warpYarnRate, 2),
             'weft_yarn_rate'               => round($weftYarnRate, 2),
