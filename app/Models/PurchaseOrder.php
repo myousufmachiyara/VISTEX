@@ -32,7 +32,7 @@ class PurchaseOrder extends Model
 
         // Weaving — derived outputs (stored via $calc from CpoFormulaService)
         'reed_space', 'warp_gsm', 'weft_gsm', 'gsm', 'gsm_kg',
-        'warp_consumption', 'weft_consumption', 'total_yarn_weight_consumed',
+        'warp_consumption', 'weft_consumption', 'total_yarn_weight_consumed','total_yarn_required',
         'warp_yarn_rate', 'weft_yarn_rate', 'total_yarn_cost_per_meter',
         'weaving_cost_per_meter', 'sizing_rate_per_meter', 'weaving_per_meter',
         'fabric_cost', 'weaving_cost', 'item_name',
@@ -54,7 +54,7 @@ class PurchaseOrder extends Model
         'pick' => 'decimal:4', 'width' => 'decimal:4', 'total_meters_required' => 'decimal:3',
         'rate_per_pick' => 'decimal:2', 'sizing_lbs' => 'decimal:4', 'warping' => 'decimal:4',
         'warp_conversion_pct' => 'decimal:2', 'weft_conversion_pct' => 'decimal:2',
-        'warp_yarn_cost_price' => 'decimal:4', 'weft_yarn_cost_price' => 'decimal:4',
+        'warp_yarn_cost_price' => 'decimal:4', 'weft_yarn_cost_price' => 'decimal:4','total_yarn_required' => 'decimal:4',
 
         // Weaving outputs
         'reed_space' => 'decimal:2', 'warp_gsm' => 'decimal:2', 'weft_gsm' => 'decimal:2',

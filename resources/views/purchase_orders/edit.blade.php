@@ -252,6 +252,7 @@
               <tr><td>Warp Consumption (lbs/m)</td><td id="p_warp_consumption">{{ $order->warp_consumption ?? '—' }}</td></tr>
               <tr><td>Weft Consumption (lbs/m)</td><td id="p_weft_consumption">{{ $order->weft_consumption ?? '—' }}</td></tr>
               <tr><td><strong>Total Yarn Consumption (lbs)</strong></td><td id="p_total_yarn_weight_consumed">{{ $order->total_yarn_weight_consumed ?? '—' }}</td></tr>
+              <tr><td><strong>Total Yarn Required (lbs)</strong></td><td id="p_total_yarn_required">{{ $order->total_yarn_required ?? '—' }}</td></tr>
               <tr><td>Warp Yarn Cost (pr/mtr)</td><td id="p_warp_yarn_rate">{{ $order->warp_yarn_rate ?? '—' }}</td></tr>
               <tr><td>Weft Yarn Cost (pr/mtr)</td><td id="p_weft_yarn_rate">{{ $order->weft_yarn_rate ?? '—' }}</td></tr>
               <tr><td><strong>Total Yarn Cost per Meter</strong></td><td id="p_total_yarn_cost_per_meter">{{ $order->total_yarn_cost_per_meter ?? '—' }}</td></tr>
@@ -478,6 +479,7 @@
       $('#p_warp_consumption').text(formatMoney(data.warp_consumption, 4));
       $('#p_weft_consumption').text(formatMoney(data.weft_consumption, 4));
       $('#p_total_yarn_weight_consumed').text(formatMoney(data.total_yarn_weight_consumed, 4));
+      $('#p_total_yarn_required').text(formatMoney(data.total_yarn_required, 4));
       $('#p_warp_yarn_rate').text(rs(data.warp_yarn_rate));
       $('#p_weft_yarn_rate').text(rs(data.weft_yarn_rate));
       $('#p_total_yarn_cost_per_meter').text(rs(data.total_yarn_cost_per_meter));
