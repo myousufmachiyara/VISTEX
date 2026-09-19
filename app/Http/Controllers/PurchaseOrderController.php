@@ -698,7 +698,8 @@ class PurchaseOrderController extends Controller
         $sizingAmount = $order->sizing_rate_per_meter * $order->total_meters_required;
         $warpingAmount = (float) $order->warping * $order->total_meters_required;
         $conversionAmount = $order->weaving_cost_per_meter * $order->total_meters_required;
-        $totalCost = $warpAmount + $weftAmount + $sizingAmount + $warpingAmount + $conversionAmount;
+        $totalCost = $order->warp_yarn_rate  + $order->weft_yarn_rate + $order->sizing_rate_per_meter + $order->warping;
+        $totalAmount = $warpAmount + $weftAmount + $sizingAmount + $warpingAmount + $conversionAmount;
  
         $costHtml = '
         <table cellpadding="0" cellspacing="0" width="100%">
@@ -760,8 +761,8 @@ class PurchaseOrderController extends Controller
                     </tr>
                     <tr style="background-color:#f0f0f0;">
                         <td colspan="2" style="border:0.75px solid #000;"><b>Total Cost</b></td>
-                        <td style="border:0.75px solid #000;">Rs</td>
-                        <td style="border:0.75px solid #000;"><b>' . number_format($totalCost, 2) . '</b></td>
+                        <td style="border:0.75px solid #000;"><b>Rs.' . number_format($totalCost, 2) . '</b></td>
+                        <td style="border:0.75px solid #000;"><b>Rs.' . number_format($totalAmount, 2) . '</b></td>
                     </tr>
                 </table>
             </td>
