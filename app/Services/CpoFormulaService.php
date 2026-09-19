@@ -35,8 +35,8 @@ class CpoFormulaService
         $warpConsumptionBase = ($reed * $width * 1.0936 / 840) / $warpCount;
         $weftConsumptionBase = ($reedSpace * $pick * 1.0936 / 840) / $weftCount;
 
-        $warpConsumption = $warpConsumptionBase * (1 + $warpShrinkagePct / 100);
-        $weftConsumption = $weftConsumptionBase * (1 + $weftShrinkagePct / 100);
+        $warpConsumption = $warpConsumptionBase + (1 + $warpShrinkagePct / 100);
+        $weftConsumption = $weftConsumptionBase + (1 + $weftShrinkagePct / 100);
 
         $totalYarnWeightConsumed = $warpConsumption + $weftConsumption;
 
