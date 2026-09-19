@@ -481,6 +481,8 @@
       $('#p_warp_consumption').text(formatMoney(data.warp_consumption, 4));
       $('#p_weft_consumption').text(formatMoney(data.weft_consumption, 4));
       $('#p_total_yarn_weight_consumed').text(formatMoney(data.total_yarn_weight_consumed, 4));
+      $('#p_warp_required_lbs').text(formatMoney(data.warp_required_lbs, 4));
+      $('#p_weft_required_lbs').text(formatMoney(data.weft_required_lbs, 4));
       $('#p_total_yarn_required').text(formatMoney(data.total_yarn_required, 4));
       $('#p_warp_yarn_rate').text(rs(data.warp_yarn_rate));
       $('#p_weft_yarn_rate').text(rs(data.weft_yarn_rate));
