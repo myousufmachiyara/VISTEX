@@ -732,7 +732,7 @@ class PurchaseOrderController extends Controller
                     <tr>
                         <td style="border:0.75px solid #000;">Warp Yarn</td>
                         <td style="border:0.75px solid #000;">' . number_format($order->warp_yarn_cost_price, 2) . '</td>
-                        <td style="border:0.75px solid #000;">'.  number_format($order->warp_yarn_cost_price, 2) * number_format($calc['warp_consumption'], 2). '</td>
+                        <td style="border:0.75px solid #000;">'.  number_format($order->warp_yarn_cost_price * $calc['warp_consumption'], 2). '</td>
                         <td style="border:0.75px solid #000;">' . number_format($warpAmount, 2) . '</td>
                     </tr>
                     <tr>
