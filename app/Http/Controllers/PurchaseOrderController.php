@@ -518,7 +518,7 @@ class PurchaseOrderController extends Controller
             <td width="20%" style="border:0.75px solid #000;"><b>Sizing Rate (per Lbs)</b></td>
             <td width="15%" style="border:0.75px solid #000;"><b>Warp Wt.</b></td>
             <td width="15%" style="border:0.75px solid #000;"><b>Weft Wt.</b></td>
-            <td width="17%" style="border:0.75px solid #000;"><b>Total Wt.</b></td>
+            <td width="16%" style="border:0.75px solid #000;"><b>Total Wt.</b></td>
         </tr>
         <tr>
             <td style="border:0.75px solid #000;">' . number_format($order->total_meters_required, 3) . ' Mtr</td>
