@@ -738,7 +738,7 @@ class PurchaseOrderController extends Controller
                     <tr>
                         <td style="border:0.75px solid #000;">Weft Yarn</td>
                         <td style="border:0.75px solid #000;">' . number_format($order->weft_yarn_cost_price, 2) . '</td>
-                        <td style="border:0.75px solid #000;">'.  number_format($order->weft_yarn_cost_price * $calc['weft_consumption'], 2). '</td>
+                        <td style="border:0.75px solid #000;">'.  number_format($order->weft_yarn_cost_price * $calc['weft_consumption'], 3). '</td>
                         <td style="border:0.75px solid #000;">' . number_format($weftAmount, 2) . '</td>
                     </tr>
                     <tr>
