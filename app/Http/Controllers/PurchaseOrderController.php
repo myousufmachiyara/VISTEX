@@ -515,15 +515,15 @@ class PurchaseOrderController extends Controller
         <tr style="background-color:#f0f0f0;">
             <td width="17%" style="border:0.75px solid #000;"><b>P.O Quantity</b></td>
             <td width="17%" style="border:0.75px solid #000;"><b>Rate Per Pick</b></td>
-            <td width="17%" style="border:0.75px solid #000;"><b>Sizing Rate (per Lbs)</b></td>
-            <td width="16%" style="border:0.75px solid #000;"><b>Warp Wt.</b></td>
-            <td width="16%" style="border:0.75px solid #000;"><b>Weft Wt.</b></td>
+            <td width="20%" style="border:0.75px solid #000;"><b>Sizing Rate (per Lbs)</b></td>
+            <td width="15%" style="border:0.75px solid #000;"><b>Warp Wt.</b></td>
+            <td width="15%" style="border:0.75px solid #000;"><b>Weft Wt.</b></td>
             <td width="17%" style="border:0.75px solid #000;"><b>Total Wt.</b></td>
         </tr>
         <tr>
             <td style="border:0.75px solid #000;">' . number_format($order->total_meters_required, 3) . ' Mtr</td>
             <td style="border:0.75px solid #000;">' . number_format($order->rate_per_pick, 2) . '</td>
-            <td style="border:0.75px solid #000;">' . number_format($order->sizing_rate_per_meter, 2) . '</td>
+            <td style="border:0.75px solid #000;">' . number_format($order->sizing_lbs, 2) . '</td>
             <td style="border:0.75px solid #000;">' . number_format($order->warp_consumption, 4) . '</td>
             <td style="border:0.75px solid #000;">' . number_format($order->weft_consumption, 4) . '</td>
             <td style="border:0.75px solid #000;">' . number_format($order->total_yarn_weight_consumed, 4) . '</td>
