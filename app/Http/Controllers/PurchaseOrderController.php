@@ -693,8 +693,8 @@ class PurchaseOrderController extends Controller
         $pdf->writeHTML($topHtml, true, false, false, false, '');
         $pdf->Ln(3);
  
-        $warpAmount = $order->warp_yarn_rate * $order->total_meters_required;
-        $weftAmount = $order->weft_yarn_rate * $order->total_meters_required;
+        $warpAmount = ($order->warp_yarn_cost_price * $calc['warp_consumption']) * $order->total_meters_required;
+        $weftAmount = ($order->weft_yarn_cost_price * $calc['weft_consumption']) * $order->total_meters_required;
         $sizingAmount = $order->sizing_rate_per_meter * $order->total_meters_required;
         $warpingAmount = (float) $order->warping * $order->total_meters_required;
         $conversionAmount = $order->weaving_cost_per_meter * $order->total_meters_required;
