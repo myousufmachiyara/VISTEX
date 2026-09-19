@@ -481,7 +481,7 @@ class PurchaseOrderController extends Controller
         $pdf->SetXY(130, 15);
         $pdf->Cell(70, 5, 'P.O Date: ' . \Carbon\Carbon::parse($order->order_date)->format('d-M-Y'), 0, 1, 'R');
         $pdf->SetXY(130, 20);
-        $pdf->Cell(70, 5, 'Delivery: ' . ($order->expected_date ? \Carbon\Carbon::parse($order->expected_date)->format('d-M-Y') : '-'), 0, 1, 'R');
+        $pdf->Cell(70, 5, 'PO Expiry Date: ' . ($order->expected_date ? \Carbon\Carbon::parse($order->expected_date)->format('d-M-Y') : '-'), 0, 1, 'R');
         $pdf->SetXY(130, 25);
         $pdf->Cell(70, 5, 'Payment Terms: ' . $paymentTerm, 0, 1, 'R');
  
@@ -496,8 +496,8 @@ class PurchaseOrderController extends Controller
             </td>
             <td width="50%" style="border:0.75px solid #000;">
                 <b style="font-size:12px">Vistex (Pvt.) Ltd.</b><br>
-                F-128, Hub River Road, SITE Area, Karachi 75600, Pakistan<br>
-                NTN: 1234567-8 &nbsp; STRN: 12-34-5678-901-23
+                NTN: 1234567-8 &nbsp; STRN: 12-34-5678-901-23<br>
+                F-128, Hub River Road, SITE Area, Karachi 75600, Pakistan
             </td>
         </tr>
         </table>';
