@@ -38,7 +38,11 @@ class CpoFormulaService
         $warpConsumption = $warpConsumptionBase * (1 + $warpShrinkagePct / 100);
         $weftConsumption = $weftConsumptionBase * (1 + $weftShrinkagePct / 100);
 
+        dd("here is:".$warpConsumptionBase);
+        dd("here is:".$weftConsumptionBase);
         dd("here is:".$warpConsumption);
+        dd("here is:".$weftConsumption);
+
         $totalYarnWeightConsumed = $warpConsumption + $weftConsumption;
 
         // Warp/Weft Required (lbs) = each yarn's per-meter weight × total meters
