@@ -509,7 +509,7 @@ class PurchaseOrderController extends Controller
  
         <tr>
             <td width="17%" style="border:0.75px solid #000;background-color:#f0f0f0;"><b>Fabric Quality</b></td>
-            <td width="83%" style="border:0.75px solid #000;">' . e($quality) . '</td>
+            <td width="83%" style="border:0.75px solid #000;">' . $order->item_name . '</td>
         </tr>
  
         <tr style="background-color:#f0f0f0;">
