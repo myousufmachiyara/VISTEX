@@ -38,7 +38,7 @@ class CpoFormulaService
         $warpConsumption = $warpConsumptionBase * (1 + $warpShrinkagePct / 100);
         $weftConsumption = $weftConsumptionBase * (1 + $weftShrinkagePct / 100);
 
-        dd(" warpConsumptionBase: ".$warpConsumptionBase. " weftConsumptionBase: ". $weftConsumptionBase." warpConsumption: ". $warpConsumption. " weftConsumption: ".$weftConsumption);
+        // dd(" warpConsumptionBase: ".$warpConsumptionBase. " weftConsumptionBase: ". $weftConsumptionBase." warpConsumption: ". $warpConsumption. " weftConsumption: ".$weftConsumption);
 
         $totalYarnWeightConsumed = $warpConsumption + $weftConsumption;
 
