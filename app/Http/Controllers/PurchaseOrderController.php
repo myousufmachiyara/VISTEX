@@ -748,7 +748,7 @@ class PurchaseOrderController extends Controller
                         <td style="border:0.75px solid #000;">Sizing</td>
                         <td style="border:0.75px solid #000;">' . number_format($order->sizing_lbs, 2) . '</td>
                         <td style="border:0.75px solid #000;">'.  number_format($order->sizing_lbs* $calc['warp_consumption'], 2). '</td>
-                        <td style="border:0.75px solid #000;">' . number_format($sizingAmount, 2) . '</td>
+                        <td style="border:0.75px solid #000;">'.  number_format($order->sizing_lbs* $calc['warp_consumption'], 2). '</td>
                     </tr>
                     <tr>
                         <td style="border:0.75px solid #000;">Warping</td>
