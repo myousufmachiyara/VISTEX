@@ -702,7 +702,7 @@ class PurchaseOrderController extends Controller
         $warpingAmount = (float) $order->warping * $order->total_meters_required;
         $conversionAmount = $order->weaving_cost_per_meter * $order->total_meters_required;
         $totalCost = ($order->warp_yarn_cost_price * $calc['warp_consumption']) + ($order->weft_yarn_cost_price * $calc['weft_consumption']) + ( $order->sizing_lbs * $calc['warp_consumption']) + ( $order->rate_per_pick* $order->pick);
-        $totalAmount = $warpAmount + $weftAmount + ($order->sizing_lbs* $calc['warp_consumption']) + $warpingAmount + $conversionAmount;
+        $totalAmount = $warpAmount + $weftAmount + ($order->sizing_lbs* $calc['warp_consumption']* $order->total_meters_required) + $warpingAmount + $conversionAmount;
  
         $costHtml = '
         <table cellpadding="0" cellspacing="0" width="100%">
