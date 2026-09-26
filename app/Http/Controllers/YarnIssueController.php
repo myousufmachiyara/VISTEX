@@ -29,7 +29,10 @@ class YarnIssueController extends Controller
             ->orderByDesc('order_date')
             ->get();
 
-        return view('yarn_issues.create', ['cpos' => $orders]);
+        // Prototype only: Sale Orders offered for the new "Yarn Sale" issue type.
+        $approvedJobs = \App\Models\Job::approved()->with('customer')->orderByDesc('order_date')->get();
+
+        return view('yarn_issues.create', ['cpos' => $orders, 'approvedJobs' => $approvedJobs]);
     }
 
     public function cpoDetails($poId)
@@ -55,6 +58,56 @@ class YarnIssueController extends Controller
             'already_issued'      => (float) $order->yarn_issued_total,
             'outstanding'         => round((float) $order->total_yarn_weight_consumed - (float) $order->yarn_issued_total, 3),
         ]);
+    }
+
+    // ── Prototype support for the "Yarn Sale" issue flow (frontend-only for now) ──
+    // Returns the yarn-category items on an approved Sale Order, mirroring the
+    // shape used by PurchaseOrderController@jobItems, so a yarn issue can be
+    // raised against what the customer actually ordered.
+    public function jobItems($jobId)
+    {
+        $job = \App\Models\Job::with('items.product.category')->findOrFail($jobId);
+
+        return response()->json([
+            'collection' => $job->customer_reference,
+            'items' => $job->items
+                ->filter(fn($i) => $i->product && optional($i->product->category)->code === 'yarn')
+                ->map(fn($i) => [
+                    'id'           => $i->id,
+                    'product_id'   => $i->product_id,
+                    'product_name' => $i->product->name ?? '',
+                    'sku'          => $i->product->sku ?? '',
+                    'outstanding'  => $i->outstanding_qty,
+                    'unit'         => $i->measurement_unit,
+                ])->values(),
+        ]);
+    }
+
+    // Which yarn Purchase Orders still have unreceived balance for this product —
+    // lets a single yarn requirement be sourced across multiple POs / rates.
+    public function productPos($productId)
+    {
+        $orders = PurchaseOrder::where('type', 'purchase')
+            ->whereIn('status', ['Approved', 'PartiallyReceived'])
+            ->whereHas('items', fn($q) => $q->where('product_id', $productId))
+            ->with(['items' => fn($q) => $q->where('product_id', $productId), 'vendor'])
+            ->orderByDesc('order_date')
+            ->get();
+
+        $result = [];
+        foreach ($orders as $po) {
+            $balance = $po->items->sum(fn($i) => (float) $i->quantity - (float) $i->quantity_received);
+            if ($balance > 0.001) {
+                $result[] = [
+                    'id' => $po->id,
+                    'order_no' => $po->order_no,
+                    'vendor_name' => $po->vendor->name ?? '',
+                    'balance' => round($balance, 3),
+                ];
+            }
+        }
+
+        return response()->json($result);
     }
 
     public function store(Request $request)

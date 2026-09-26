@@ -45,9 +45,6 @@
         </div>
 
         <div class="alert alert-info py-2" id="categoryMsg">Select a Category to continue.</div>
-        <div class="alert alert-warning py-2" id="processingMsg" style="display:none">
-          Processing-type Purchase Orders are not yet enabled in this build.
-        </div>
 
         {{-- ═══ COMMON HEADER FIELDS (shown once category/type resolved) ═══ --}}
         <div id="commonFields" style="display:none">
@@ -238,6 +235,87 @@
               </tbody>
             </table>
           </div>
+
+          {{-- ═══ PROCESSING TYPE: Mill Processing PO fields ═══ --}}
+          <div id="processingSection" style="display:none">
+            <hr><h6>Processing Order Details</h6>
+            <div class="row">
+              <div class="col-md-4 mb-3">
+                <label>Sale Order <span class="text-danger">*</span></label>
+                <select name="job_id" id="job_select" class="form-control select2-js" required>
+                  <option value="">Select Sale Order</option>
+                  @foreach($approvedJobs as $job)
+                    <option value="{{ $job->id }}">{{ $job->job_no }} — {{ $job->customer->name ?? 'General' }}</option>
+                  @endforeach
+                </select>
+                <small class="text-muted">Loads the patterns / SKUs ordered by the customer for this job.</small>
+              </div>
+              <div class="col-md-4 mb-3">
+                <label>Program</label>
+                <input type="text" name="program" class="form-control" placeholder="e.g. 100% Cotton">
+              </div>
+              <div class="col-md-4 mb-3">
+                <label>Collection</label>
+                <input type="text" id="proc_collection_display" class="form-control" placeholder="Auto-filled from Sale Order" readonly>
+              </div>
+            </div>
+
+            {{-- Fabric Details --}}
+            <h6 class="mt-3">Fabric Details</h6>
+            <div class="row">
+              <div class="col-md-4 mb-3">
+                <label>Fabric Quality</label>
+                <input type="text" name="fabric_specs[fabric_quality]" class="form-control" placeholder="e.g. 20x20/60x60 Combed 100% CTN">
+              </div>
+              <div class="col-md-2 mb-3">
+                <label>Greige Width</label>
+                <input type="text" name="fabric_specs[greige_width]" class="form-control" placeholder="e.g. 120&quot;">
+              </div>
+              <div class="col-md-2 mb-3">
+                <label>Finished Width</label>
+                <input type="text" name="fabric_specs[finished_width]" class="form-control" placeholder="e.g. 108&quot;">
+              </div>
+              <div class="col-md-2 mb-3">
+                <label>Finished GSM</label>
+                <input type="text" name="fabric_specs[finished_gsm]" class="form-control" placeholder="e.g. 155">
+              </div>
+              <div class="col-md-2 mb-3">
+                <label>Dyestuff</label>
+                <input type="text" name="fabric_specs[dyestuff]" class="form-control" placeholder="e.g. Reactive">
+              </div>
+            </div>
+
+            {{-- Line Items --}}
+            <h6 class="mt-3">Line Items</h6>
+            <table class="table table-bordered" id="procItemsTable">
+              <thead>
+                <tr>
+                  <th width="14%">Collection</th>
+                  <th width="18%">Pattern #</th>
+                  <th>Description</th>
+                  <th width="10%">Qty (m)</th>
+                  <th width="10%">Rate</th>
+                  <th width="10%">Amount</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="procItemsBody"></tbody>
+              <tfoot>
+                <tr><td colspan="4" class="text-end">Subtotal:</td><td colspan="2" class="text-end" id="procSubtotalDisplay">0.00</td><td></td></tr>
+                <tr><td colspan="4" class="text-end">GST:</td><td colspan="2" class="text-end" id="procGstDisplay">0.00</td><td></td></tr>
+                <tr class="fw-bold"><td colspan="4" class="text-end">Total:</td><td colspan="2" class="text-end" id="procTotalDisplay">0.00</td><td></td></tr>
+              </tfoot>
+            </table>
+            <button type="button" class="btn btn-outline-primary" id="addProcRowBtn">Add Custom Row</button>
+
+            {{-- Lab Requirements --}}
+            <h6 class="mt-4">Lab Requirements <small class="text-muted">(varies by mill — add / remove as needed)</small></h6>
+            <table class="table table-bordered table-sm" id="labReqTable">
+              <thead><tr><th width="35%">Requirement</th><th>Value</th><th width="1%"></th></tr></thead>
+              <tbody id="labReqBody"></tbody>
+            </table>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="addLabReqBtn">Add Requirement</button>
+          </div>
         </div>
       </div>
       <footer class="card-footer text-end"><button type="submit" class="btn btn-success" id="submitBtn" style="display:none">Save Purchase Order</button></footer>
@@ -247,6 +325,8 @@
 
 <script>
   let rowIndex = 0;
+  let procRowIndex = 0;
+  let labReqIndex = 0;
   let categoryProducts = [];
   const units = @json($units->map(fn($u) => ['id' => $u->id, 'label' => $u->name . ' (' . $u->shortcode . ')']));
 
@@ -306,7 +386,10 @@
     } else if (type === 'processing') {
       $('#categoryMsg').hide();
       $('#commonFields, #service_type_field, #processingSection, #submitBtn').show();
-      addProcRow();
+      if ($('#procItemsBody').children().length === 0) addProcRow();
+      if ($('#labReqBody').children().length === 0) {
+        ['Strike-Off', 'Lab Dips', 'Shrinkage', 'Colour Fastness (Wash)', 'Colour Fastness (Rubbing)', 'Finish'].forEach(addLabReqRow);
+      }
     }
   });
 
@@ -318,9 +401,13 @@
   }
 
   function resetAll() {
-    $('#type_field, #service_type_field, #commonFields, #purchaseItemsSection, #weavingSection, #brokerSection, #processingMsg, #submitBtn').hide();
-    $('#itemsBody').empty();
+    $('#type_field, #service_type_field, #commonFields, #purchaseItemsSection, #weavingSection, #processingSection, #brokerSection, #submitBtn').hide();
+    $('#itemsBody, #procItemsBody, #labReqBody').empty();
     rowIndex = 0;
+    procRowIndex = 0;
+    labReqIndex = 0;
+    $('#job_select').val(null).trigger('change');
+    $('#proc_collection_display').val('');
     $('#po_type').val('');
   }
 
@@ -514,6 +601,95 @@
       $('#p_net_amount').text(rs(data.net_amount));
     });
   }
+
+  // ── Processing type: line items from Sale Order ──
+  function addProcRow(prefill) {
+    prefill = prefill || {};
+    const idx = procRowIndex++;
+    const row = $(`
+      <tr class="proc-item-row">
+        <td><input type="text" name="items[${idx}][collection]" class="form-control proc-collection" value="${prefill.collection || ''}"></td>
+        <td><input type="text" name="items[${idx}][pattern_code]" class="form-control proc-pattern" value="${prefill.pattern_code || ''}" required></td>
+        <td><input type="text" name="items[${idx}][description]" class="form-control proc-description" value="${prefill.description || ''}"></td>
+        <td>
+          <input type="number" name="items[${idx}][quantity]" class="form-control proc-qty comma-input" step="any" min="0.001" value="${prefill.quantity || 0}" ${prefill.max ? `max="${prefill.max}"` : ''}>
+          ${prefill.max ? `<small class="text-muted">Max: ${prefill.max}</small>` : ''}
+        </td>
+        <td><input type="number" name="items[${idx}][rate]" class="form-control proc-rate comma-input" step="any" min="0" value="0"></td>
+        <td class="proc-amount-cell text-end">0.00</td>
+        <td>
+          <input type="hidden" name="items[${idx}][job_item_id]" value="${prefill.job_item_id || ''}">
+          <input type="hidden" name="items[${idx}][measurement_unit]" value="${prefill.measurement_unit || ''}">
+          <button type="button" class="btn btn-sm btn-outline-danger remove-proc-row">&times;</button>
+        </td>
+      </tr>
+    `);
+    $('#procItemsBody').append(row);
+  }
+  $('#addProcRowBtn').on('click', function () { addProcRow(); });
+
+  $(document).on('click', '.remove-proc-row', function () {
+    if ($('.proc-item-row').length > 1) { $(this).closest('tr').remove(); recalcProcTotal(); }
+  });
+
+  $('#job_select').on('change', function () {
+    const jobId = $(this).val();
+    $('#procItemsBody').empty();
+    if (!jobId) { addProcRow(); return; }
+    fetch(`/purchase-orders/job-items/${jobId}`).then(r => r.json()).then(data => {
+      $('#proc_collection_display').val(data.collection || '');
+      if (!data.items || data.items.length === 0) { addProcRow(); return; }
+      data.items.forEach(item => {
+        addProcRow({
+          collection: data.collection || '',
+          pattern_code: item.pattern_code,
+          description: item.description,
+          quantity: item.outstanding,
+          max: item.outstanding,
+          job_item_id: item.id,
+          measurement_unit: item.unit,
+        });
+      });
+      recalcProcTotal();
+    });
+  });
+
+  $(document).on('input', '.proc-qty, .proc-rate', function () {
+    const row = $(this).closest('tr');
+    const qty = unformatNumber(row.find('.proc-qty').val());
+    const rate = unformatNumber(row.find('.proc-rate').val());
+    row.find('.proc-amount-cell').text((qty * rate).toFixed(2));
+    recalcProcTotal();
+  });
+
+  function recalcProcTotal() {
+    let subtotal = 0;
+    $('.proc-item-row').each(function () { subtotal += unformatNumber($(this).find('.proc-amount-cell').text()); });
+    const gstApplicable = $('#gst_applicable').val() === '1';
+    const rate = gstApplicable ? (parseFloat($('#tax_select').find('option:selected').data('rate')) || 0) : 0;
+    const gst = subtotal * (rate / 100);
+    $('#procSubtotalDisplay').text(formatMoney(subtotal));
+    $('#procGstDisplay').text(formatMoney(gst));
+    $('#procTotalDisplay').text(formatMoney(subtotal + gst));
+  }
+  $(document).on('change', '#gst_applicable, #tax_select', recalcProcTotal);
+
+  // ── Processing type: Lab Requirements (dynamic key/value list) ──
+  function addLabReqRow(label) {
+    const idx = labReqIndex++;
+    const row = $(`
+      <tr class="lab-req-row">
+        <td><input type="text" name="fabric_specs[lab_requirements][${idx}][label]" class="form-control" value="${label || ''}" placeholder="e.g. Shrinkage"></td>
+        <td><input type="text" name="fabric_specs[lab_requirements][${idx}][value]" class="form-control" placeholder="e.g. Max 3% warp / 3% weft"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger remove-lab-req-row">&times;</button></td>
+      </tr>
+    `);
+    $('#labReqBody').append(row);
+  }
+  $('#addLabReqBtn').on('click', function () { addLabReqRow(); });
+  $(document).on('click', '.remove-lab-req-row', function () {
+    if ($('.lab-req-row').length > 1) $(this).closest('tr').remove();
+  });
 
   $('form').on('submit', function () {
     const $customInput = $('input[name="payment_term_days_custom"]:visible');
