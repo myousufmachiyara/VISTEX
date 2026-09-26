@@ -322,8 +322,8 @@ Route::middleware(['auth'])->group(function () {
          Route::get('/',                   [YarnIssueController::class, 'index'])      ->name('index')  ->middleware('check.permission:yarn_issues.index');
          Route::get('create',              [YarnIssueController::class, 'create'])     ->name('create') ->middleware('check.permission:yarn_issues.create');
          Route::get('cpo-details/{poId}',  [YarnIssueController::class, 'cpoDetails']) ->name('cpo_details')->middleware('check.permission:yarn_issues.index');
-+        Route::get('job-items/{jobId}',   [YarnIssueController::class, 'jobItems'])   ->name('job_items')->middleware('check.permission:yarn_issues.index');
-+        Route::get('product-pos/{productId}', [YarnIssueController::class, 'productPos'])->name('product_pos')->middleware('check.permission:yarn_issues.index');
+         Route::get('job-items/{jobId}',   [YarnIssueController::class, 'jobItems'])   ->name('job_items')->middleware('check.permission:yarn_issues.index');
+         Route::get('product-pos/{productId}', [YarnIssueController::class, 'productPos'])->name('product_pos')->middleware('check.permission:yarn_issues.index');
          Route::post('/',                   [YarnIssueController::class, 'store'])      ->name('store')  ->middleware('check.permission:yarn_issues.create');
          Route::get('{id}/edit',           [YarnIssueController::class, 'edit'])       ->name('edit')   ->middleware('check.permission:yarn_issues.edit');
          Route::put('{id}',                [YarnIssueController::class, 'update'])     ->name('update') ->middleware('check.permission:yarn_issues.edit');
