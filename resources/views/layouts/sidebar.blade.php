@@ -120,7 +120,7 @@
         {{-- ═══════════════════════════════════════════════════════ --}}
         {{-- SALES — Forecasting + Jobs                                 --}}
         {{-- ═══════════════════════════════════════════════════════ --}}
-        @if(auth()->user()->canAny(['forecasts.index','jobs.index']))
+        {{-- @if(auth()->user()->canAny(['forecasts.index','jobs.index']))
         <li class="nav-parent {{ request()->routeIs('forecasts.*','jobs.*') ? 'nav-expanded active' : '' }}">
           <a class="nav-link" href="#"><i class="fa fa-chart-line"></i><span>Sales</span></a>
           <ul class="nav nav-children">
@@ -128,7 +128,7 @@
             @can('jobs.index')<li class="{{ request()->routeIs('jobs.*')?'active':'' }}"><a class="nav-link" href="{{ route('jobs.index') }}">Jobs / Customer Orders</a></li>@endcan
           </ul>
         </li>
-        @endif
+        @endif --}}
 
         {{-- ═══════════════════════════════════════════════════════ --}}
         {{-- FINANCE — PDC + Vouchers                                   --}}
