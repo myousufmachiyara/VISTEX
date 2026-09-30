@@ -384,9 +384,9 @@ class PurchaseOrderController extends Controller
         <tr style="font-weight:bold; background-color:#f0f0f0;">
             <th width="6%" style="border:1px solid #333; text-align:center;">#</th>
             <th width="28%" style="border:1px solid #333;">Item</th>
-            <th width="14%" style="border:1px solid #333; text-align:center;">Packs × Qty/Pack</th>
-            <th width="10%" style="border:1px solid #333; text-align:center;">Quantity</th>
-            <th width="8%" style="border:1px solid #333; text-align:center;">Unit</th>
+            <th width="14%" style="border:1px solid #333; text-align:center;">Total Bags</th>
+            <th width="18%" style="border:1px solid #333; text-align:center;">Total Unit</th>
+            <th width="14%" style="border:1px solid #333; text-align:right;">Rate/Unit</th>
             <th width="14%" style="border:1px solid #333; text-align:right;">Rate</th>
             <th width="20%" style="border:1px solid #333; text-align:right;">Amount</th>
         </tr>';
@@ -399,9 +399,8 @@ class PurchaseOrderController extends Controller
         <tr>
             <td style="border:1px solid #333; text-align:center;">' . $count . '</td>
             <td style="border:1px solid #333;">' . e($item->product->name ?? '') . '</td>
-            <td style="border:1px solid #333; text-align:center;">' . e($item->packing_label ?? '—') . '</td>
-            <td style="border:1px solid #333; text-align:center;">' . number_format($item->quantity, 3) . '</td>
-            <td style="border:1px solid #333; text-align:center;">' . e($item->product->measurementUnit->shortcode ?? '') . '</td>
+            <td style="border:1px solid #333; text-align:center;">' . e($item->pack_qty ?? '—') . '</td>
+            <td style="border:1px solid #333; text-align:center;">' . number_format($item->quantity, 3) . ' ' . e($item->product->measurementUnit->shortcode ?? '') . '</td>
             <td style="border:1px solid #333; text-align:right;">' . number_format($item->rate, 2) . '</td>
             <td style="border:1px solid #333; text-align:right;">' . number_format($amount, 2) . '</td>
         </tr>';
