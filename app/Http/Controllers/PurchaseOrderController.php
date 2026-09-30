@@ -48,7 +48,7 @@ class PurchaseOrderController extends Controller
 
     public function edit($id)
     {
-        $order = PurchaseOrder::with('items')->findOrFail($id);
+        $order = PurchaseOrder::with('items.product.measurementUnit')->findOrFail($id);
         if (!$order->canBeEditedBy(auth()->user())) abort(403, 'Only the creator or a superadmin can edit a Draft, Pending or Rejected PO.');
         return view('purchase_orders.edit', array_merge($this->formData(), ['order' => $order]));
     }
@@ -113,7 +113,8 @@ class PurchaseOrderController extends Controller
         if ($type === 'purchase') {
             return array_merge($base, [
                 'items' => 'required|array|min:1', 'items.*.product_id' => 'required|exists:products,id',
-                'items.*.quantity' => 'required|numeric|min:0.001', 'items.*.rate' => 'required|numeric|min:0',
+                'items.*.quantity' => 'required_without:items.*.pack_qty|nullable|numeric|min:0', 'items.*.rate' => 'required|numeric|min:0',
+                'items.*.pack_qty' => 'nullable|numeric|min:0', 'items.*.qty_per_pack' => 'nullable|numeric|gt:0',
                 'items.*.measurement_unit' => 'nullable|exists:measurement_units,id', 'items.*.forecast_id' => 'nullable|exists:forecasts,id',
             ]);
         }
@@ -372,11 +373,12 @@ class PurchaseOrderController extends Controller
         <table cellpadding="4" cellspacing="0" width="100%" style="border:1px solid #333; font-size:10px;">
         <tr style="font-weight:bold; background-color:#f0f0f0;">
             <th width="6%" style="border:1px solid #333; text-align:center;">#</th>
-            <th width="38%" style="border:1px solid #333;">Item</th>
-            <th width="14%" style="border:1px solid #333; text-align:center;">Quantity</th>
-            <th width="12%" style="border:1px solid #333; text-align:center;">Unit</th>
-            <th width="15%" style="border:1px solid #333; text-align:right;">Rate</th>
-            <th width="15%" style="border:1px solid #333; text-align:right;">Amount</th>
+            <th width="28%" style="border:1px solid #333;">Item</th>
+            <th width="14%" style="border:1px solid #333; text-align:center;">Packs × Qty/Pack</th>
+            <th width="10%" style="border:1px solid #333; text-align:center;">Quantity</th>
+            <th width="8%" style="border:1px solid #333; text-align:center;">Unit</th>
+            <th width="14%" style="border:1px solid #333; text-align:right;">Rate</th>
+            <th width="20%" style="border:1px solid #333; text-align:right;">Amount</th>
         </tr>';
 
         $count = 0;
@@ -387,6 +389,7 @@ class PurchaseOrderController extends Controller
         <tr>
             <td style="border:1px solid #333; text-align:center;">' . $count . '</td>
             <td style="border:1px solid #333;">' . e($item->product->name ?? '') . '</td>
+            <td style="border:1px solid #333; text-align:center;">' . e($item->packing_label ?? '—') . '</td>
             <td style="border:1px solid #333; text-align:center;">' . number_format($item->quantity, 3) . '</td>
             <td style="border:1px solid #333; text-align:center;">' . e($item->product->measurementUnit->shortcode ?? '') . '</td>
             <td style="border:1px solid #333; text-align:right;">' . number_format($item->rate, 2) . '</td>

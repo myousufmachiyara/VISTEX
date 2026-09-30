@@ -120,7 +120,7 @@
             <tr>
               <td>{{ $item->product->name ?? trim($item->pattern_code . ' ' . $item->description) }}</td>
               <td>{{ $item->measurementUnit->shortcode ?? '' }}</td>
-              <td class="text-end">{{ number_format($item->quantity,3) }}</td>
+              <td class="text-end">{{ number_format($item->quantity,3) }}@if($item->packing_label)<div class="small text-muted">{{ $item->packing_label }}</div>@endif</td>
               <td class="text-end">{{ number_format($item->quantity_received,3) }}</td>
               <td class="text-end">{{ number_format($item->outstanding_qty,3) }}</td>
               <td class="text-end">{{ number_format($item->rate,2) }}</td>

@@ -156,7 +156,14 @@
         @if($order->type === 'purchase')
         <div id="purchaseItemsSection">
           <table class="table table-bordered" id="itemsTable">
-            <thead><tr><th>Item</th><th>Quantity</th><th>Rate</th><th>Amount</th><th></th></tr></thead>
+            <thead><tr>
+              <th>Item</th>
+              <th width="11%">Qty <small class="text-muted d-block">bags / packs</small></th>
+              <th width="11%">Qty / Pack <small class="text-muted d-block">in item unit</small></th>
+              <th width="12%" class="text-end">Total Qty</th>
+              <th width="11%">Rate <small class="text-muted d-block">per unit</small></th>
+              <th>Amount</th><th></th>
+            </tr></thead>
             <tbody id="itemsBody">
               @foreach($order->items as $i => $item)
               <tr class="item-row">
@@ -168,7 +175,10 @@
                     @endforeach
                   </select>
                 </td>
-                <td><input type="number" name="items[{{ $i }}][quantity]" class="form-control qty-input comma-input" step="any" min="0.001" value="{{ $item->quantity }}"></td>
+                <td><input type="number" name="items[{{ $i }}][pack_qty]" class="form-control pack-input comma-input" step="any" min="0" value="{{ (float) ($item->pack_qty ?? $item->quantity) }}"></td>
+                <td><input type="number" name="items[{{ $i }}][qty_per_pack]" class="form-control perpack-input comma-input" step="any" min="0.0001" value="{{ (float) ($item->qty_per_pack ?? 1) }}"></td>
+                <td class="text-end"><span class="total-qty-cell">{{ rtrim(rtrim(number_format($item->quantity, 3), '0'), '.') }}</span> <small class="text-muted">{{ $item->product->measurementUnit->shortcode ?? '' }}</small>
+                  <input type="hidden" name="items[{{ $i }}][quantity]" class="qty-input" value="{{ (float) $item->quantity }}"></td>
                 <td><input type="number" name="items[{{ $i }}][rate]" class="form-control price-input comma-input" step="any" min="0" value="{{ $item->rate }}"></td>
                 <td class="amount-cell text-end">{{ number_format($item->amount, 2) }}</td>
                 <td><button type="button" class="btn btn-sm btn-outline-danger remove-row">&times;</button></td>
@@ -177,22 +187,22 @@
             </tbody>
             <tfoot>
               <tr>
-                <td colspan="3" class="text-end">Subtotal:</td>
+                <td colspan="5" class="text-end">Subtotal:</td>
                 <td class="text-end" id="subtotalDisplay">{{ number_format($order->subtotal, 2) }}</td>
                 <td></td>
               </tr>
               <tr>
-                <td colspan="3" class="text-end">GST:</td>
+                <td colspan="5" class="text-end">GST:</td>
                 <td class="text-end" id="gstDisplay">{{ number_format($order->gst_amount, 2) }}</td>
                 <td></td>
               </tr>
               <tr>
-                <td colspan="3" class="text-end">Broker Commission:</td>
+                <td colspan="5" class="text-end">Broker Commission:</td>
                 <td class="text-end" id="brokerDisplay">{{ number_format($order->broker_commission_amount ?? 0, 2) }}</td>
                 <td></td>
               </tr>
               <tr class="fw-bold">
-                <td colspan="3" class="text-end">Total:</td>
+                <td colspan="5" class="text-end">Total:</td>
                 <td class="text-end" id="totalDisplay">{{ number_format($order->total_amount, 2) }}</td>
                 <td></td>
               </tr>
@@ -385,7 +395,10 @@
     const row = $(`
       <tr class="item-row">
         <td><select name="items[${idx}][product_id]" class="form-control select2-js product-select" required>${productOptionsHtml()}</select></td>
-        <td><input type="number" name="items[${idx}][quantity]" class="form-control qty-input comma-input" step="any" min="0.001" value="0"></td>
+        <td><input type="number" name="items[${idx}][pack_qty]" class="form-control pack-input comma-input" step="any" min="0" value="0"></td>
+        <td><input type="number" name="items[${idx}][qty_per_pack]" class="form-control perpack-input comma-input" step="any" min="0.0001" value="1"></td>
+        <td class="text-end"><span class="total-qty-cell">0</span>
+          <input type="hidden" name="items[${idx}][quantity]" class="qty-input" value="0"></td>
         <td><input type="number" name="items[${idx}][rate]" class="form-control price-input comma-input" step="any" min="0" value="0"></td>
         <td class="amount-cell text-end">0.00</td>
         <td><button type="button" class="btn btn-sm btn-outline-danger remove-row">&times;</button></td>
@@ -395,11 +408,16 @@
     row.find('.select2-js').select2({ width: '100%' });
   });
 
-  $(document).on('input', '.qty-input, .price-input', function () {
+  // Total Qty = Qty (packs) × Qty/Pack;  Amount = Total Qty × Rate
+  $(document).on('input', '.pack-input, .perpack-input, .price-input', function () {
     const row = $(this).closest('tr');
-    const qty = unformatNumber(row.find('.qty-input').val());
-    const price = unformatNumber(row.find('.price-input').val());
-    row.find('.amount-cell').text((qty * price).toFixed(2));
+    const packs = unformatNumber(row.find('.pack-input').val()) || 0;
+    const perPack = unformatNumber(row.find('.perpack-input').val()) || 0;
+    const total = +(packs * perPack).toFixed(3);
+    const price = unformatNumber(row.find('.price-input').val()) || 0;
+    row.find('.qty-input').val(total);
+    row.find('.total-qty-cell').text(total.toLocaleString(undefined, { maximumFractionDigits: 3 }));
+    row.find('.amount-cell').text((total * price).toFixed(2));
     recalcTotal();
   });
 

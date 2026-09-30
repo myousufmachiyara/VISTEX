@@ -65,6 +65,7 @@ class PurchaseOrderService
 
     private function createPurchaseType(array $data, array $items, ?int $userId): PurchaseOrder
     {
+        $items = $this->normalisePacking($items);
         $items = array_values(array_filter($items, fn($i) => (float) ($i['quantity'] ?? 0) > 0));
         if (empty($items)) throw new \Exception('Enter at least one item.');
 
@@ -153,6 +154,7 @@ class PurchaseOrderService
             }
 
             if ($order->type === 'purchase') {
+                $items = $this->normalisePacking($items);
                 $items = array_values(array_filter($items, fn($i) => (float) ($i['quantity'] ?? 0) > 0));
                 if (empty($items)) throw new \Exception('Enter at least one item.');
                 $subtotal = 0;
@@ -257,6 +259,28 @@ class PurchaseOrderService
         return $data;
     }
 
+    /**
+     * Purchase lines may be entered as packs: pack_qty (bags) x qty_per_pack (lbs per bag).
+     * The server — not the browser — works out quantity = pack_qty x qty_per_pack,
+     * and amount is then quantity x rate. Lines without packing keep their quantity.
+     */
+    private function normalisePacking(array $items): array
+    {
+        return array_map(function ($i) {
+            $packs = $i['pack_qty'] ?? null;
+            if ($packs === null || $packs === '') {
+                $i['pack_qty'] = null; $i['qty_per_pack'] = null;
+                return $i;
+            }
+            $perPack = (float) (($i['qty_per_pack'] ?? '') === '' ? 1 : $i['qty_per_pack']);
+            if ($perPack <= 0) throw new \Exception('Qty per pack must be greater than zero.');
+            $i['pack_qty'] = round((float) $packs, 3);
+            $i['qty_per_pack'] = round($perPack, 4);
+            $i['quantity'] = round($i['pack_qty'] * $i['qty_per_pack'], 3);
+            return $i;
+        }, $items);
+    }
+
     private function syncItems(PurchaseOrder $order, array $items): void
     {
         foreach ($items as $item) {
@@ -266,6 +290,7 @@ class PurchaseOrderService
                 'purchase_order_id' => $order->id, 'product_id' => $item['product_id'],
                 'forecast_id' => $item['forecast_id'] ?? null,
                 'measurement_unit' => $item['measurement_unit'] ?? $product?->measurement_unit,
+                'pack_qty' => $item['pack_qty'] ?? null, 'qty_per_pack' => $item['qty_per_pack'] ?? null,
                 'quantity' => $qty, 'rate' => $rate, 'amount' => round($qty * $rate, 2),
             ]);
         }

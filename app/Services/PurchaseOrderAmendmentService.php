@@ -107,7 +107,12 @@ class PurchaseOrderAmendmentService
                 $item = PurchaseOrderItem::where('purchase_order_id', $po->id)->findOrFail($row['id']);
                 $qty = $row['quantity'] ?? $item->quantity;
                 $rate = $row['rate'] ?? $item->rate;
-                $item->update(['quantity' => $qty, 'rate' => $rate, 'amount' => round((float) $qty * (float) $rate, 2)]);
+                $packing = [];
+                if ($item->pack_qty !== null && (float) $item->qty_per_pack > 0 && isset($row['quantity'])) {
+                    // Pack size stays, number of packs follows the new total
+                    $packing['pack_qty'] = round((float) $qty / (float) $item->qty_per_pack, 3);
+                }
+                $item->update(array_merge($packing, ['quantity' => $qty, 'rate' => $rate, 'amount' => round((float) $qty * (float) $rate, 2)]));
             }
 
             $po->update(array_merge($values, ['revision_no' => $po->revision_no + 1, 'updated_by' => $approverId]));

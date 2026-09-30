@@ -151,15 +151,20 @@
               <thead>
                 <tr>
                   <th width="24%">Item (search by name or code)</th>
-                  <th>Unit</th><th>Link Forecast</th><th>Quantity</th><th>Rate</th><th>Amount</th><th></th>
+                  <th>Unit</th><th>Link Forecast</th>
+                  <th width="9%">Qty <small class="text-muted d-block">bags / packs</small></th>
+                  <th width="9%">Qty / Pack <small class="text-muted d-block">in item unit</small></th>
+                  <th width="10%" class="text-end">Total Qty</th>
+                  <th width="9%">Rate <small class="text-muted d-block">per unit</small></th>
+                  <th>Amount</th><th></th>
                 </tr>
               </thead>
               <tbody id="itemsBody"></tbody>
               <tfoot>
-                <tr><td colspan="4" class="text-end">Subtotal:</td><td colspan="2" class="text-end" id="subtotalDisplay">0.00</td><td></td></tr>
-                <tr><td colspan="4" class="text-end">GST:</td><td colspan="2" class="text-end" id="gstDisplay">0.00</td><td></td></tr>
-                <tr><td colspan="4" class="text-end">Broker Commission:</td><td colspan="2" class="text-end" id="brokerDisplay">0.00</td><td></td></tr>
-                <tr class="fw-bold"><td colspan="4" class="text-end">Total:</td><td colspan="2" class="text-end" id="totalDisplay">0.00</td><td></td></tr>
+                <tr><td colspan="6" class="text-end">Subtotal:</td><td colspan="2" class="text-end" id="subtotalDisplay">0.00</td><td></td></tr>
+                <tr><td colspan="6" class="text-end">GST:</td><td colspan="2" class="text-end" id="gstDisplay">0.00</td><td></td></tr>
+                <tr><td colspan="6" class="text-end">Broker Commission:</td><td colspan="2" class="text-end" id="brokerDisplay">0.00</td><td></td></tr>
+                <tr class="fw-bold"><td colspan="6" class="text-end">Total:</td><td colspan="2" class="text-end" id="totalDisplay">0.00</td><td></td></tr>
               </tfoot>
             </table>
             <button type="button" class="btn btn-outline-primary" id="addRowBtn">Add Item</button>
@@ -465,7 +470,10 @@
         <td><select name="items[${idx}][product_id]" class="form-control select2-js product-select" required>${productOptionsHtml()}</select></td>
         <td><select name="items[${idx}][measurement_unit]" class="form-control unit-select">${unitOptionsHtml(null)}</select></td>
         <td><select name="items[${idx}][forecast_id]" class="form-control forecast-select" disabled><option value="">—</option></select></td>
-        <td><input type="number" name="items[${idx}][quantity]" class="form-control qty-input comma-input" step="any" min="0.001" value="0"></td>
+        <td><input type="number" name="items[${idx}][pack_qty]" class="form-control pack-input comma-input" step="any" min="0" value="0"></td>
+        <td><input type="number" name="items[${idx}][qty_per_pack]" class="form-control perpack-input comma-input" step="any" min="0.0001" value="1"></td>
+        <td class="text-end"><span class="total-qty-cell">0</span> <small class="text-muted unit-label"></small>
+          <input type="hidden" name="items[${idx}][quantity]" class="qty-input" value="0"></td>
         <td><input type="number" name="items[${idx}][rate]" class="form-control rate-input comma-input" step="any" min="0" value="0"></td>
         <td class="amount-cell text-end">0.00</td>
         <td><button type="button" class="btn btn-sm btn-outline-danger remove-row">&times;</button></td>
@@ -480,6 +488,7 @@
     const row = $(this).closest('tr');
     const opt = $(this).find('option:selected');
     row.find('.unit-select').html(unitOptionsHtml(opt.data('unit')));
+    refreshUnitLabel(row);
 
     const productId = $(this).val();
     const $fc = row.find('.forecast-select');
@@ -492,18 +501,34 @@
     });
   });
 
+  // Forecast shortfall is in item units: convert it to packs of the current size
   $(document).on('change', '.forecast-select', function () {
     const shortfall = $(this).find('option:selected').data('shortfall');
-    if (shortfall !== undefined) $(this).closest('tr').find('.qty-input').val(shortfall).trigger('input');
+    if (shortfall === undefined) return;
+    const row = $(this).closest('tr');
+    const perPack = unformatNumber(row.find('.perpack-input').val()) || 1;
+    row.find('.pack-input').val(+(shortfall / perPack).toFixed(3)).trigger('input');
   });
 
-  $(document).on('input', '.qty-input, .rate-input', function () {
-    const row = $(this).closest('tr');
-    const qty = unformatNumber(row.find('.qty-input').val());
-    const rate = unformatNumber(row.find('.rate-input').val());
-    row.find('.amount-cell').text((qty * rate).toFixed(2));
+  // Total Qty = Qty (packs) × Qty/Pack;  Amount = Total Qty × Rate
+  function recalcPurchaseRow(row) {
+    const packs = unformatNumber(row.find('.pack-input').val()) || 0;
+    const perPack = unformatNumber(row.find('.perpack-input').val()) || 0;
+    const total = +(packs * perPack).toFixed(3);
+    const rate = unformatNumber(row.find('.rate-input').val()) || 0;
+    row.find('.qty-input').val(total);
+    row.find('.total-qty-cell').text(total.toLocaleString(undefined, { maximumFractionDigits: 3 }));
+    row.find('.amount-cell').text((total * rate).toFixed(2));
     recalcPurchaseTotal();
-  });
+  }
+  $(document).on('input', '.pack-input, .perpack-input, .rate-input', function () { recalcPurchaseRow($(this).closest('tr')); });
+
+  function refreshUnitLabel(row) {
+    const text = row.find('.unit-select option:selected').text();
+    const m = text.match(/\(([^)]+)\)\s*$/);   // "Pounds (lbs)" -> "lbs"
+    row.find('.unit-label').text(m ? m[1] : text);
+  }
+  $(document).on('change', '.unit-select', function () { refreshUnitLabel($(this).closest('tr')); });
 
   $(document).on('input change', '#broker_commission_amount', recalcPurchaseTotal);
   $(document).on('change', '#tax_select', function () { recalcPurchaseTotal(); recalcCpo(); });
