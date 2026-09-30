@@ -376,7 +376,7 @@ class PurchaseOrderController extends Controller
             <th width="28%" style="border:1px solid #333;">Item</th>
             <th width="14%" style="border:1px solid #333; text-align:center;">Total Bags</th>
             <th width="18%" style="border:1px solid #333; text-align:center;">Total Qty</th>
-            <th width="14%" style="border:1px solid #333; text-align:right;">Rate</th>
+            <th width="14%" style="border:1px solid #333; text-align:right;">Rate/unit</th>
             <th width="20%" style="border:1px solid #333; text-align:right;">Amount</th>
         </tr>';
 
@@ -389,7 +389,7 @@ class PurchaseOrderController extends Controller
             <td style="border:1px solid #333; text-align:center;">' . $count . '</td>
             <td style="border:1px solid #333;">' . e($item->product->name ?? '') . '</td>
             <td style="border:1px solid #333; text-align:center;">' . e($item->pack_qty ?? '—') . '</td>
-            <td style="border:1px solid #333; text-align:center;">' . number_format($item->quantity, 3) . e($item->product->measurementUnit->shortcode ?? '') . '</td>
+            <td style="border:1px solid #333; text-align:center;">' . number_format($item->quantity, 3) . ' ' . e($item->product->measurementUnit->shortcode ?? '') . '</td>
             <td style="border:1px solid #333; text-align:right;">' . number_format($item->rate, 2) . '</td>
             <td style="border:1px solid #333; text-align:right;">' . number_format($amount, 2) . '</td>
         </tr>';
