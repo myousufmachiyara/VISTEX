@@ -41,7 +41,7 @@
               <td class="text-primary">{{ $order->order_no }} <small class="text-muted">(Rev {{ $order->revision_no }})</small></td>
               <td>{{ $order->category->name ?? '' }}</td>
               <td>{{ $order->vendor->name ?? '' }}</td>
-              <td class="small">$order->items->product->name</td>
+              <td class="small">{{$order->items->product->name}}</td>
               <td class="text-end">{{ number_format($order->total_amount, 2) }}</td>
               <td>
                 <span class="badge bg-{{ $order->status_badge }}">{{ $order->status_label }}</span>
