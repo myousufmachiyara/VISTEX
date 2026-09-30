@@ -375,7 +375,7 @@ class PurchaseOrderController extends Controller
             <th width="6%" style="border:1px solid #333; text-align:center;">#</th>
             <th width="28%" style="border:1px solid #333;">Item</th>
             <th width="14%" style="border:1px solid #333; text-align:center;">Total Bags</th>
-            <th width="10%" style="border:1px solid #333; text-align:center;">Total Qty</th>
+            <th width="18%" style="border:1px solid #333; text-align:center;">Total Qty</th>
             <th width="14%" style="border:1px solid #333; text-align:right;">Rate</th>
             <th width="20%" style="border:1px solid #333; text-align:right;">Amount</th>
         </tr>';
