@@ -42,7 +42,14 @@
               <td>{{ $order->category->name ?? '' }}</td>
               <td>{{ $order->vendor->name ?? '' }}</td>
               <td class="small">{{ $order->items->map(fn($i) => $i->product->name ?? $i->pattern_code)->filter()->join(', ') }}</td>
-              <td class="text-end">{{ number_format($order->total_amount, 2) }}</td>
+              <td class="text-end">
+                @if($order->type === 'weaving')
+                  {{ number_format($order->total_meters_required, 3) }} m
+                @else
+                  {{ number_format($order->items->sum('quantity'), 3) }}
+                  {{ $order->items->first()?->product?->measurementUnit?->shortcode }}
+                @endif
+              </td>
               <td>
                 <span class="badge bg-{{ $order->status_badge }}">{{ $order->status_label }}</span>
               </td>
