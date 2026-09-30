@@ -29,8 +29,8 @@
         <table class="table table-bordered table-striped" id="poTable">
           <thead>
             <tr>
-              <th>#</th><th>Date</th><th>PO #</th><th>Category</th><th>Vendor</th>
-              <th>From → Drop Off</th><th class="text-end">Total</th><th>Status</th><th width="18%">Actions</th>
+              <th>#</th><th>PO Date</th><th>PO #</th><th>Category</th><th>Vendor</th>
+              <th>Item</th><th class="text-end">Total Qty</th><th>Status</th><th width="18%">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -41,7 +41,7 @@
               <td class="text-primary">{{ $order->order_no }} <small class="text-muted">(Rev {{ $order->revision_no }})</small></td>
               <td>{{ $order->category->name ?? '' }}</td>
               <td>{{ $order->vendor->name ?? '' }}</td>
-              <td class="small">{{ $order->fromLocation->name ?? '—' }} → {{ $order->dropOffLocation->name ?? '' }}</td>
+              <td class="small">$order->items->product->name</td>
               <td class="text-end">{{ number_format($order->total_amount, 2) }}</td>
               <td>
                 <span class="badge bg-{{ $order->status_badge }}">{{ $order->status_label }}</span>
