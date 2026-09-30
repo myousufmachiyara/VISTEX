@@ -33,6 +33,7 @@ class PurchaseOrderController extends Controller
         $brokers = Broker::active()->orderBy('name')->get();
         $serviceTypes = ServiceType::active()->orderBy('name')->get();
         $units = MeasurementUnit::orderBy('name')->get();
+        $terms = \App\Models\TermAndCondition::active()->orderBy('sort_order')->orderBy('title')->get();
         $dropOffLocations = Location::whereNull('vendor_id')->where('is_active', true)->orderBy('name')->get();
         $approvedJobs = Job::approved()->with('customer')->orderByDesc('order_date')->get();
 
@@ -41,16 +42,22 @@ class PurchaseOrderController extends Controller
         $greigeCategory = ProductCategory::where('code', 'greige')->first();
         $greigeProducts = $greigeCategory ? Product::active()->where('category_id', $greigeCategory->id)->orderBy('name')->get() : collect();
 
-        return compact('categories', 'vendors', 'products', 'taxes', 'brokers', 'serviceTypes', 'units', 'dropOffLocations', 'approvedJobs', 'yarnProducts', 'greigeProducts');
+        return compact('categories', 'vendors', 'products', 'taxes', 'brokers', 'serviceTypes', 'units', 'dropOffLocations', 'approvedJobs', 'yarnProducts', 'greigeProducts', 'terms');
     }
 
     public function create() { return view('purchase_orders.create', $this->formData()); }
 
     public function edit($id)
     {
-        $order = PurchaseOrder::with('items.product.measurementUnit')->findOrFail($id);
+        $order = PurchaseOrder::with('items.product.measurementUnit', 'terms')->findOrFail($id);
         if (!$order->canBeEditedBy(auth()->user())) abort(403, 'Only the creator or a superadmin can edit a Draft, Pending or Rejected PO.');
-        return view('purchase_orders.edit', array_merge($this->formData(), ['order' => $order]));
+
+        $selected = $order->terms->pluck('term_id')->filter()->all();
+        $terms = \App\Models\TermAndCondition::forType($order->type)
+            ->where(fn($q) => $q->where('is_active', true)->orWhereIn('id', $selected))
+            ->orderBy('sort_order')->orderBy('title')->get();
+
+        return view('purchase_orders.edit', array_merge($this->formData(), ['order' => $order, 'terms' => $terms]));
     }
 
     public function vendorLocations($vendorId) { return response()->json($this->service->vendorLocations($vendorId)); }
@@ -108,6 +115,9 @@ class PurchaseOrderController extends Controller
             'gst_applicable' => 'required|boolean', 'tax_id' => 'required_if:gst_applicable,1|nullable|exists:tax_masters,id',
             'remarks' => 'nullable|string',
             'submit_action' => 'nullable|in:draft,submit',
+            'terms_submitted' => 'nullable|boolean',
+            'term_ids' => 'nullable|array', 'term_ids.*' => 'integer|exists:terms_and_conditions,id',
+            'keep_snapshot_ids' => 'nullable|array', 'keep_snapshot_ids.*' => 'integer',
         ];
 
         if ($type === 'purchase') {
@@ -235,7 +245,7 @@ class PurchaseOrderController extends Controller
             'warpProduct', 'weftProduct', 'greigeProduct', 'openObjections.raisedBy',
             'issuances.items.product', 'processingIssues.items.product',
             'receivings.items.product', 'receivings.challan', 'challans',
-            'amendments.requestedBy',
+            'amendments.requestedBy', 'terms',
         ])->findOrFail($id);
         return view('purchase_orders.show', compact('order'));
     }
@@ -374,9 +384,10 @@ class PurchaseOrderController extends Controller
         <tr style="font-weight:bold; background-color:#f0f0f0;">
             <th width="6%" style="border:1px solid #333; text-align:center;">#</th>
             <th width="28%" style="border:1px solid #333;">Item</th>
-            <th width="14%" style="border:1px solid #333; text-align:center;">Total Bags</th>
-            <th width="18%" style="border:1px solid #333; text-align:center;">Total Unit</th>
-            <th width="14%" style="border:1px solid #333; text-align:right;">Rate/Unit</th>
+            <th width="14%" style="border:1px solid #333; text-align:center;">Packs × Qty/Pack</th>
+            <th width="10%" style="border:1px solid #333; text-align:center;">Quantity</th>
+            <th width="8%" style="border:1px solid #333; text-align:center;">Unit</th>
+            <th width="14%" style="border:1px solid #333; text-align:right;">Rate</th>
             <th width="20%" style="border:1px solid #333; text-align:right;">Amount</th>
         </tr>';
 
@@ -388,8 +399,9 @@ class PurchaseOrderController extends Controller
         <tr>
             <td style="border:1px solid #333; text-align:center;">' . $count . '</td>
             <td style="border:1px solid #333;">' . e($item->product->name ?? '') . '</td>
-            <td style="border:1px solid #333; text-align:center;">' . e($item->pack_qty ?? '—') . '</td>
-            <td style="border:1px solid #333; text-align:center;">' . number_format($item->quantity, 3) . ' ' . e($item->product->measurementUnit->shortcode ?? '') . '</td>
+            <td style="border:1px solid #333; text-align:center;">' . e($item->packing_label ?? '—') . '</td>
+            <td style="border:1px solid #333; text-align:center;">' . number_format($item->quantity, 3) . '</td>
+            <td style="border:1px solid #333; text-align:center;">' . e($item->product->measurementUnit->shortcode ?? '') . '</td>
             <td style="border:1px solid #333; text-align:right;">' . number_format($item->rate, 2) . '</td>
             <td style="border:1px solid #333; text-align:right;">' . number_format($amount, 2) . '</td>
         </tr>';
@@ -432,12 +444,7 @@ class PurchaseOrderController extends Controller
 
         if ($order->terms->isNotEmpty()) {
             $pdf->Ln(3);
-            $pdf->SetFont('helvetica', 'B', 9);
-            $pdf->Cell(0, 6, 'Terms & Conditions:', 0, 1, 'L');
-            $pdf->SetFont('helvetica', '', 8);
-            foreach ($order->terms as $i => $term) {
-                $pdf->MultiCell(0, 4, ($i + 1) . '. ' . $term->title . ' — ' . $term->description, 0, 'L');
-            }
+            $pdf->writeHTML($this->termsHtml($order), true, false, false, false, '');
         }
 
         if ($order->remarks) {
@@ -461,6 +468,17 @@ class PurchaseOrderController extends Controller
         $pdf->Cell($lineWidth, 10, 'Approved By', 0, 0, 'C');
 
         return $pdf->Output($order->order_no . '.pdf', 'I');
+    }
+
+    // Numbered "Terms & Conditions" block: bold title, then the full text
+    private function termsHtml(PurchaseOrder $order): string
+    {
+        $html = '<table cellpadding="3" cellspacing="0" width="100%" style="border:0.75px solid #333; font-size:8.5px;">
+            <tr style="background-color:#f0f0f0;"><td style="border-bottom:0.75px solid #333;"><b>Terms &amp; Conditions</b></td></tr><tr><td>';
+        foreach ($order->terms as $i => $term) {
+            $html .= '<b>' . ($i + 1) . '. ' . e($term->title) . '</b><br>' . nl2br(e($term->description)) . '<br>';
+        }
+        return $html . '</td></tr></table>';
     }
 
     private function printWeaving(PurchaseOrder $order)
@@ -652,18 +670,16 @@ class PurchaseOrderController extends Controller
         <tr>
             <td style="border:0.75px solid #000; height:28px; vertical-align:top;">';
  
-        if ($order->terms->isNotEmpty()) {
-            foreach ($order->terms as $i => $term) {
-                $gridHtml .= ($i + 1) . '. ' . e($term->title) . ' — ' . e($term->description) . '<br>';
-            }
+        foreach ($order->terms as $i => $term) {
+            $gridHtml .= '<b>' . ($i + 1) . '. ' . e($term->title) . '</b><br>' . nl2br(e($term->description)) . '<br>';
         }
+        if ($order->terms->isEmpty()) $gridHtml .= '-';
  
         $gridHtml .= '</td>
         </tr>
  
         <tr>
-            <td style="border:0.75px solid #000;"><b>Remarks:</b></td>
-            <td style="border:0.75px solid #000;">' . e($order->remarks ?: '-') . '</td>
+            <td style="border:0.75px solid #000;"><b>Remarks:</b> ' . e($order->remarks ?: '-') . '</td>
         </tr>
  
         </table>';

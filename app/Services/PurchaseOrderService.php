@@ -1,6 +1,8 @@
 <?php
 namespace App\Services;
 
+use App\Models\TermAndCondition;
+
 use App\Models\{PurchaseOrder, PurchaseOrderItem, Location, Product, TaxMaster, ProductCategory};
 use Illuminate\Support\Facades\DB;
 
@@ -18,10 +20,14 @@ class PurchaseOrderService
     {
         $order = DB::transaction(function () use ($data, $items, $userId) {
             $type = $data['type'];
-            if ($type === 'purchase') return $this->createPurchaseType($data, $items, $userId);
-            if ($type === 'weaving') return $this->createWeavingType($data, $userId);
-            if ($type === 'processing') return $this->createProcessingType($data, $items, $userId);
-            throw new \Exception('Unknown PO type.');
+            $order = match ($type) {
+                'purchase'   => $this->createPurchaseType($data, $items, $userId),
+                'weaving'    => $this->createWeavingType($data, $userId),
+                'processing' => $this->createProcessingType($data, $items, $userId),
+                default      => throw new \Exception('Unknown PO type.'),
+            };
+            $this->syncTerms($order, $data);
+            return $order;
         });
 
         if (($data['submit_action'] ?? 'draft') === 'submit') {
@@ -213,6 +219,7 @@ class PurchaseOrderService
                 }
             }
 
+            $this->syncTerms($order, $data);
             return $order->fresh(['items', 'vendor', 'category']);
         });
 
@@ -257,6 +264,39 @@ class PurchaseOrderService
         $data['warp_shrinkage_pct'] = $data['warp_shrinkage_pct'] ?? ($data['warp_conversion_pct'] ?? 0);
         $data['weft_shrinkage_pct'] = $data['weft_shrinkage_pct'] ?? ($data['weft_conversion_pct'] ?? 0);
         return $data;
+    }
+
+    /**
+     * Save the ticked Terms & Conditions as snapshot rows (title + text copied
+     * from the master), in master sort order. Only runs when the form actually
+     * contained the terms picker, so API/other callers leave terms untouched.
+     *
+     * POs are only editable before approval, so the snapshot is refreshed from
+     * the master on every save and frozen once the PO is approved.
+     * keep_snapshot_ids keeps ticked terms whose master row has since been deleted.
+     */
+    private function syncTerms(PurchaseOrder $order, array $data): void
+    {
+        if (empty($data['terms_submitted'])) return;
+
+        $ids = array_map('intval', (array) ($data['term_ids'] ?? []));
+        $keep = array_map('intval', (array) ($data['keep_snapshot_ids'] ?? []));
+
+        // Ticked terms whose master row was deleted: keep their saved text
+        $orphans = $order->terms()->whereIn('id', $keep ?: [0])->whereNull('term_id')->get(['title', 'description']);
+
+        $masters = TermAndCondition::whereIn('id', $ids ?: [0])
+            ->forType($order->type)                                          // ignore terms for other PO types
+            ->orderBy('sort_order')->orderBy('title')->get();
+
+        // Rebuild in a stable order: master terms by sort order, then kept orphans
+        $order->terms()->delete();
+        foreach ($masters as $t) {
+            $order->terms()->create(['term_id' => $t->id, 'title' => $t->title, 'description' => $t->description]);
+        }
+        foreach ($orphans as $o) {
+            $order->terms()->create(['term_id' => null, 'title' => $o->title, 'description' => $o->description]);
+        }
     }
 
     /**

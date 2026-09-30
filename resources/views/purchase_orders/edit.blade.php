@@ -285,6 +285,12 @@
         </div>
         @endif
 
+        @include('purchase_orders._terms', [
+          'terms' => $terms,
+          'selectedIds' => old('term_ids', $order->terms->pluck('term_id')->filter()->all()),
+          'orphans' => $order->terms->whereNull('term_id'),
+          'fixedType' => $order->type,
+        ])
       </div>
       <footer class="card-footer text-end">
         @if($order->status === 'Pending')

@@ -104,7 +104,7 @@ class PurchaseOrder extends Model
     public function submitter()       { return $this->belongsTo(User::class, 'submitted_by'); }
     public function creator()         { return $this->belongsTo(User::class, 'locked_by'); }
     public function items()           { return $this->hasMany(PurchaseOrderItem::class, 'purchase_order_id'); }
-    public function terms()           { return $this->hasMany(PurchaseOrderTerm::class, 'purchase_order_id'); }
+    public function terms()           { return $this->hasMany(PurchaseOrderTerm::class, 'purchase_order_id')->orderBy('id'); }
     public function objections()      { return $this->hasMany(PurchaseOrderObjection::class, 'purchase_order_id'); }
     public function openObjections()  { return $this->hasMany(PurchaseOrderObjection::class, 'purchase_order_id')->where('status', 'Open'); }
     public function amendments()      { return $this->hasMany(PurchaseOrderAmendment::class, 'purchase_order_id')->orderByDesc('amendment_no'); }

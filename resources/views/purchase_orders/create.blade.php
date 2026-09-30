@@ -323,6 +323,9 @@
           </div>
         </div>
       </div>
+      <div class="card-body pt-0">
+        @include('purchase_orders._terms', ['terms' => $terms, 'selectedIds' => old('term_ids', []), 'fixedType' => null])
+      </div>
       <footer class="card-footer text-end">
         <span id="submitBtn" style="display:none">
           <button type="submit" name="submit_action" value="draft" class="btn btn-outline-secondary me-1">Save as Draft</button>
@@ -368,6 +371,7 @@
       $('#categoryMsg').show().text('Select a Type to continue.');
     } else {
       $('#po_type').val('purchase');
+      refreshTerms('purchase');
       loadCategoryProducts(catId).then(() => showPurchaseFlow(code));
     }
   });
@@ -381,6 +385,7 @@
   $('#type_select').on('change', function () {
     const type = $(this).val();
     $('#po_type').val(type);
+    refreshTerms(type);
     $('#weavingSection, #purchaseItemsSection, #service_type_field, #processingSection').hide();
     $('#submitBtn').hide();
 
@@ -419,6 +424,7 @@
     $('#job_select').val(null).trigger('change');
     $('#proc_collection_display').val('');
     $('#po_type').val('');
+    refreshTerms('');
   }
 
   $('#vendor_select').on('change', function () {

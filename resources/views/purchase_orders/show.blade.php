@@ -148,6 +148,17 @@
         <div class="col-md-3 text-end">Total: {{ number_format($order->total_amount,2) }}</div>
       </div>
 
+      {{-- ── Terms & Conditions ─────────────────────────────────────── --}}
+      @if($order->terms->isNotEmpty())
+      <hr>
+      <h6>Terms &amp; Conditions</h6>
+      <ol class="small mb-0 ps-3">
+        @foreach($order->terms as $term)
+          <li class="mb-1"><strong>{{ $term->title }}</strong><div class="text-muted" style="white-space:pre-line">{{ $term->description }}</div></li>
+        @endforeach
+      </ol>
+      @endif
+
       {{-- ── Issuances (weaving / processing) ───────────────────────── --}}
       @if(in_array($order->type, ['weaving','processing']) && !in_array($order->status, ['Draft','Pending','Rejected']))
       <hr>
