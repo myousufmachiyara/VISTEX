@@ -669,7 +669,7 @@ class PurchaseOrderController extends Controller
             <td style="border:0.75px solid #000; height:28px; vertical-align:top;">';
  
         foreach ($order->terms as $i => $term) {
-            $gridHtml .= '<b>' . ($i + 1) . '. ' . e($term->title) . '</b><br>' . nl2br(e($term->description)) . '<br>';
+            $gridHtml .= nl2br(e($term->description)) . '<br>';
         }
         if ($order->terms->isEmpty()) $gridHtml .= '-';
  
