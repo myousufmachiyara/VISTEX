@@ -33,8 +33,11 @@ class PurchaseReceiving extends Model
     public function items()         { return $this->hasMany(PurchaseReceivingItem::class, 'purchase_receiving_id'); }
     public function approver()      { return $this->belongsTo(User::class, 'approved_by'); }
 
+    public function objections()    { return $this->hasMany(PurchaseOrderObjection::class, 'purchase_receiving_id'); }
+
+    // Receiving is signed off by the PO category's incharge (or a superadmin)
     public function canBeApprovedBy(User $user): bool
     {
-        return $this->purchaseOrder && $this->purchaseOrder->canBeApprovedBy($user);
+        return $this->purchaseOrder && $this->purchaseOrder->isInchargeOrAdmin($user);
     }
 }

@@ -49,6 +49,15 @@ class ChallanService
                 ]);
             }
 
+            if ($challan->has_objection) {
+                $objection = \App\Models\PurchaseOrderObjection::create([
+                    'purchase_order_id' => $po->id, 'source' => 'gate', 'challan_id' => $challan->id,
+                    'remarks' => $challan->objection_remarks ?: 'Objection raised at gate (see voice note).',
+                    'status' => 'Open', 'raised_by' => $userId,
+                ]);
+                $challan->update(['objection_id' => $objection->id]);
+            }
+
             $this->notificationService->notifyCategoryIncharges(
                 $po->product_category_id, 'challan_received', 'New Challan Received',
                 "Challan {$challan->challan_no} logged against PO {$po->order_no}" . ($challan->has_objection ? ' — with objection.' : '.'),
@@ -205,7 +214,7 @@ class ChallanService
 
     private function assertPoIsReceivable(PurchaseOrder $po): void
     {
-        if ($po->type === 'purchase' && !in_array($po->status, ['Approved', 'PartiallyReceived'])) {
+        if ($po->type === 'purchase' && !in_array($po->status, ['Approved', 'Issued', 'PartiallyReceived'])) {
             throw new \Exception('This Purchase Order is not yet Approved, or is already fully received.');
         }
         if (in_array($po->type, ['weaving', 'processing']) && !in_array($po->status, ['Issued', 'PartiallyReceived'])) {
@@ -213,8 +222,12 @@ class ChallanService
         }
     }
 
-    public function markProcessed(Challan $challan): void
+    // Legacy GRN path: only touch a challan nobody has reviewed yet.
+    // The incharge review flow sets its own final status.
+    public function markProcessed(?Challan $challan): void
     {
-        $challan->update(['status' => 'Processed']);
+        if ($challan && $challan->status === Challan::AWAITING) {
+            $challan->update(['status' => Challan::PROCESSED]);
+        }
     }
 }

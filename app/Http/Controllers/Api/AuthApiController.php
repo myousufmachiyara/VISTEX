@@ -30,17 +30,7 @@ class AuthApiController extends Controller
 
         $token = $user->createToken('mobile')->plainTextToken;
 
-        $permissions = $user->getAllPermissions()->pluck('name') ?? collect();
-
-        return response()->json([
-            'token' => $token,
-            'user' => [
-                'id'    => $user->id,
-                'name'  => $user->name,
-                'role'  => $user->roles->first()->name ?? null,
-                'permissions' => $permissions,
-            ],
-        ]);
+        return response()->json(['token' => $token, 'user' => $this->profile($user)]);
     }
 
     public function logout(Request $request)
@@ -51,10 +41,18 @@ class AuthApiController extends Controller
 
     public function me(Request $request)
     {
-        $user = $request->user();
-        return response()->json([
-            'id' => $user->id, 'name' => $user->name,
-            'role' => $user->roles->first()->name ?? null,
-        ]);
+        return response()->json($this->profile($request->user()));
+    }
+
+    // is_incharge drives the "Inspect Challans" tile in the app
+    private function profile(User $user): array
+    {
+        return [
+            'id'          => $user->id,
+            'name'        => $user->name,
+            'role'        => $user->roles->first()->name ?? null,
+            'permissions' => $user->getAllPermissions()->pluck('name')->values(),
+            'is_incharge' => $user->hasRole('superadmin') || \App\Models\CategoryIncharge::where('user_id', $user->id)->exists(),
+        ];
     }
 }

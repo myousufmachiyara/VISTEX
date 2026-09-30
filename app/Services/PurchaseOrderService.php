@@ -8,18 +8,59 @@ class PurchaseOrderService
 {
     public function __construct(
         private DocumentNumberService $numberService,
-        private CpoFormulaService $formulaService
+        private CpoFormulaService $formulaService,
+        private NotificationService $notificationService
     ) {}
 
+    // $data['submit_action']: 'draft' (default) keeps the PO private to its creator,
+    // 'submit' sends it straight to the approver as Pending.
     public function create(array $data, array $items, ?int $userId = null): PurchaseOrder
     {
-        return DB::transaction(function () use ($data, $items, $userId) {
+        $order = DB::transaction(function () use ($data, $items, $userId) {
             $type = $data['type'];
             if ($type === 'purchase') return $this->createPurchaseType($data, $items, $userId);
             if ($type === 'weaving') return $this->createWeavingType($data, $userId);
             if ($type === 'processing') return $this->createProcessingType($data, $items, $userId);
             throw new \Exception('Unknown PO type.');
         });
+
+        if (($data['submit_action'] ?? 'draft') === 'submit') {
+            $order = $this->submit($order, $userId);
+        }
+        return $order;
+    }
+
+    // Draft -> Pending
+    public function submit(PurchaseOrder $order, ?int $userId): PurchaseOrder
+    {
+        if ($order->status !== PurchaseOrder::STATUS_DRAFT) {
+            throw new \Exception('Only a Draft PO can be submitted for approval.');
+        }
+        if ($order->type !== 'weaving' && $order->items()->count() === 0) {
+            throw new \Exception('Add at least one item before submitting.');
+        }
+
+        $order->update([
+            'status' => PurchaseOrder::STATUS_PENDING, 'submitted_by' => $userId, 'submitted_at' => now(),
+            'rejection_reason' => null, 'updated_by' => $userId,
+        ]);
+
+        $this->notificationService->notifyRole(
+            'superadmin', 'po_submitted', 'PO Awaiting Approval',
+            "{$order->order_no} was submitted for approval.", 'purchase_order', $order->id
+        );
+
+        return $order->fresh();
+    }
+
+    // Pending -> Draft (creator pulls it back before it is approved)
+    public function recall(PurchaseOrder $order, ?int $userId): PurchaseOrder
+    {
+        if ($order->status !== PurchaseOrder::STATUS_PENDING) {
+            throw new \Exception('Only a PO that is Pending approval can be recalled to Draft.');
+        }
+        $order->update(['status' => PurchaseOrder::STATUS_DRAFT, 'submitted_by' => null, 'submitted_at' => null, 'updated_by' => $userId]);
+        return $order->fresh();
     }
 
     private function createPurchaseType(array $data, array $items, ?int $userId): PurchaseOrder
@@ -45,7 +86,7 @@ class PurchaseOrderService
 
     private function createWeavingType(array $data, ?int $userId): PurchaseOrder
     {
-        $calc = $this->formulaService->calculate($data);
+        $calc = $this->formulaService->calculate($this->formulaInputs($data));
         $taxApplicable = (bool) ($data['gst_applicable'] ?? false);
         $taxRate = 0;
         if ($taxApplicable && !empty($data['tax_id'])) {
@@ -101,8 +142,15 @@ class PurchaseOrderService
 
     public function update(PurchaseOrder $order, array $data, array $items, ?int $userId = null): PurchaseOrder
     {
-        return DB::transaction(function () use ($order, $data, $items, $userId) {
-            if ($order->status !== 'Pending') throw new \Exception('Only a Pending PO can be edited.');
+        $order = DB::transaction(function () use ($order, $data, $items, $userId) {
+            if (!in_array($order->status, PurchaseOrder::EDITABLE_STATUSES, true)) {
+                throw new \Exception('Only a Draft, Pending or Rejected PO can be edited.');
+            }
+
+            // Editing a rejected PO re-opens it as a Draft for resubmission
+            if ($order->status === PurchaseOrder::STATUS_REJECTED) {
+                $order->update(['status' => PurchaseOrder::STATUS_DRAFT, 'rejection_reason' => null]);
+            }
 
             if ($order->type === 'purchase') {
                 $items = array_values(array_filter($items, fn($i) => (float) ($i['quantity'] ?? 0) > 0));
@@ -120,7 +168,7 @@ class PurchaseOrderService
                 $this->syncItems($order, $items);
 
             } elseif ($order->type === 'weaving') {
-                $calc = $this->formulaService->calculate($data);
+                $calc = $this->formulaService->calculate($this->formulaInputs($data));
                 $taxApplicable = (bool) ($data['gst_applicable'] ?? false);
                 $taxRate = 0;
                 if ($taxApplicable && !empty($data['tax_id'])) {
@@ -165,6 +213,11 @@ class PurchaseOrderService
 
             return $order->fresh(['items', 'vendor', 'category']);
         });
+
+        if (($data['submit_action'] ?? null) === 'submit' && $order->status === PurchaseOrder::STATUS_DRAFT) {
+            $order = $this->submit($order, $userId);
+        }
+        return $order;
     }
 
     // Shared between createWeavingType() and update()'s weaving branch —
@@ -191,6 +244,17 @@ class PurchaseOrderService
             'warp_yarn_cost_price' => $data['warp_yarn_cost_price'] ?? 0,
             'weft_yarn_cost_price' => $data['weft_yarn_cost_price'] ?? 0,
         ];
+    }
+
+    // The form/columns call the shrinkage % fields warp/weft_conversion_pct, but
+    // CpoFormulaService reads warp/weft_shrinkage_pct. Without this bridge the
+    // stored consumption and yarn-required figures ignored shrinkage (only the
+    // print re-applied it), so issuance limits were understated.
+    private function formulaInputs(array $data): array
+    {
+        $data['warp_shrinkage_pct'] = $data['warp_shrinkage_pct'] ?? ($data['warp_conversion_pct'] ?? 0);
+        $data['weft_shrinkage_pct'] = $data['weft_shrinkage_pct'] ?? ($data['weft_conversion_pct'] ?? 0);
+        return $data;
     }
 
     private function syncItems(PurchaseOrder $order, array $items): void
@@ -224,7 +288,7 @@ class PurchaseOrderService
             'payment_term_note' => ($data['payment_term_type'] ?? '') === 'other' ? ($data['payment_term_note'] ?? null) : null,
             'gst_applicable' => (bool) ($data['gst_applicable'] ?? false),
             'tax_id' => ($data['gst_applicable'] ?? false) ? ($data['tax_id'] ?? null) : null,
-            'status' => 'Pending', 'locked_by' => $userId, 'forecast_id' => $data['forecast_id'] ?? null,
+            'status' => PurchaseOrder::STATUS_DRAFT, 'locked_by' => $userId, 'forecast_id' => $data['forecast_id'] ?? null,
             'remarks' => $data['remarks'] ?? null, 'attachments' => $data['attachments'] ?? null,
             'created_by' => $userId, 'updated_by' => $userId,
         ], $amounts);
@@ -264,21 +328,34 @@ class PurchaseOrderService
 
     public function approve(PurchaseOrder $order, int $approverId): PurchaseOrder
     {
-        if ($order->status !== 'Pending') throw new \Exception('Only a Pending PO can be approved.');
-        $order->update(['status' => 'Approved', 'approved_by' => $approverId, 'approved_at' => now(), 'updated_by' => $approverId]);
+        if ($order->status !== PurchaseOrder::STATUS_PENDING) throw new \Exception('Only a Pending PO can be approved.');
+        $order->update(['status' => PurchaseOrder::STATUS_APPROVED, 'approved_by' => $approverId, 'approved_at' => now(), 'updated_by' => $approverId]);
+
+        $this->notifyCreator($order, 'po_approved', 'PO Approved', "{$order->order_no} has been approved.");
         return $order->fresh();
     }
 
     public function reject(PurchaseOrder $order, int $approverId, string $reason): PurchaseOrder
     {
-        if ($order->status !== 'Pending') throw new \Exception('Only a Pending PO can be rejected.');
-        $order->update(['status' => 'Rejected', 'rejection_reason' => $reason, 'updated_by' => $approverId]);
+        if ($order->status !== PurchaseOrder::STATUS_PENDING) throw new \Exception('Only a Pending PO can be rejected.');
+        $order->update(['status' => PurchaseOrder::STATUS_REJECTED, 'rejection_reason' => $reason, 'updated_by' => $approverId]);
+
+        $this->notifyCreator($order, 'po_rejected', 'PO Rejected', "{$order->order_no} was rejected: {$reason}");
         return $order->fresh();
+    }
+
+    private function notifyCreator(PurchaseOrder $order, string $type, string $title, string $body): void
+    {
+        if ($order->locked_by) {
+            $this->notificationService->notifyUsers([$order->locked_by], $type, $title, $body, 'purchase_order', $order->id);
+        }
     }
 
     public function delete(PurchaseOrder $order): void
     {
-        if ($order->status !== 'Pending') throw new \Exception('Cannot delete — only a Pending PO can be deleted.');
+        if (!in_array($order->status, PurchaseOrder::EDITABLE_STATUSES, true)) {
+            throw new \Exception('Cannot delete — only a Draft, Pending or Rejected PO can be deleted.');
+        }
         $order->items()->delete();
         $order->delete();
     }

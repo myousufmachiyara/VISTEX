@@ -36,27 +36,28 @@ class PurchaseReceivingService
                 $poItem = $po->items->firstWhere('id', $item['purchase_order_item_id']);
                 if (!$poItem) throw new \Exception('Invalid item — not part of this Purchase Order.');
 
+                // Only ACCEPTED quantity counts against the PO. Rejected goods go back
+                // to the vendor, so that quantity is still owed to us.
                 $outstanding = round((float) $poItem->quantity - (float) $poItem->quantity_received, 3);
                 $qty = round((float) $item['quantity_received'], 3);
-
-                if ($qty > $outstanding + 0.001) {
-                    $label = $poItem->product->name ?? $poItem->pattern_code ?? 'item';
-                    throw new \Exception("Cannot receive {$qty} of {$label} — only {$outstanding} remains outstanding.");
-                }
-
                 $rejectedQty = round((float) ($item['quantity_rejected'] ?? 0), 3);
-                if ($rejectedQty > $qty) throw new \Exception('Rejected quantity cannot exceed received quantity.');
+                if ($rejectedQty > $qty + 0.0001) throw new \Exception('Rejected quantity cannot exceed received quantity.');
+                $acceptedQty = round($qty - $rejectedQty, 3);
+
+                if ($acceptedQty > $outstanding + 0.001) {
+                    $label = $poItem->product->name ?? $poItem->pattern_code ?? 'item';
+                    throw new \Exception("Cannot accept {$acceptedQty} of {$label} — only {$outstanding} remains outstanding on the PO. Request a PO amendment to receive more.");
+                }
 
                 $productId = $poItem->product_id ?? optional($poItem->jobItem)->product_id ?? null;
 
                 if (!$productId) {
-                    $poItem->increment('quantity_received', $qty);
+                    $poItem->increment('quantity_received', $acceptedQty);
                     $unresolvedLines[] = $poItem->pattern_code ?? $poItem->description ?? "Item #{$poItem->id}";
                     continue;
                 }
 
                 $rate = (float) $poItem->rate;
-                $acceptedQty = $qty - $rejectedQty;
                 $amount = round($acceptedQty * $rate, 2);
                 $subtotal += $amount;
 
@@ -66,7 +67,7 @@ class PurchaseReceivingService
                     'rate' => $rate, 'amount' => $amount,
                 ]);
 
-                $poItem->increment('quantity_received', $qty);
+                $poItem->increment('quantity_received', $acceptedQty);
             }
 
             if (!empty($unresolvedLines)) {
@@ -93,6 +94,16 @@ class PurchaseReceivingService
             if ($qty <= 0) throw new \Exception('Enter a received quantity greater than zero.');
 
             $isFinal = (bool) ($data['is_final_receiving'] ?? false);
+
+            $alreadyReceived = (float) PurchaseReceiving::where('purchase_order_id', $po->id)
+                ->whereIn('status', ['Approved', 'PendingApproval'])
+                ->join('purchase_receiving_items', 'purchase_receivings.id', '=', 'purchase_receiving_items.purchase_receiving_id')
+                ->sum('purchase_receiving_items.quantity_received');
+            $outstandingMeters = round((float) $po->total_meters_required - $alreadyReceived, 3);
+            if ($qty > $outstandingMeters + 0.001) {
+                throw new \Exception("Cannot accept {$qty} m — only {$outstandingMeters} m remains outstanding on {$po->order_no}. Request a PO amendment to receive more.");
+            }
+
             $yarnCostTotal = 0; $yarnConsumedRows = [];
 
             $yarnLines = [
@@ -118,7 +129,9 @@ class PurchaseReceivingService
                 $yarnCostTotal += $amtConsumed;
             }
 
-            $weavingChargeTotal = round($qty * (float) $po->weaving_rate, 2);
+            // Conversion charge per meter = pick rate x picks + sizing (weaving_per_meter).
+            // The old code read `weaving_rate`, a column that was renamed, so it always charged 0.
+            $weavingChargeTotal = round($qty * (float) $po->weaving_per_meter, 2);
             $totalAmount = round($yarnCostTotal + $weavingChargeTotal, 2);
 
             $receiving = PurchaseReceiving::create([
@@ -149,7 +162,7 @@ class PurchaseReceivingService
 
             if ($po->type === 'weaving') return $this->approveWeaving($receiving, $po, $approverId);
 
-            $defaultLocationId = Location::whereNull('vendor_id')->value('id');
+            $defaultLocationId = $this->receivingLocationId($po);
             $stockTotalsByAccount = [];
 
             foreach ($receiving->items as $item) {
@@ -164,7 +177,7 @@ class PurchaseReceivingService
                 if ($item->quantity_rejected > 0) {
                     LocationStockLedger::create([
                         'doc_no' => $receiving->receiving_no, 'location_id' => $defaultLocationId, 'product_id' => $item->product_id,
-                        'status' => 'fresh', 'quantity' => $item->quantity_rejected, 'amount' => 0,
+                        'status' => 'rejected', 'quantity' => $item->quantity_rejected, 'amount' => 0,
                         'reference_type' => 'PurchaseReceivingRejection', 'reference_id' => $receiving->id, 'entry_date' => $receiving->receiving_date,
                         'remarks' => 'Awaiting return to vendor',
                     ]);
@@ -190,7 +203,7 @@ class PurchaseReceivingService
 
     private function approveWeaving(PurchaseReceiving $receiving, PurchaseOrder $po, int $approverId): PurchaseReceiving
     {
-        $defaultLocationId = Location::whereNull('vendor_id')->value('id');
+        $defaultLocationId = $this->receivingLocationId($po);
         $item = $receiving->items->first();
 
         foreach ($receiving->yarn_consumed_meta ?? [] as $row) {
@@ -212,11 +225,17 @@ class PurchaseReceivingService
         $apAccountId = $this->mappingService->accountId('accounts_payable');
         if (!$stockAccountId || !$yipAccountId || !$apAccountId) throw new \Exception('Required account mappings missing.');
 
+        $weavingCharge = (float) $receiving->weaving_charge_amount;
+        $gstAmount = ($po->gst_applicable && $weavingCharge > 0) ? round($weavingCharge * ((float) $po->gst_rate / 100), 2) : 0;
+        $purchaseTaxAccountId = $gstAmount > 0 ? $this->mappingService->accountId('purchase_tax') : null;
+        if ($gstAmount > 0 && !$purchaseTaxAccountId) $gstAmount = 0; // no tax account mapped — keep voucher balanced without GST
+
         $lines = [];
         if ($receiving->amount > 0) $lines[] = ['account_id' => $stockAccountId, 'debit' => (float) $receiving->amount, 'credit' => 0];
+        if ($gstAmount > 0) $lines[] = ['account_id' => $purchaseTaxAccountId, 'debit' => $gstAmount, 'credit' => 0];
         if ($receiving->yarn_cost_amount > 0) $lines[] = ['account_id' => $yipAccountId, 'debit' => 0, 'credit' => (float) $receiving->yarn_cost_amount];
-        if ($receiving->weaving_charge_amount > 0) {
-            $lines[] = ['account_id' => $apAccountId, 'debit' => 0, 'credit' => (float) $receiving->weaving_charge_amount, 'party_type' => 'vendor', 'party_id' => $po->vendor_id];
+        if ($weavingCharge + $gstAmount > 0) {
+            $lines[] = ['account_id' => $apAccountId, 'debit' => 0, 'credit' => round($weavingCharge + $gstAmount, 2), 'party_type' => 'vendor', 'party_id' => $po->vendor_id];
         }
 
         if (count($lines) >= 2) {
@@ -224,7 +243,7 @@ class PurchaseReceivingService
                 "Weaving Receiving {$receiving->receiving_no} — {$po->order_no}", 'PurchaseReceiving', $receiving->id, $approverId);
         }
 
-        $this->createPdcForReceiving($receiving, $po, (float) $receiving->weaving_charge_amount, $approverId);
+        $this->createPdcForReceiving($receiving, $po, round($weavingCharge + $gstAmount, 2), $approverId);
 
         $receiving->update(['status' => 'Approved', 'approved_by' => $approverId, 'approved_at' => now(), 'updated_by' => $approverId]);
         $this->challanService->markProcessed($receiving->challan);
@@ -232,7 +251,8 @@ class PurchaseReceivingService
         $totalReceived = PurchaseReceiving::where('purchase_order_id', $po->id)->where('status', 'Approved')
             ->join('purchase_receiving_items', 'purchase_receivings.id', '=', 'purchase_receiving_items.purchase_receiving_id')
             ->sum('purchase_receiving_items.quantity_received');
-        $po->update(['status' => $totalReceived < $po->total_meters_required ? 'PartiallyReceived' : 'Received']);
+        $done = $receiving->is_final_receiving || $totalReceived >= (float) $po->total_meters_required - 0.001;
+        $po->update(['status' => $done ? 'Received' : 'PartiallyReceived', 'is_final_receiving_done' => (bool) $receiving->is_final_receiving]);
 
         return $receiving->fresh();
     }
@@ -244,7 +264,7 @@ class PurchaseReceivingService
 
             foreach ($receiving->items as $item) {
                 if ($item->purchase_order_item_id) {
-                    PurchaseOrderItem::where('id', $item->purchase_order_item_id)->decrement('quantity_received', $item->quantity_received);
+                    PurchaseOrderItem::where('id', $item->purchase_order_item_id)->decrement('quantity_received', $item->quantity_accepted);
                 }
             }
 
@@ -336,12 +356,32 @@ class PurchaseReceivingService
         );
     }
 
-    private function refreshPoStatus(PurchaseOrder $po): void
+    // Recompute Partially/Received for item-based POs (also used after an amendment changes quantities)
+    public function refreshPoStatus(PurchaseOrder $po): void
     {
         $po->refresh();
-        $totalOrdered = $po->items->sum('quantity');
-        $totalReceived = $po->items->sum('quantity_received');
-        $status = $totalReceived <= 0 ? $po->status : ($totalReceived < $totalOrdered ? 'PartiallyReceived' : 'Received');
+        $po->load('items');
+        if ($po->type === 'weaving' || $po->items->isEmpty()) return;
+
+        $totalOrdered = (float) $po->items->sum('quantity');
+        $totalReceived = (float) $po->items->sum('quantity_received');
+
+        if ($totalReceived <= 0.0001) {
+            // Nothing received: fall back to the pre-receiving status
+            $status = in_array($po->status, ['PartiallyReceived', 'Received'])
+                ? ($po->issuances()->exists() ? 'Issued' : 'Approved')
+                : $po->status;
+        } else {
+            $status = $totalReceived < $totalOrdered - 0.001 ? 'PartiallyReceived' : 'Received';
+        }
         if ($status !== $po->status) $po->update(['status' => $status]);
+    }
+
+    // Goods land in the PO's drop-off warehouse; fall back to the default own warehouse
+    private function receivingLocationId(PurchaseOrder $po): ?int
+    {
+        $dropOff = $po->drop_off_location_id ? Location::find($po->drop_off_location_id) : null;
+        if ($dropOff && $dropOff->isOwnWarehouse()) return $dropOff->id;
+        return Location::defaultId() ?? Location::whereNull('vendor_id')->value('id');
     }
 }

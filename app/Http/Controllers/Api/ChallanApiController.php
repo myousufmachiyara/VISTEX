@@ -2,8 +2,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\{Challan, PurchaseOrder, ProductCategory};
-use App\Services\ChallanService;
+use App\Models\{Challan, CategoryIncharge, PurchaseOrder, ProductCategory};
+use App\Services\{ChallanReviewService, ChallanService};
 use Illuminate\Http\Request;
 
 class ChallanApiController extends Controller
@@ -11,7 +11,10 @@ class ChallanApiController extends Controller
     private const OPEN_STATUSES = ['Pending', 'Approved', 'Issued', 'PartiallyReceived'];
     private const VOICE_EXT = ['m4a', 'aac', 'mp3', 'wav', 'ogg', '3gp', 'webm', 'mp4'];
 
-    public function __construct(private ChallanService $service) {}
+    public function __construct(
+        private ChallanService $service,
+        private ChallanReviewService $reviewService,
+    ) {}
 
     // Category tiles for the "IN" screen
     public function categories()
@@ -84,7 +87,7 @@ class ChallanApiController extends Controller
     public function index(Request $request)
     {
         $challans = Challan::with('purchaseOrder.vendor', 'vendor')
-            ->forCategoryIncharge($request->user())
+            ->visibleTo($request->user())
             ->when($request->filled('status'), fn($q) => $q->where('status', $request->status))
             ->orderByDesc('received_date')->orderByDesc('id')->get();
 
@@ -93,13 +96,14 @@ class ChallanApiController extends Controller
             'vendor_name' => $c->display_vendor_name,
             'po_order_no' => $c->purchaseOrder->order_no ?? null,
             'received_date' => $c->received_date->format('Y-m-d'), 'status' => $c->status,
+            'status_label' => $c->status_label,
             'thumbnail' => !empty($c->challan_images) ? asset('storage/' . $c->challan_images[0]) : null,
         ]));
     }
 
     public function show($id)
     {
-        $c = Challan::with('purchaseOrder.vendor', 'category', 'vendor', 'receivedBy', 'items.product', 'directItems')->findOrFail($id);
+        $c = Challan::with('purchaseOrder.vendor', 'category', 'vendor', 'receivedBy', 'reviewedBy', 'receiving', 'items.product', 'directItems')->findOrFail($id);
 
         return response()->json([
             'id' => $c->id, 'challan_no' => $c->challan_no, 'entry_type' => $c->entry_type,
@@ -109,13 +113,18 @@ class ChallanApiController extends Controller
             'vendor_challan_no' => $c->vendor_challan_no,
             'received_date' => $c->received_date->format('Y-m-d'),
             'images' => collect($c->challan_images)->map(fn($p) => asset('storage/' . $p))->values(),
-            'status' => $c->status,
+            'status' => $c->status, 'status_label' => $c->status_label,
+            'decision' => $c->decision, 'decision_remarks' => $c->decision_remarks,
+            'reviewed_by' => $c->reviewedBy->name ?? null,
+            'grn_no' => $c->receiving->receiving_no ?? null,
+            'can_review' => $c->isAwaitingReview() && $c->entry_type === 'po' && $c->canBeReviewedBy(request()->user()),
             'has_objection' => $c->has_objection, 'objection_remarks' => $c->objection_remarks,
             'objection_voice_url' => $c->objection_voice_note ? asset('storage/' . $c->objection_voice_note) : null,
             'remarks' => $c->remarks, 'received_by' => $c->receivedBy->name ?? '', 'created_at' => $c->created_at,
             'items' => $c->items->map(fn($i) => [
                 'id' => $i->id, 'product_name' => $i->product->name ?? $i->description,
-                'expected_qty' => (float) $i->expected_qty, 'received_qty' => (float) $i->received_qty, 'decision' => $i->decision,
+                'expected_qty' => (float) $i->expected_qty, 'received_qty' => (float) $i->received_qty,
+                'accepted_qty' => (float) $i->accepted_qty, 'rejected_qty' => (float) $i->rejected_qty, 'decision' => $i->decision,
             ]),
             'direct_items' => $c->directItems->map(fn($i) => [
                 'id' => $i->id, 'description' => $i->description, 'unit' => $i->unit,
@@ -204,6 +213,75 @@ class ChallanApiController extends Controller
                 'id' => $challan->id, 'challan_no' => $challan->challan_no, 'status' => $challan->status,
                 'message' => $challan->challan_no . ' logged — sent to category incharge for review.',
             ], 201);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    // ── Category incharge inspection ─────────────────────────────────
+
+    // Challans waiting for this user's decision (PO-based only; no-PO review stays on web)
+    public function pendingReview(Request $request)
+    {
+        $challans = Challan::awaitingInspection()->where('entry_type', 'po')
+            ->with('purchaseOrder.vendor', 'purchaseOrder.category', 'receivedBy')
+            ->forCategoryIncharge($request->user())
+            ->orderBy('received_date')->get();
+
+        return response()->json($challans->map(fn($c) => [
+            'id' => $c->id, 'challan_no' => $c->challan_no,
+            'po_order_no' => $c->purchaseOrder->order_no ?? '', 'po_type' => $c->purchaseOrder->type ?? '',
+            'vendor_name' => $c->display_vendor_name, 'category_name' => $c->purchaseOrder->category->name ?? '',
+            'received_date' => $c->received_date->format('Y-m-d'), 'received_by' => $c->receivedBy->name ?? '',
+            'has_objection' => (bool) $c->has_objection,
+            'thumbnail' => !empty($c->challan_images) ? asset('storage/' . $c->challan_images[0]) : null,
+        ]));
+    }
+
+    public function reviewData(Request $request, $id)
+    {
+        $challan = Challan::with('purchaseOrder')->findOrFail($id);
+        if (!$challan->canBeReviewedBy($request->user())) return response()->json(['message' => 'Only the category incharge can review this challan.'], 403);
+        if ($challan->entry_type !== 'po') return response()->json(['message' => 'Challans without a PO are reviewed on the web.'], 422);
+
+        return response()->json($this->reviewService->reviewData($challan));
+    }
+
+    public function review(Request $request, $id)
+    {
+        $challan = Challan::with('purchaseOrder')->findOrFail($id);
+        if (!$challan->canBeReviewedBy($request->user())) return response()->json(['message' => 'Only the category incharge can review this challan.'], 403);
+
+        $request->validate([
+            'decision'                       => 'required|in:' . implode(',', array_keys(Challan::DECISIONS)),
+            'remarks'                        => 'nullable|string|max:2000',
+            'receiving_date'                 => 'nullable|date',
+            'is_final_receiving'             => 'nullable|boolean',
+            'lines'                          => 'required|array|min:1',
+            'lines.*.purchase_order_item_id' => 'nullable|integer',
+            'lines.*.accepted_qty'           => 'nullable|numeric|min:0',
+            'lines.*.rejected_qty'           => 'nullable|numeric|min:0',
+            'lines.*.new_quantity'           => 'nullable|numeric|min:0',
+            'lines.*.new_rate'               => 'nullable|numeric|min:0',
+            'lines.*.note'                   => 'nullable|string|max:255',
+            'amend'                          => 'nullable|array',
+        ]);
+
+        try {
+            $challan = $this->reviewService->review($challan, $request->decision, $request->input('lines', []), [
+                'remarks' => $request->remarks, 'receiving_date' => $request->receiving_date,
+                'is_final_receiving' => $request->boolean('is_final_receiving'), 'amend' => $request->input('amend', []),
+            ], $request->user()->id);
+
+            return response()->json([
+                'id' => $challan->id, 'status' => $challan->status, 'status_label' => $challan->status_label,
+                'grn_no' => $challan->receiving->receiving_no ?? null,
+                'message' => match ($request->decision) {
+                    'amend'  => 'Amendment sent for approval.',
+                    'reject' => 'Consignment rejected.',
+                    default  => 'Receiving posted' . ($challan->receiving ? ' — ' . $challan->receiving->receiving_no : '') . '.',
+                },
+            ]);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }

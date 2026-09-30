@@ -7,7 +7,6 @@ use App\Http\Controllers\{
     DashboardController,
     UserController,
     RoleController,
-    PermissionController,
     COAController,
     SubHeadOfAccController,
     AccountMappingController,
@@ -33,7 +32,7 @@ use App\Http\Controllers\{
     ChallanController,
     PurchaseReceivingController,
     PurchaseReturnController,
-    YarnIssueController,
+    IssuanceController,
     StockMovementController,
     ProcessingIssueController,
     PdcController,
@@ -157,7 +156,6 @@ Route::middleware(['auth'])->group(function () {
     // MASTER SETUP 5 — USERS, ROLES & PERMISSIONS
     // ════════════════════════════════════════════════════════════════
     Route::resource('roles', RoleController::class)->except(['show'])->middleware('check.permission:user_roles.index');
-    Route::resource('permissions', PermissionController::class)->except(['show'])->middleware('check.permission:user_roles.index');
 
     Route::prefix('users')->name('users.')->group(function () {
         Route::get('/',                    [UserController::class, 'index'])          ->name('index')  ->middleware('check.permission:users.index');
@@ -258,6 +256,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('{id}/edit',                          [PurchaseOrderController::class, 'edit'])               ->name('edit')   ->middleware('check.permission:purchase_orders.edit');
         Route::put('{id}',                               [PurchaseOrderController::class, 'update'])             ->name('update') ->middleware('check.permission:purchase_orders.edit');
         Route::delete('{id}',                            [PurchaseOrderController::class, 'destroy'])            ->name('destroy')->middleware('check.permission:purchase_orders.delete');
+        Route::post('{id}/submit',                       [PurchaseOrderController::class, 'submit'])             ->name('submit') ->middleware('check.permission:purchase_orders.create');
+        Route::post('{id}/recall',                       [PurchaseOrderController::class, 'recall'])             ->name('recall') ->middleware('check.permission:purchase_orders.create');
         Route::post('{id}/approve',                      [PurchaseOrderController::class, 'approve'])            ->name('approve')->middleware('check.permission:purchase_orders.edit');
         Route::post('{id}/reject',                       [PurchaseOrderController::class, 'reject'])             ->name('reject') ->middleware('check.permission:purchase_orders.edit');
         Route::get('{id}/print',                         [PurchaseOrderController::class, 'print'])              ->name('print')  ->middleware('check.permission:purchase_orders.print');
@@ -286,12 +286,18 @@ Route::middleware(['auth'])->group(function () {
     // OPERATIONAL 4 — CHALLAN
     // ════════════════════════════════════════════════════════════════
     Route::prefix('challans')->name('challans.')->group(function () {
-        Route::get('/',               [ChallanController::class, 'index'])   ->name('index')  ->middleware('check.permission:challans.index');
-        Route::get('pending',         [ChallanController::class, 'pending']) ->name('pending')->middleware('check.permission:challans.index');
-        Route::get('create',          [ChallanController::class, 'create'])  ->name('create') ->middleware('check.permission:challans.create');
-        Route::get('po-items/{poId}', [ChallanController::class, 'poItems']) ->name('po_items')->middleware('check.permission:challans.index');
-        Route::post('/',              [ChallanController::class, 'store'])   ->name('store')  ->middleware('check.permission:challans.create');
-        Route::get('{id}',            [ChallanController::class, 'show'])    ->name('show')   ->middleware('check.permission:challans.index');
+        Route::get('/',                   [ChallanController::class, 'index'])            ->name('index')  ->middleware('check.permission:challans.index');
+        Route::get('pending',             [ChallanController::class, 'pending'])          ->name('pending')->middleware('check.permission:challans.index');
+        Route::get('create',              [ChallanController::class, 'create'])           ->name('create') ->middleware('check.permission:challans.create');
+        Route::get('po-items/{poId}',     [ChallanController::class, 'poItems'])          ->name('po_items')->middleware('check.permission:challans.index');
+        Route::post('/',                  [ChallanController::class, 'store'])            ->name('store')  ->middleware('check.permission:challans.create');
+        Route::get('{id}',                [ChallanController::class, 'show'])             ->name('show')   ->middleware('check.permission:challans.index');
+        // Category incharge inspection (further restricted to the category's incharges in the controller)
+        Route::get('{id}/review',         [ChallanController::class, 'reviewForm'])       ->name('review_form')->middleware('check.permission:challans.index');
+        Route::post('{id}/review',        [ChallanController::class, 'review'])           ->name('review')     ->middleware('check.permission:challans.index');
+        Route::get('{id}/review-direct',  [ChallanController::class, 'reviewDirectForm']) ->name('review_direct_form')->middleware('check.permission:challans.index');
+        Route::post('{id}/review-direct', [ChallanController::class, 'reviewDirect'])     ->name('review_direct')     ->middleware('check.permission:challans.index');
+        Route::post('{id}/reject-direct', [ChallanController::class, 'rejectDirect'])     ->name('reject_direct')     ->middleware('check.permission:challans.index');
     });
 
     // ════════════════════════════════════════════════════════════════
@@ -316,18 +322,22 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ════════════════════════════════════════════════════════════════
-    // OPERATIONAL 6 — YARN ISSUE (Weaving)
+    // OPERATIONAL 6 — ISSUANCE (Yarn for Weaving, Greige for Processing, …)
     // ════════════════════════════════════════════════════════════════
-    Route::prefix('yarn-issues')->name('yarn_issues.')->group(function () {
-         Route::get('/',                   [YarnIssueController::class, 'index'])      ->name('index')  ->middleware('check.permission:yarn_issues.index');
-         Route::get('create',              [YarnIssueController::class, 'create'])     ->name('create') ->middleware('check.permission:yarn_issues.create');
-         Route::get('cpo-details/{poId}',  [YarnIssueController::class, 'cpoDetails']) ->name('cpo_details')->middleware('check.permission:yarn_issues.index');
-         Route::get('job-items/{jobId}',   [YarnIssueController::class, 'jobItems'])   ->name('job_items')->middleware('check.permission:yarn_issues.index');
-         Route::get('product-pos/{productId}', [YarnIssueController::class, 'productPos'])->name('product_pos')->middleware('check.permission:yarn_issues.index');
-         Route::post('/',                   [YarnIssueController::class, 'store'])      ->name('store')  ->middleware('check.permission:yarn_issues.create');
-         Route::get('{id}/edit',           [YarnIssueController::class, 'edit'])       ->name('edit')   ->middleware('check.permission:yarn_issues.edit');
-         Route::put('{id}',                [YarnIssueController::class, 'update'])     ->name('update') ->middleware('check.permission:yarn_issues.edit');
+    Route::prefix('issuances')->name('issuances.')->group(function () {
+        Route::get('/',                 [IssuanceController::class, 'index'])     ->name('index')  ->middleware('check.permission:issuances.index');
+        Route::get('create',            [IssuanceController::class, 'create'])    ->name('create') ->middleware('check.permission:issuances.create');
+        Route::get('po-details/{poId}', [IssuanceController::class, 'poDetails']) ->name('po_details')->middleware('check.permission:issuances.index');
+        Route::post('/',                [IssuanceController::class, 'store'])     ->name('store')  ->middleware('check.permission:issuances.create');
+        Route::get('{id}',              [IssuanceController::class, 'show'])      ->name('show')   ->middleware('check.permission:issuances.index');
+        Route::get('{id}/edit',         [IssuanceController::class, 'edit'])      ->name('edit')   ->middleware('check.permission:issuances.edit');
+        Route::put('{id}',              [IssuanceController::class, 'update'])    ->name('update') ->middleware('check.permission:issuances.edit');
+        Route::delete('{id}',           [IssuanceController::class, 'destroy'])   ->name('destroy')->middleware('check.permission:issuances.delete');
+        Route::get('{id}/print',        [IssuanceController::class, 'print'])     ->name('print')  ->middleware('check.permission:issuances.print');
     });
+    // Old bookmarks
+    Route::redirect('yarn-issues', 'issuances');
+    Route::redirect('yarn-issues/create', 'issuances/create?type=yarn_weaving');
 
     // ════════════════════════════════════════════════════════════════
     // OPERATIONAL 7 — STOCK MOVEMENT (Warehouse ↔ Warehouse ↔ Vendor)
@@ -379,18 +389,4 @@ Route::middleware(['auth'])->group(function () {
         Route::post('cheques/{id}/bounced',  [PdcController::class, 'markBounced'])->name('mark_bounced')->middleware('check.permission:pdcs.edit');
     });
 
-    Route::prefix('challans')->name('challans.')->group(function () {
-        Route::get('/',                    [ChallanController::class, 'index'])          ->name('index')  ->middleware('check.permission:challans.index');
-        Route::get('pending',              [ChallanController::class, 'pending'])        ->name('pending')->middleware('check.permission:challans.index');
-        Route::get('create',               [ChallanController::class, 'create'])         ->name('create') ->middleware('check.permission:challans.create');
-        Route::get('vendors-for-type',     [ChallanController::class, 'vendorsForType']) ->name('vendors_for_type')->middleware('check.permission:challans.index');
-        Route::get('pos-for-vendor',       [ChallanController::class, 'posForVendor'])   ->name('pos_for_vendor')  ->middleware('check.permission:challans.index');
-        Route::get('po-items/{poId}',      [ChallanController::class, 'poItems'])        ->name('po_items')->middleware('check.permission:challans.index');
-        Route::post('/',                    [ChallanController::class, 'store'])          ->name('store')  ->middleware('check.permission:challans.create');
-        Route::get('{id}',                 [ChallanController::class, 'show'])           ->name('show')   ->middleware('check.permission:challans.index');
-        Route::post('{id}/approve-direct', [ChallanController::class, 'approveDirect'])  ->name('approve_direct')->middleware('check.permission:challans.edit');
-        Route::post('{id}/reject-direct',  [ChallanController::class, 'rejectDirect'])   ->name('reject_direct') ->middleware('check.permission:challans.edit');
-        Route::get('{id}/review-direct',  [ChallanController::class, 'reviewDirectForm'])->name('review_direct_form')->middleware('check.permission:challans.edit');
-        Route::post('{id}/review-direct', [ChallanController::class, 'reviewDirect'])->name('review_direct')->middleware('check.permission:challans.edit');
-    });
 });

@@ -49,7 +49,7 @@ class PurchaseOrderController extends Controller
     public function edit($id)
     {
         $order = PurchaseOrder::with('items')->findOrFail($id);
-        if (!$order->canBeEditedBy(auth()->user())) abort(403, 'Only the creator or a superadmin can edit a Pending PO.');
+        if (!$order->canBeEditedBy(auth()->user())) abort(403, 'Only the creator or a superadmin can edit a Draft, Pending or Rejected PO.');
         return view('purchase_orders.edit', array_merge($this->formData(), ['order' => $order]));
     }
 
@@ -107,6 +107,7 @@ class PurchaseOrderController extends Controller
             'payment_term_note' => 'required_if:payment_term_type,other|nullable|string|max:255',
             'gst_applicable' => 'required|boolean', 'tax_id' => 'required_if:gst_applicable,1|nullable|exists:tax_masters,id',
             'remarks' => 'nullable|string',
+            'submit_action' => 'nullable|in:draft,submit',
         ];
 
         if ($type === 'purchase') {
@@ -176,8 +177,11 @@ class PurchaseOrderController extends Controller
             }
 
             $order = $this->service->create(array_merge($data, ['attachments' => $attachments ?: null]), $request->input('items', []), auth()->id());
-            Log::info('[PurchaseOrder] Created', ['id' => $order->id, 'type' => $order->type, 'by' => auth()->id()]);
-            return redirect()->route('purchase_orders.index')->with('success', $order->order_no . ' created — pending superadmin approval.');
+            Log::info('[PurchaseOrder] Created', ['id' => $order->id, 'type' => $order->type, 'status' => $order->status, 'by' => auth()->id()]);
+            $msg = $order->status === PurchaseOrder::STATUS_DRAFT
+                ? $order->order_no . ' saved as Draft. Submit it when it is ready for approval.'
+                : $order->order_no . ' submitted — pending superadmin approval.';
+            return redirect()->route('purchase_orders.show', $order->id)->with('success', $msg);
         } catch (\Exception $e) {
             Log::error('[PurchaseOrder] Store failed', ['message' => $e->getMessage()]);
             return back()->withInput()->with('error', $e->getMessage());
@@ -187,7 +191,7 @@ class PurchaseOrderController extends Controller
     public function update(Request $request, $id)
     {
         $order = PurchaseOrder::findOrFail($id);
-        if (!$order->canBeEditedBy(auth()->user())) abort(403, 'Only the creator or a superadmin can edit a Pending PO.');
+        if (!$order->canBeEditedBy(auth()->user())) abort(403, 'Only the creator or a superadmin can edit a Draft, Pending or Rejected PO.');
 
         $rules = $this->rules($order->type); unset($rules['type']);
         $request->validate($rules);
@@ -205,14 +209,17 @@ class PurchaseOrderController extends Controller
                 $data = $this->normalizeWeavingData($data);
             }
 
-            $this->service->update(
+            $order = $this->service->update(
                 $order,
                 array_merge($data, ['attachments' => $attachments ?: null]),
                 $request->input('items', []),
                 auth()->id()
             );
 
-            return redirect()->route('purchase_orders.show', $order->id)->with('success', 'Purchase Order updated successfully.');
+            $msg = $order->status === PurchaseOrder::STATUS_PENDING
+                ? 'Purchase Order updated and submitted for approval.'
+                : 'Purchase Order updated.';
+            return redirect()->route('purchase_orders.show', $order->id)->with('success', $msg);
 
         } catch (\Exception $e) {
             return back()->withInput()->with('error', $e->getMessage());
@@ -223,11 +230,11 @@ class PurchaseOrderController extends Controller
     {
         $order = PurchaseOrder::with([
             'vendor', 'category', 'serviceType', 'fromLocation', 'dropOffLocation', 'broker', 'tax', 'forecast',
-            'approver', 'creator', 'job', 'items.product.measurementUnit', 'items.forecast', 'items.jobItem',
+            'approver', 'creator', 'submitter', 'job', 'items.product.measurementUnit', 'items.forecast', 'items.jobItem',
             'warpProduct', 'weftProduct', 'greigeProduct', 'openObjections.raisedBy',
-            'yarnIssues.items.product', 'processingIssues.items.product',
-            'receivings.items.product', 'receivings.challan',
-            'amendments',
+            'issuances.items.product', 'processingIssues.items.product',
+            'receivings.items.product', 'receivings.challan', 'challans',
+            'amendments.requestedBy',
         ])->findOrFail($id);
         return view('purchase_orders.show', compact('order'));
     }
@@ -236,12 +243,32 @@ class PurchaseOrderController extends Controller
     {
         try {
             $order = PurchaseOrder::findOrFail($id);
-            if (!$order->canBeEditedBy(auth()->user())) abort(403, 'Only the creator or a superadmin can delete a Pending PO.');
+            if (!$order->canBeDeletedBy(auth()->user())) abort(403, 'Only the creator or a superadmin can delete a Draft, Pending or Rejected PO.');
             $this->service->delete($order);
             return redirect()->route('purchase_orders.index')->with('success', 'Purchase Order deleted successfully.');
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }
+    }
+
+    public function submit($id)
+    {
+        $order = PurchaseOrder::findOrFail($id);
+        if (!$order->canBeSubmittedBy(auth()->user())) abort(403, 'Only the creator can submit this Draft.');
+        try {
+            $this->service->submit($order, auth()->id());
+            return back()->with('success', $order->order_no . ' submitted for approval.');
+        } catch (\Exception $e) { return back()->with('error', $e->getMessage()); }
+    }
+
+    public function recall($id)
+    {
+        $order = PurchaseOrder::findOrFail($id);
+        if (!$order->canBeRecalledBy(auth()->user())) abort(403, 'Only the creator can recall this PO.');
+        try {
+            $this->service->recall($order, auth()->id());
+            return back()->with('success', $order->order_no . ' moved back to Draft.');
+        } catch (\Exception $e) { return back()->with('error', $e->getMessage()); }
     }
 
     public function approve($id)

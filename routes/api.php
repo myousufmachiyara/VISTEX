@@ -15,9 +15,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthApiController::class, 'me']);
 
     // Challan
-    Route::get('/challans/vendors-for-type', [ChallanApiController::class, 'vendorsForType']);
-    Route::get('/challans/pos-for-vendor', [ChallanApiController::class, 'posForVendor']);
-    Route::get('/challans/expense-accounts', [ChallanApiController::class, 'expenseAccounts']);
+    // Incharge inspection (registered before /challans/{id})
+    Route::get('/challans/pending-review', [ChallanApiController::class, 'pendingReview']);
+    Route::get('/challans/{id}/review', [ChallanApiController::class, 'reviewData']);
+    Route::post('/challans/{id}/review', [ChallanApiController::class, 'review']);
 
     Route::get('/challans', [ChallanApiController::class, 'index']);
     Route::get('/challans/categories', [ChallanApiController::class, 'categories']);

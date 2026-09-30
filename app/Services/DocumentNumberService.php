@@ -76,7 +76,8 @@ class DocumentNumberService
             'weaving_order'    => 'CPO',  // type=weaving
             'processing_order' => 'PPO',  // type=processing
             'purchase_receiving' => 'GRN',
-            'yarn_issue'       => 'YI',
+            'yarn_issue'       => 'YI',   // legacy numbers keep their prefix
+            'issuance'         => 'ISS',
             'greige_receive'   => 'GR',
             'forecast'         => 'FC',
             'job'              => 'JOB',

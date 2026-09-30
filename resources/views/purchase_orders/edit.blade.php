@@ -9,8 +9,13 @@
     <section class="card">
       <header class="card-header d-flex justify-content-between align-items-center">
         <h2 class="card-title">Edit Purchase Order — {{ $order->order_no }} <small class="text-muted">(Rev {{ $order->revision_no }})</small></h2>
+        <span class="badge bg-{{ $order->status_badge }}">{{ $order->status_label }}</span>
       </header>
       <div class="card-body">
+        @if($order->status === 'Rejected')
+          <div class="alert alert-danger"><strong>Rejected:</strong> {{ $order->rejection_reason }}<br><small>Saving your changes moves this PO back to Draft so you can resubmit it.</small></div>
+        @endif
+
         @if($errors->any())
           <div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>
         @endif
@@ -271,7 +276,14 @@
         @endif
 
       </div>
-      <footer class="card-footer text-end"><button type="submit" class="btn btn-success">Update Purchase Order</button></footer>
+      <footer class="card-footer text-end">
+        @if($order->status === 'Pending')
+          <button type="submit" name="submit_action" value="draft" class="btn btn-success">Update Purchase Order</button>
+        @else
+          <button type="submit" name="submit_action" value="draft" class="btn btn-outline-secondary me-1">Save as Draft</button>
+          <button type="submit" name="submit_action" value="submit" class="btn btn-success">Save &amp; Submit for Approval</button>
+        @endif
+      </footer>
     </section>
   </form>
 </div></div>

@@ -18,8 +18,8 @@
         <div class="col-md-2">
           <select name="status" class="form-control" onchange="this.form.submit()">
             <option value="">All Status</option>
-            @foreach(['Pending','PartiallyReceived','Received'] as $s)
-              <option value="{{ $s }}" @selected(request('status')==$s)>{{ $s }}</option>
+            @foreach(\App\Models\PurchaseOrder::STATUSES as $key => $label)
+              <option value="{{ $key }}" @selected(request('status')==$key)>{{ $label }}</option>
             @endforeach
           </select>
         </div>
@@ -44,25 +44,28 @@
               <td class="small">{{ $order->fromLocation->name ?? '—' }} → {{ $order->dropOffLocation->name ?? '' }}</td>
               <td class="text-end">{{ number_format($order->total_amount, 2) }}</td>
               <td>
-                <span class="badge bg-{{ match($order->status){'Received'=>'success','PartiallyReceived'=>'warning text-dark',default=>'info text-dark'} }}">
-                  {{ $order->status }}
-                </span>
+                <span class="badge bg-{{ $order->status_badge }}">{{ $order->status_label }}</span>
               </td>
               <td>
                 <a href="{{ route('purchase_orders.show', $order->id) }}" target="_blank" class="btn btn-sm btn-outline-warning me-1">Show</a>
                 <a href="{{ route('purchase_orders.print', $order->id) }}" target="_blank" class="btn btn-sm btn-outline-success me-1">Print</a>
                 @can('challans.create')
-                  @if(in_array($order->status, ['Approved','Issued']))
+                  @if(in_array($order->status, ['Approved','Issued','PartiallyReceived']))
                     <a href="{{ route('challans.create') }}?purchase_order_id={{ $order->id }}" class="btn btn-sm btn-outline-success me-1">Log Challan</a>
                   @endif
                 @endcan
+                @if($order->canBeSubmittedBy(auth()->user()))
+                <form action="{{ route('purchase_orders.submit', $order->id) }}" method="POST" class="d-inline">
+                  @csrf<button class="btn btn-sm btn-success me-1" onclick="return confirm('Submit {{ $order->order_no }} for approval?')">Submit</button>
+                </form>
+                @endif
                 @can('purchase_orders.edit')
-                @if($order->canBeEditedBy(auth()->user()) && $order->status === 'Pending')
+                @if($order->canBeEditedBy(auth()->user()))
                 <a href="{{ route('purchase_orders.edit', $order->id) }}" class="btn btn-sm btn-outline-primary me-1">Edit</a>
                 @endif
                 @endcan
                 @can('purchase_orders.delete')
-                @if($order->canBeEditedBy(auth()->user()) && $order->status === 'Pending')
+                @if($order->canBeDeletedBy(auth()->user()))
                 <form action="{{ route('purchase_orders.destroy', $order->id) }}" method="POST" class="d-inline">
                   @csrf @method('DELETE')
                   <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete?')">Delete</button>

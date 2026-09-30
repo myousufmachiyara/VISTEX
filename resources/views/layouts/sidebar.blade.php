@@ -95,7 +95,11 @@
           <ul class="nav nav-children">
             @can('purchase_orders.index')<li class="{{ request()->routeIs('purchase_orders.*')?'active':'' }}"><a class="nav-link" href="{{ route('purchase_orders.index') }}">Purchase Orders</a></li>@endcan
             @can('purchase_orders.index')<li class="{{ request()->routeIs('purchase_order_objections.*')?'active':'' }}"><a class="nav-link" href="{{ route('purchase_order_objections.index') }}">Objections</a></li>@endcan
-            @can('challans.index')<li class="{{ request()->routeIs('challans.*')?'active':'' }}"><a class="nav-link" href="{{ route('challans.index') }}">Challans</a></li>@endcan
+            @can('challans.index')<li class="{{ request()->routeIs('challans.index','challans.show','challans.create')?'active':'' }}"><a class="nav-link" href="{{ route('challans.index') }}">Challans</a></li>@endcan
+            @can('challans.index')
+              @php($__inspect = \App\Models\Challan::awaitingInspection()->forCategoryIncharge(auth()->user())->count())
+              <li class="{{ request()->routeIs('challans.pending','challans.review*')?'active':'' }}"><a class="nav-link" href="{{ route('challans.pending') }}">Inspection Queue @if($__inspect)<span class="badge bg-danger ms-1">{{ $__inspect }}</span>@endif</a></li>
+            @endcan
             @can('purchase_receivings.index')<li class="{{ request()->routeIs('purchase_receivings.*')?'active':'' }}"><a class="nav-link" href="{{ route('purchase_receivings.index') }}">Receivings (GRN)</a></li>@endcan
             @can('purchase_returns.index')<li class="{{ request()->routeIs('purchase_returns.*')?'active':'' }}"><a class="nav-link" href="{{ route('purchase_returns.index') }}">Returns</a></li>@endcan
           </ul>
@@ -106,11 +110,11 @@
         {{-- ═══════════════════════════════════════════════════════ --}}
         {{-- PRODUCTION — Yarn Issue, Stock Movement, Processing        --}}
         {{-- ═══════════════════════════════════════════════════════ --}}
-        @if(auth()->user()->canAny(['yarn_issues.index','stock_movements.index','processing_issues.index']))
-        <li class="nav-parent {{ request()->routeIs('yarn_issues.*','stock_movements.*','processing_issues.*') ? 'nav-expanded active' : '' }}">
+        @if(auth()->user()->canAny(['issuances.index','stock_movements.index','processing_issues.index']))
+        <li class="nav-parent {{ request()->routeIs('issuances.*','stock_movements.*','processing_issues.*') ? 'nav-expanded active' : '' }}">
           <a class="nav-link" href="#"><i class="fa fa-industry"></i><span>Production</span></a>
           <ul class="nav nav-children">
-            @can('yarn_issues.index')<li class="{{ request()->routeIs('yarn_issues.*')?'active':'' }}"><a class="nav-link" href="{{ route('yarn_issues.index') }}">Yarn Issue</a></li>@endcan
+            @can('issuances.index')<li class="{{ request()->routeIs('issuances.*')?'active':'' }}"><a class="nav-link" href="{{ route('issuances.index') }}">Issuance</a></li>@endcan
             @can('stock_movements.index')<li class="{{ request()->routeIs('stock_movements.*')?'active':'' }}"><a class="nav-link" href="{{ route('stock_movements.index') }}">Stock Movement</a></li>@endcan
             @can('processing_issues.index')<li class="{{ request()->routeIs('processing_issues.*')?'active':'' }}"><a class="nav-link" href="{{ route('processing_issues.index') }}">Processing Issue</a></li>@endcan
           </ul>

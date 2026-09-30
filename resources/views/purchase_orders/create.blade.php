@@ -318,7 +318,12 @@
           </div>
         </div>
       </div>
-      <footer class="card-footer text-end"><button type="submit" class="btn btn-success" id="submitBtn" style="display:none">Save Purchase Order</button></footer>
+      <footer class="card-footer text-end">
+        <span id="submitBtn" style="display:none">
+          <button type="submit" name="submit_action" value="draft" class="btn btn-outline-secondary me-1">Save as Draft</button>
+          <button type="submit" name="submit_action" value="submit" class="btn btn-success">Save &amp; Submit for Approval</button>
+        </span>
+      </footer>
     </section>
   </form>
 </div></div>

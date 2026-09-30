@@ -75,7 +75,7 @@ class DatabaseSeeder extends Seeder
             'purchase_orders', 'purchase_order_amendments',
             'challans',
             'purchase_receivings', 'purchase_returns',
-            'yarn_issues',
+            'issuances',
             'stock_movements',
             'processing_issues',
             'vouchers',
