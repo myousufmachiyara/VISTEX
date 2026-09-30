@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\MediaController;
 use Illuminate\Support\Facades\Auth;
 
 use App\Http\Controllers\{
@@ -390,3 +391,6 @@ Route::middleware(['auth'])->group(function () {
     });
 
 });
+
+// Uploaded files (challan photos, voice notes). Works without `php artisan storage:link`.
+Route::get('media/{path}', [MediaController::class, 'show'])->where('path', '.*')->name('media.show');

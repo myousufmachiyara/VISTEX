@@ -34,7 +34,10 @@
         <div class="alert alert-warning">
           <strong>Gate objection:</strong> {{ $challan->objection_remarks }}
           @if($challan->objection_voice_note)
-            <div class="mt-2"><audio controls src="{{ asset('storage/' . $challan->objection_voice_note) }}"></audio></div>
+            <div class="mt-2">
+              <audio controls preload="metadata"><source src="{{ \App\Support\Media::url($challan->objection_voice_note) }}" type="audio/mp4">Your browser cannot play this voice note.</audio>
+              <a href="{{ \App\Support\Media::url($challan->objection_voice_note) }}" target="_blank" class="small ms-2">Download</a>
+            </div>
           @endif
         </div>
       @endif
@@ -97,7 +100,7 @@
       <h6>Challan Photo(s)</h6>
       <div class="row mb-3">
         @foreach($challan->challan_images ?? [] as $img)
-        <div class="col-md-3 mb-2"><a href="{{ Storage::url($img) }}" target="_blank"><img src="{{ Storage::url($img) }}" class="img-fluid border rounded"></a></div>
+        <div class="col-md-3 mb-2"><a href="{{ \App\Support\Media::url($img) }}" target="_blank"><img src="{{ \App\Support\Media::url($img) }}" class="img-fluid border rounded"></a></div>
         @endforeach
       </div>
     </div>

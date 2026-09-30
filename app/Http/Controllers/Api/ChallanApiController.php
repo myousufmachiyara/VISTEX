@@ -97,7 +97,7 @@ class ChallanApiController extends Controller
             'po_order_no' => $c->purchaseOrder->order_no ?? null,
             'received_date' => $c->received_date->format('Y-m-d'), 'status' => $c->status,
             'status_label' => $c->status_label,
-            'thumbnail' => !empty($c->challan_images) ? asset('storage/' . $c->challan_images[0]) : null,
+            'thumbnail' => !empty($c->challan_images) ? \App\Support\Media::url($c->challan_images[0]) : null,
         ]));
     }
 
@@ -112,14 +112,14 @@ class ChallanApiController extends Controller
             'po' => $c->purchaseOrder ? ['id' => $c->purchaseOrder->id, 'order_no' => $c->purchaseOrder->order_no, 'type' => $c->purchaseOrder->type] : null,
             'vendor_challan_no' => $c->vendor_challan_no,
             'received_date' => $c->received_date->format('Y-m-d'),
-            'images' => collect($c->challan_images)->map(fn($p) => asset('storage/' . $p))->values(),
+            'images' => collect($c->challan_images)->map(fn($p) => \App\Support\Media::url($p))->values(),
             'status' => $c->status, 'status_label' => $c->status_label,
             'decision' => $c->decision, 'decision_remarks' => $c->decision_remarks,
             'reviewed_by' => $c->reviewedBy->name ?? null,
             'grn_no' => $c->receiving->receiving_no ?? null,
             'can_review' => $c->isAwaitingReview() && $c->entry_type === 'po' && $c->canBeReviewedBy(request()->user()),
             'has_objection' => $c->has_objection, 'objection_remarks' => $c->objection_remarks,
-            'objection_voice_url' => $c->objection_voice_note ? asset('storage/' . $c->objection_voice_note) : null,
+            'objection_voice_url' => $c->objection_voice_note ? \App\Support\Media::url($c->objection_voice_note) : null,
             'remarks' => $c->remarks, 'received_by' => $c->receivedBy->name ?? '', 'created_at' => $c->created_at,
             'items' => $c->items->map(fn($i) => [
                 'id' => $i->id, 'product_name' => $i->product->name ?? $i->description,
@@ -163,7 +163,9 @@ class ChallanApiController extends Controller
                 if (!in_array(strtolower($file->getClientOriginalExtension()), self::VOICE_EXT)) {
                     return response()->json(['message' => 'Unsupported voice note format.'], 422);
                 }
-                $voicePath = $file->store('challan_voice', 'public');
+                // Keep the recorder's extension (.m4a) — content sniffing often mislabels
+                // AAC audio, and browsers won't play a file saved as .bin/.mp4-video.
+                $voicePath = $file->storeAs('challan_voice', \Illuminate\Support\Str::random(40) . '.' . strtolower($file->getClientOriginalExtension()), 'public');
             }
 
             $images = [];
@@ -234,7 +236,7 @@ class ChallanApiController extends Controller
             'vendor_name' => $c->display_vendor_name, 'category_name' => $c->purchaseOrder->category->name ?? '',
             'received_date' => $c->received_date->format('Y-m-d'), 'received_by' => $c->receivedBy->name ?? '',
             'has_objection' => (bool) $c->has_objection,
-            'thumbnail' => !empty($c->challan_images) ? asset('storage/' . $c->challan_images[0]) : null,
+            'thumbnail' => !empty($c->challan_images) ? \App\Support\Media::url($c->challan_images[0]) : null,
         ]));
     }
 

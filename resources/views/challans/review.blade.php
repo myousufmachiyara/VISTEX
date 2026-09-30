@@ -27,7 +27,7 @@
 
         @if($c['has_objection'])
           <div class="alert alert-warning"><strong>Gatekeeper objection:</strong> {{ $c['objection_remarks'] }}
-            @if($c['objection_voice_url'])<div class="mt-2"><audio controls src="{{ $c['objection_voice_url'] }}"></audio></div>@endif
+            @if($c['objection_voice_url'])<div class="mt-2"><audio controls preload="metadata"><source src="{{ $c['objection_voice_url'] }}" type="audio/mp4"></audio></div>@endif
           </div>
         @endif
         @if($c['last_amendment'])

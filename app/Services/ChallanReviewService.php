@@ -34,9 +34,9 @@ class ChallanReviewService
                 'status_label' => $challan->status_label, 'received_date' => $challan->received_date->format('Y-m-d'),
                 'vendor_challan_no' => $challan->vendor_challan_no, 'received_by' => $challan->receivedBy->name ?? '',
                 'has_objection' => (bool) $challan->has_objection, 'objection_remarks' => $challan->objection_remarks,
-                'objection_voice_url' => $challan->objection_voice_note ? asset('storage/' . $challan->objection_voice_note) : null,
+                'objection_voice_url' => $challan->objection_voice_note ? \App\Support\Media::url($challan->objection_voice_note) : null,
                 'remarks' => $challan->remarks,
-                'images' => collect($challan->challan_images ?? [])->map(fn($p) => asset('storage/' . $p))->values(),
+                'images' => collect($challan->challan_images ?? [])->map(fn($p) => \App\Support\Media::url($p))->values(),
                 'last_amendment' => $challan->amendment ? [
                     'amendment_no' => $challan->amendment->amendment_no, 'status' => $challan->amendment->status,
                     'rejection_reason' => $challan->amendment->rejection_reason, 'changes' => $challan->amendment->change_lines,

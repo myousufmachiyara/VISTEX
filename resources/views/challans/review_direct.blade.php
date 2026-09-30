@@ -22,7 +22,7 @@
         @if($challan->remarks)<div class="alert alert-secondary py-2"><strong>Remarks:</strong> {{ $challan->remarks }}</div>@endif
         <div class="mb-3">
           @foreach($challan->challan_images as $img)
-            <a href="{{ asset('storage/' . $img) }}" target="_blank"><img src="{{ asset('storage/' . $img) }}" style="height:90px;margin-right:8px;border:1px solid #ccc;"></a>
+            <a href="{{ \App\Support\Media::url($img) }}" target="_blank"><img src="{{ \App\Support\Media::url($img) }}" style="height:90px;margin-right:8px;border:1px solid #ccc;"></a>
           @endforeach
         </div>
 
