@@ -640,6 +640,10 @@
   $('#job_select').on('change', function () {
     const jobId = $(this).val();
     $('#procItemsBody').empty();
+    // resetAll() clears this select on every category change. Only build
+    // processing rows for a Processing PO — otherwise a hidden row with
+    // required fields (and clashing items[0] names) blocked form submission.
+    if ($('#po_type').val() !== 'processing') return;
     if (!jobId) { addProcRow(); return; }
     fetch(`/purchase-orders/job-items/${jobId}`).then(r => r.json()).then(data => {
       $('#proc_collection_display').val(data.collection || '');
@@ -694,6 +698,26 @@
   $('#addLabReqBtn').on('click', function () { addLabReqRow(); });
   $(document).on('click', '.remove-lab-req-row', function () {
     if ($('.lab-req-row').length > 1) $(this).closest('tr').remove();
+  });
+
+  // Fields in hidden sections (other PO types) must not be validated or posted.
+  // HTML5 validation runs BEFORE the submit event, so this has to happen on click:
+  // Chrome silently refuses to submit when a hidden field is required
+  // ("An invalid form control ... is not focusable").
+  const TYPE_SECTIONS = '#purchaseItemsSection, #weavingSection, #processingSection, #service_type_field, #brokerSection';
+  function disableHiddenSections() {
+    $(TYPE_SECTIONS).each(function () {
+      const hidden = !$(this).is(':visible');
+      $(this).find(':input').each(function () {
+        if (hidden && !this.disabled) { this.disabled = true; this.dataset.autoDisabled = '1'; }
+        if (!hidden && this.dataset.autoDisabled) { this.disabled = false; delete this.dataset.autoDisabled; }
+      });
+    });
+  }
+  $('#submitBtn button').on('click', disableHiddenSections);
+  // Switching category/type re-shows sections, so give their fields back
+  $('#category_select, #type_select').on('change', function () {
+    $('[data-auto-disabled]').prop('disabled', false).removeAttr('data-auto-disabled');
   });
 
   $('form').on('submit', function () {
