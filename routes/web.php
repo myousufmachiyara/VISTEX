@@ -390,5 +390,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('{id}',                 [ChallanController::class, 'show'])           ->name('show')   ->middleware('check.permission:challans.index');
         Route::post('{id}/approve-direct', [ChallanController::class, 'approveDirect'])  ->name('approve_direct')->middleware('check.permission:challans.edit');
         Route::post('{id}/reject-direct',  [ChallanController::class, 'rejectDirect'])   ->name('reject_direct') ->middleware('check.permission:challans.edit');
+        Route::get('{id}/review-direct',  [ChallanController::class, 'reviewDirectForm'])->name('review_direct_form')->middleware('check.permission:challans.edit');
+        Route::post('{id}/review-direct', [ChallanController::class, 'reviewDirect'])->name('review_direct')->middleware('check.permission:challans.edit');
     });
 });

@@ -15,11 +15,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthApiController::class, 'me']);
 
     // Challan
-    Route::get('/challans', [ChallanApiController::class, 'index']);
     Route::get('/challans/vendors-for-type', [ChallanApiController::class, 'vendorsForType']);
     Route::get('/challans/pos-for-vendor', [ChallanApiController::class, 'posForVendor']);
-    Route::get('/challans/po-expected-items/{poId}', [ChallanApiController::class, 'poExpectedItems']);
     Route::get('/challans/expense-accounts', [ChallanApiController::class, 'expenseAccounts']);
+
+    Route::get('/challans', [ChallanApiController::class, 'index']);
+    Route::get('/challans/categories', [ChallanApiController::class, 'categories']);
+    Route::get('/challans/category-pos', [ChallanApiController::class, 'categoryPos']);
+    Route::get('/challans/po-expected-items/{poId}', [ChallanApiController::class, 'poExpectedItems']);
     Route::get('/challans/{id}', [ChallanApiController::class, 'show']);
     Route::post('/challans', [ChallanApiController::class, 'store']);
     Route::post('/challans/direct', [ChallanApiController::class, 'storeDirect']);

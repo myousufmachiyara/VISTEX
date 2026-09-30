@@ -228,4 +228,65 @@ class ChallanController extends Controller
             return back()->with('error', $e->getMessage());
         }
     }
+
+    public function reviewDirectForm($id)
+    {
+        $challan = Challan::with('directItems', 'category.inchargeUsers', 'receivedBy')->findOrFail($id);
+        abort_unless($challan->entry_type === 'direct', 404);
+        $this->authorizeReview($challan);
+
+        if ($challan->status !== 'AwaitingInspection') {
+            return redirect()->route('challans.show', $id)->with('error', 'This challan has already been reviewed.');
+        }
+
+        return view('challans.review_direct', [
+            'challan'         => $challan,
+            'categories'      => ProductCategory::orderBy('name')->get(['id', 'name']),
+            'units'           => MeasurementUnit::orderBy('name')->get(),
+            'vendors'         => Vendor::active()->orderBy('name')->get(['id', 'name']),
+            'accounts'        => ChartOfAccounts::active()->orderBy('name')->get(['id', 'name']),
+            'expenseAccounts' => ChartOfAccounts::active()->where('account_type', 'expense')->orderBy('name')->get(['id', 'name']),
+            'locations'       => Location::whereNull('vendor_id')->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+        ]);
+    }
+
+    public function reviewDirect(Request $request, $id)
+    {
+        $request->validate([
+            'location_id'          => 'required|exists:locations,id',
+            'payable_vendor_id'    => 'nullable|exists:vendors,id',
+            'payable_account_id'   => 'nullable|exists:chart_of_accounts,id',
+            'paid_from_account_id' => 'nullable|exists:chart_of_accounts,id',
+            'items'                                 => 'required|array|min:1',
+            'items.*.id'                            => 'required|exists:challan_direct_items,id',
+            'items.*.treatment'                     => 'required|in:stock,expense',
+            'items.*.product_category_id'           => 'required_if:items.*.treatment,stock|nullable|exists:product_categories,id',
+            'items.*.product_id'                    => 'nullable|string',
+            'items.*.measurement_unit_id'           => 'nullable|exists:measurement_units,id',
+            'items.*.expense_account_id'            => 'required_if:items.*.treatment,expense|nullable|exists:chart_of_accounts,id',
+        ]);
+
+        try {
+            $challan = Challan::with('directItems')->findOrFail($id);
+            $this->authorizeReview($challan);
+
+            $this->service->reviewDirect(
+                $challan,
+                $request->only(['location_id', 'payable_vendor_id', 'payable_account_id', 'paid_from_account_id']),
+                $request->items, auth()->id()
+            );
+
+            return redirect()->route('challans.show', $id)->with('success', 'Challan reviewed — stock and ledger posted.');
+        } catch (\Exception $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+    }
+
+    private function authorizeReview(Challan $challan): void
+    {
+        abort_unless(
+            Challan::forCategoryIncharge(auth()->user())->where('id', $challan->id)->exists(),
+            403, 'Only the category incharge can review this challan.'
+        );
+    }
 }

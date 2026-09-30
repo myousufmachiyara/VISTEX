@@ -1,156 +1,205 @@
 <?php
-
 namespace App\Services;
 
-use App\Models\Challan;
-use App\Models\ChallanDirectItem;
-use App\Models\PurchaseOrder;
+use App\Models\{Challan, ChallanDirectItem, ChallanItem, PurchaseOrder, Product, ProductCategory, LocationStockLedger};
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class ChallanService
 {
-    public function __construct(private DocumentNumberService $numberService) {}
+    public function __construct(
+        private DocumentNumberService $numberService,
+        private NotificationService $notificationService
+    ) {}
 
+    // ── PO-based challan (gatekeeper) ──
     public function create(array $data, array $items, ?int $userId = null): Challan
     {
         return DB::transaction(function () use ($data, $items, $userId) {
-
             $po = PurchaseOrder::findOrFail($data['purchase_order_id']);
-
             $this->assertPoIsReceivable($po);
 
             $images = $data['challan_images'] ?? [];
-            if (empty($images)) {
-                throw new \Exception('At least one photo of the challan is required.');
-            }
+            if (empty($images)) throw new \Exception('At least one photo of the challan is required.');
 
             $challan = Challan::create([
-                'challan_no'          => $this->numberService->next('challan', 'challans', 'challan_no', 'CHL'),
-                'entry_type'          => 'po',
-                'purchase_order_id'   => $po->id,
-                'vendor_challan_no'   => $data['vendor_challan_no'] ?? null,
-                'received_date'       => $data['received_date'],
-                'challan_images'      => $images,
-                'status'              => 'AwaitingInspection',
-                'has_objection'       => (bool) ($data['has_objection'] ?? false),
-                'objection_remarks'   => $data['objection_remarks'] ?? null,
-                'remarks'             => $data['remarks'] ?? null,
-                'received_by'         => $userId,
-                'created_by'          => $userId,
-                'updated_by'          => $userId,
+                'challan_no'           => $this->numberService->next('challan', 'challans', 'challan_no', 'CHL'),
+                'entry_type'           => 'po',
+                'category_id'          => $po->product_category_id,
+                'purchase_order_id'    => $po->id,
+                'vendor_challan_no'    => $data['vendor_challan_no'] ?? null,
+                'received_date'        => $data['received_date'],
+                'challan_images'       => $images,
+                'status'               => 'AwaitingInspection',
+                'has_objection'        => (bool) ($data['has_objection'] ?? false),
+                'objection_remarks'    => $data['objection_remarks'] ?? null,
+                'objection_voice_note' => $data['objection_voice_note'] ?? null,
+                'remarks'              => $data['remarks'] ?? null,
+                'received_by' => $userId, 'created_by' => $userId, 'updated_by' => $userId,
             ]);
 
             foreach ($items as $item) {
-                \App\Models\ChallanItem::create([
-                    'challan_id'              => $challan->id,
-                    'purchase_order_item_id'  => $item['purchase_order_item_id'] ?? null,
-                    'product_id'              => $item['product_id'] ?? null,
-                    'description'             => $item['description'] ?? null,
-                    'expected_qty'            => $item['expected_qty'] ?? 0,
-                    'received_qty'            => $item['received_qty'] ?? 0,
+                ChallanItem::create([
+                    'challan_id' => $challan->id,
+                    'purchase_order_item_id' => $item['purchase_order_item_id'] ?? null,
+                    'product_id' => $item['product_id'] ?? null,
+                    'description' => $item['description'] ?? null,
+                    'expected_qty' => $item['expected_qty'] ?? 0,
+                    'received_qty' => $item['received_qty'] ?? 0,
                 ]);
             }
+
+            $this->notificationService->notifyCategoryIncharges(
+                $po->product_category_id, 'challan_received', 'New Challan Received',
+                "Challan {$challan->challan_no} logged against PO {$po->order_no}" . ($challan->has_objection ? ' — with objection.' : '.'),
+                'challan', $challan->id
+            );
 
             return $challan->load('items');
         });
     }
 
+    // ── No-PO challan (gatekeeper): vendor typed, items typed, nothing posted yet ──
     public function createDirect(array $data, array $items, ?int $userId = null): Challan
     {
         return DB::transaction(function () use ($data, $items, $userId) {
-
-            $items = array_values(array_filter($items, fn($i) => (float) ($i['quantity'] ?? 0) > 0));
-            if (empty($items)) {
-                throw new \Exception('Enter at least one item.');
-            }
+            $items = array_values(array_filter($items, fn($i) => (float) ($i['quantity'] ?? 0) > 0 && trim($i['description'] ?? '') !== ''));
+            if (empty($items)) throw new \Exception('Enter at least one item.');
 
             $images = $data['challan_images'] ?? [];
-            if (empty($images)) {
-                throw new \Exception('At least one photo of the challan is required.');
-            }
+            if (empty($images)) throw new \Exception('At least one photo of the challan is required.');
 
             $challan = Challan::create([
-                'challan_no'      => $this->numberService->next('challan', 'challans', 'challan_no', 'CHL'),
-                'entry_type'      => 'direct',
-                'vendor_id'       => $data['vendor_id'],
-                'received_date'   => $data['received_date'],
-                'challan_images'  => $images,
-                'status'          => 'AwaitingInspection',
-                'remarks'         => $data['remarks'] ?? null,
-                'received_by'     => $userId,
-                'created_by'      => $userId,
-                'updated_by'      => $userId,
+                'challan_no'         => $this->numberService->next('challan', 'challans', 'challan_no', 'CHL'),
+                'entry_type'         => 'direct',
+                'category_id'        => $data['category_id'],
+                'direct_vendor_name' => trim($data['vendor_name']),
+                'received_date'      => $data['received_date'],
+                'challan_images'     => $images,
+                'status'             => 'AwaitingInspection',
+                'remarks'            => $data['remarks'] ?? null,
+                'received_by' => $userId, 'created_by' => $userId, 'updated_by' => $userId,
             ]);
 
             foreach ($items as $item) {
-                $qty = (float) $item['quantity'];
-                $price = (float) $item['unit_price'];
-
+                $qty = (float) $item['quantity']; $price = (float) ($item['unit_price'] ?? 0);
                 ChallanDirectItem::create([
-                    'challan_id'          => $challan->id,
-                    'description'         => $item['description'],
-                    'quantity'            => $qty,
-                    'unit_price'          => $price,
-                    'expense_account_id'  => $item['expense_account_id'],
-                    'amount'              => round($qty * $price, 2),
+                    'challan_id' => $challan->id, 'description' => trim($item['description']),
+                    'quantity' => $qty, 'unit' => $item['unit'] ?? null,
+                    'unit_price' => $price, 'amount' => round($qty * $price, 2),
                 ]);
             }
 
-            return $challan->load('directItems.expenseAccount', 'vendor');
-        });
-    }
-
-    public function approveDirect(Challan $challan, int $approverId): Challan
-    {
-        return DB::transaction(function () use ($challan, $approverId) {
-
-            if ($challan->entry_type !== 'direct') {
-                throw new \Exception('This is not a direct (no-PO) entry.');
-            }
-            if ($challan->status !== 'AwaitingInspection') {
-                throw new \Exception('This entry has already been processed.');
-            }
-
-            $lines = [];
-            foreach ($challan->directItems as $item) {
-                $lines[] = ['account_id' => $item->expense_account_id, 'debit' => (float) $item->amount, 'credit' => 0];
-            }
-
-            $apAccountId = app(AccountMappingService::class)->accountId('accounts_payable');
-            if (!$apAccountId) {
-                throw new \Exception('Accounts Payable mapping is not configured.');
-            }
-
-            $total = $challan->directItems->sum('amount');
-            $lines[] = ['account_id' => $apAccountId, 'debit' => 0, 'credit' => $total, 'party_type' => 'vendor', 'party_id' => $challan->vendor_id];
-
-            app(VoucherService::class)->post(
-                'system',
-                $challan->received_date->format('Y-m-d'),
-                $lines,
-                "Direct Receiving {$challan->challan_no} — no PO",
-                'Challan',
-                $challan->id,
-                $approverId
+            $this->notificationService->notifyCategoryIncharges(
+                $challan->category_id, 'challan_received', 'Purchase Without PO — Review Needed',
+                "Challan {$challan->challan_no} logged without PO from '{$challan->direct_vendor_name}'.",
+                'challan', $challan->id
             );
 
-            $challan->update(['status' => 'Processed', 'updated_by' => $approverId]);
-
-            return $challan->fresh();
+            return $challan->load('directItems');
         });
     }
 
-    public function rejectDirect(Challan $challan, int $approverId, string $reason): Challan
+    // ── Incharge review of a no-PO challan: links accounts, stock and expense, posts ledger ──
+    public function reviewDirect(Challan $challan, array $header, array $items, int $userId): Challan
     {
-        if ($challan->entry_type !== 'direct') {
-            throw new \Exception('This is not a direct (no-PO) entry.');
-        }
-        if ($challan->status !== 'AwaitingInspection') {
-            throw new \Exception('This entry has already been processed.');
-        }
+        return DB::transaction(function () use ($challan, $header, $items, $userId) {
+            if ($challan->entry_type !== 'direct') throw new \Exception('This is not a no-PO entry.');
+            if ($challan->status !== 'AwaitingInspection') throw new \Exception('This challan has already been reviewed.');
 
-        $challan->update(['status' => 'Processed', 'remarks' => trim(($challan->remarks ?? '') . ' [Rejected: ' . $reason . ']'), 'updated_by' => $approverId]);
+            $mapping = app(AccountMappingService::class);
+            $hasVendor = !empty($header['payable_vendor_id']);
+            if (!$hasVendor && empty($header['payable_account_id'])) {
+                throw new \Exception('Select the vendor or payable account this purchase is owed to.');
+            }
+            $payableAccountId = $hasVendor ? $mapping->accountId('accounts_payable') : (int) $header['payable_account_id'];
+            if (!$payableAccountId) throw new \Exception('Accounts Payable mapping is not configured.');
 
+            $rows = $challan->directItems->keyBy('id');
+            $debits = []; // account_id => amount
+
+            foreach ($items as $row) {
+                $item = $rows->get((int) $row['id']);
+                if (!$item) throw new \Exception('Invalid item in submission.');
+                $amount = round((float) $item->amount, 2);
+
+                if ($row['treatment'] === 'stock') {
+                    $category = ProductCategory::findOrFail($row['product_category_id']);
+                    $pid = $row['product_id'] ?? 'new';
+                    $product = ($pid === 'new' || $pid === '' || $pid === null)
+                        ? $this->makeProductFromItem($item, $category->id, $row['measurement_unit_id'] ?? null)
+                        : Product::findOrFail((int) $pid);
+
+                    $stockAccount = $category->stock_account_id ?: $mapping->accountId('stock_in_hand');
+                    if (!$stockAccount) throw new \Exception("No stock account set for category {$category->name}.");
+                    $debits[$stockAccount] = ($debits[$stockAccount] ?? 0) + $amount;
+
+                    LocationStockLedger::create([
+                        'doc_no' => $challan->challan_no, 'location_id' => $header['location_id'], 'product_id' => $product->id,
+                        'status' => 'fresh', 'quantity' => $item->quantity, 'amount' => $amount,
+                        'reference_type' => 'Challan', 'reference_id' => $challan->id, 'entry_date' => $challan->received_date,
+                    ]);
+                    $item->update(['treatment' => 'stock', 'product_category_id' => $category->id, 'product_id' => $product->id, 'expense_account_id' => null]);
+                } else {
+                    $accId = (int) $row['expense_account_id'];
+                    $debits[$accId] = ($debits[$accId] ?? 0) + $amount;
+                    $item->update(['treatment' => 'expense', 'expense_account_id' => $accId, 'product_id' => null, 'product_category_id' => null]);
+                }
+            }
+
+            $total = round(array_sum($debits), 2);
+            $party = $hasVendor ? ['party_type' => 'vendor', 'party_id' => (int) $header['payable_vendor_id']] : [];
+
+            $lines = [];
+            foreach ($debits as $accId => $amt) $lines[] = ['account_id' => $accId, 'debit' => round($amt, 2), 'credit' => 0];
+            $lines[] = array_merge(['account_id' => $payableAccountId, 'debit' => 0, 'credit' => $total], $party);
+
+            // Optional: settled straight away from petty cash / bank / staff account
+            if (!empty($header['paid_from_account_id'])) {
+                $lines[] = array_merge(['account_id' => $payableAccountId, 'debit' => $total, 'credit' => 0], $party);
+                $lines[] = ['account_id' => (int) $header['paid_from_account_id'], 'debit' => 0, 'credit' => $total];
+            }
+
+            app(VoucherService::class)->post(
+                'system', $challan->received_date->format('Y-m-d'), $lines,
+                "Purchase without PO {$challan->challan_no} — {$challan->direct_vendor_name}",
+                'Challan', $challan->id, $userId
+            );
+
+            $challan->update([
+                'status' => 'Accepted', 'reviewed_by' => $userId, 'reviewed_at' => now(), 'updated_by' => $userId,
+                'payable_vendor_id' => $header['payable_vendor_id'] ?? null,
+                'payable_account_id' => $payableAccountId,
+                'paid_from_account_id' => $header['paid_from_account_id'] ?? null,
+            ]);
+
+            return $challan->fresh('directItems');
+        });
+    }
+
+    private function makeProductFromItem(ChallanDirectItem $item, int $categoryId, $unitId): Product
+    {
+        if (!$unitId) throw new \Exception("Select a unit to create the new item '{$item->description}'.");
+
+        $base = Str::slug($item->description) ?: 'item';
+        $sku = $base; $n = 2;
+        while (DB::table('products')->where('sku', $sku)->exists()) $sku = $base . '-' . $n++;
+
+        return Product::create([
+            'name' => $item->description, 'sku' => $sku, 'category_id' => $categoryId,
+            'measurement_unit' => $unitId, 'is_active' => true,
+        ]);
+    }
+
+    public function rejectDirect(Challan $challan, int $userId, string $reason): Challan
+    {
+        if ($challan->entry_type !== 'direct') throw new \Exception('This is not a no-PO entry.');
+        if ($challan->status !== 'AwaitingInspection') throw new \Exception('This entry has already been processed.');
+
+        $challan->update([
+            'status' => 'Rejected', 'reviewed_by' => $userId, 'reviewed_at' => now(), 'updated_by' => $userId,
+            'remarks' => trim(($challan->remarks ?? '') . ' [Rejected: ' . $reason . ']'),
+        ]);
         return $challan->fresh();
     }
 
@@ -159,7 +208,6 @@ class ChallanService
         if ($po->type === 'purchase' && !in_array($po->status, ['Approved', 'PartiallyReceived'])) {
             throw new \Exception('This Purchase Order is not yet Approved, or is already fully received.');
         }
-
         if (in_array($po->type, ['weaving', 'processing']) && !in_array($po->status, ['Issued', 'PartiallyReceived'])) {
             throw new \Exception('This Purchase Order has not been Issued yet, or is already fully received.');
         }
