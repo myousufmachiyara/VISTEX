@@ -22,9 +22,14 @@ return new class extends Migration
     public function up(): void
     {
         // 1. Detach the item FK so the parent table and column can be renamed cleanly
-        Schema::table('yarn_issue_items', function (Blueprint $table) {
-            $table->dropForeign('yii_issue_fk');
-        });
+        //    (looked up by column, not by name, in case the live DB named it differently)
+        $fk = DB::table('information_schema.KEY_COLUMN_USAGE')
+            ->where('TABLE_SCHEMA', DB::getDatabaseName())->where('TABLE_NAME', 'yarn_issue_items')
+            ->where('COLUMN_NAME', 'yarn_issue_id')->whereNotNull('REFERENCED_TABLE_NAME')
+            ->value('CONSTRAINT_NAME');
+        if ($fk) {
+            Schema::table('yarn_issue_items', fn(Blueprint $t) => $t->dropForeign($fk));
+        }
 
         Schema::rename('yarn_issues', 'issuances');
         Schema::rename('yarn_issue_items', 'issuance_items');
