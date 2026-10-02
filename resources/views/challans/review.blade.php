@@ -9,7 +9,7 @@
     @csrf
     <section class="card">
       <header class="card-header d-flex justify-content-between align-items-center">
-        <h2 class="card-title">Inspect {{ $c['challan_no'] }}</h2>
+        <h2 class="card-title">Inspect {{ $c['challan_no'] }} </h2>
         <a href="{{ route('challans.show', $challan->id) }}" class="btn btn-sm btn-outline-secondary">View Challan</a>
       </header>
       <div class="card-body">
@@ -19,10 +19,11 @@
         @endif
 
         <div class="row mb-3">
+          <div class="col-md-3"><strong>PO#:</strong>{{ $po['order_no'] }}</div>
           <div class="col-md-3"><strong>Vendor:</strong> {{ $po['vendor_name'] }}</div>
-          <div class="col-md-3"><strong>Category:</strong> {{ $po['category_name'] }}</div>
-          <div class="col-md-3"><strong>Arrived:</strong> {{ \Carbon\Carbon::parse($c['received_date'])->format('d-M-Y') }} ({{ $c['received_by'] }})</div>
-          <div class="col-md-3"><strong>Vendor Challan #:</strong> {{ $c['vendor_challan_no'] ?? '—' }}</div>
+          <div class="col-md-2"><strong>Category:</strong> {{ $po['category_name'] }}</div>
+          <div class="col-md-2"><strong>Arrived:</strong> {{ \Carbon\Carbon::parse($c['received_date'])->format('d-M-Y') }} ({{ $c['received_by'] }})</div>
+          <div class="col-md-2"><strong>Vendor Challan #:</strong> {{ $c['vendor_challan_no'] ?? '—' }}</div>
         </div>
 
         @if($c['has_objection'])
