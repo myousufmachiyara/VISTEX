@@ -19,8 +19,8 @@
         @endif
 
         <div class="row mb-3">
-          <div class="col-md-3"><strong>Vendor:</strong> {{ $po['vendor_name'] }}</div>
-          <div class="col-md-2"><strong>PO#:{{ $po['order_no'] }}</div>
+          <div class="col-md-3"><strong>Vendor:{{ $po['vendor_name'] }}</strong> </div>
+          <div class="col-md-2"><strong>PO#:{{ $po['order_no'] }}</strong></div>
           <div class="col-md-2"><strong>Category:{{ $po['category_name'] }}</strong></div>
           <div class="col-md-2"><strong>Arrived: {{ \Carbon\Carbon::parse($c['received_date'])->format('d-M-Y') }} ({{ $c['received_by'] }})</strong></div>
           <div class="col-md-2"><strong>Vendor Challan #: {{ $c['vendor_challan_no'] ?? '—' }}</strong></div>
