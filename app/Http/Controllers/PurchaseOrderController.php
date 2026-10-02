@@ -133,7 +133,7 @@ class PurchaseOrderController extends Controller
             return array_merge($base, [
                 'warp_product_id' => 'required|exists:products,id',
                 'weft_product_id' => 'required|exists:products,id',
-                'greige_product_id' => 'nullable|exists:products,id',
+                'greige_product_id' => 'required|exists:products,id',
                 'warp_count' => 'required|numeric|min:0.01',
                 'weft_count' => 'required|numeric|min:0.01',
                 'reed_input' => 'required|numeric|min:0.01',
@@ -600,7 +600,7 @@ class PurchaseOrderController extends Controller
             <td width="16%" style="border:0.75px solid #000;"><b>Total Wt.</b></td>
         </tr>
         <tr>
-            <td style="border:0.75px solid #000;">' . number_format($order->total_meters_required, 3) . ' Mtr</td>
+            <td style="border:0.75px solid #000;">' . number_format($order->total_meters_required, 2) . ' Mtr</td>
             <td style="border:0.75px solid #000;">' . number_format($order->rate_per_pick, 2) . '</td>
             <td style="border:0.75px solid #000;">' . number_format($order->sizing_lbs, 2) . '</td>
             <td style="border:0.75px solid #000;">' . number_format($calc['warp_consumption'], 4) . '</td>
@@ -624,9 +624,9 @@ class PurchaseOrderController extends Controller
         <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
  
         <tr style="background-color:#f0f0f0;">
-            <td width="34%" style="border:0.75px solid #000;"><b>Warp Yarn Wt. Required</b></td>
-            <td width="33%" style="border:0.75px solid #000;"><b>Weft Yarn Wt. Required</b></td>
-            <td width="33%" style="border:0.75px solid #000;"><b>Total Yarn Required</b></td>
+            <td width="34%" style="border:0.75px solid #000;"><b>Warp Yarn Wt. Required Lbs</b></td>
+            <td width="33%" style="border:0.75px solid #000;"><b>Weft Yarn Wt. Required Lbs</b></td>
+            <td width="33%" style="border:0.75px solid #000;"><b>Total Yarn Required Lbs</b></td>
         </tr>
         <tr>
             <td style="border:0.75px solid #000;">' . number_format($calc['warp_required_lbs'], 2) . '</td>

@@ -230,7 +230,7 @@
               </select>
             </div>
             <div class="col-md-4 mb-3"><label>Output Greige Product</label>
-              <select name="greige_product_id" class="form-control select2-js">
+              <select name="greige_product_id" class="form-control select2-js" required>
                 <option value="">Not specified yet</option>
                 @foreach($greigeProducts as $p)<option value="{{ $p->id }}" @selected($p->id == $order->greige_product_id)>{{ $p->name }} ({{ $p->sku }})</option>@endforeach
               </select>
