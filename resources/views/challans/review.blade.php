@@ -19,11 +19,11 @@
         @endif
 
         <div class="row mb-3">
-          <div class="col-md-3"><strong>PO#:</strong>{{ $po['order_no'] }}</div>
           <div class="col-md-3"><strong>Vendor:</strong> {{ $po['vendor_name'] }}</div>
-          <div class="col-md-2"><strong>Category:</strong> {{ $po['category_name'] }}</div>
-          <div class="col-md-2"><strong>Arrived:</strong> {{ \Carbon\Carbon::parse($c['received_date'])->format('d-M-Y') }} ({{ $c['received_by'] }})</div>
-          <div class="col-md-2"><strong>Vendor Challan #:</strong> {{ $c['vendor_challan_no'] ?? '—' }}</div>
+          <div class="col-md-2"><strong>PO#:{{ $po['order_no'] }}</div>
+          <div class="col-md-2"><strong>Category:{{ $po['category_name'] }}</strong></div>
+          <div class="col-md-2"><strong>Arrived: {{ \Carbon\Carbon::parse($c['received_date'])->format('d-M-Y') }} ({{ $c['received_by'] }})</strong></div>
+          <div class="col-md-2"><strong>Vendor Challan #: {{ $c['vendor_challan_no'] ?? '—' }}</strong></div>
         </div>
 
         @if($c['has_objection'])
