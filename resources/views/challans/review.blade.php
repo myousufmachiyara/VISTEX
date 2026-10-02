@@ -9,7 +9,7 @@
     @csrf
     <section class="card">
       <header class="card-header d-flex justify-content-between align-items-center">
-        <h2 class="card-title">Inspect {{ $c['challan_no'] }} — {{ $po['order_no'] }}</h2>
+        <h2 class="card-title">Inspect {{ $c['challan_no'] }}</h2>
         <a href="{{ route('challans.show', $challan->id) }}" class="btn btn-sm btn-outline-secondary">View Challan</a>
       </header>
       <div class="card-body">
