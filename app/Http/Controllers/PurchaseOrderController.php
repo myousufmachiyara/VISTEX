@@ -314,6 +314,10 @@ class PurchaseOrderController extends Controller
             return $this->printWeaving($order);
         }
 
+        if ($order->type === 'purchase' && ($order->category->code ?? null) === 'greige') {
+            return $this->printGreigePurchase($order);
+        }
+
         $pdf = new \App\Services\myPDF();
 
         $pdf->setPrintHeader(false);
@@ -399,6 +403,162 @@ class PurchaseOrderController extends Controller
             <td style="border:1px solid #333; text-align:center;">' . $count . '</td>
             <td style="border:1px solid #333;">' . e($item->product->name ?? '') . '</td>
             <td style="border:1px solid #333; text-align:center;">' . number_format($item->quantity, 0) . '</td>
+            <td style="border:1px solid #333; text-align:center;">' . number_format($item->quantity, 3) . ' ' . e($item->product->measurementUnit->shortcode ?? '') . '</td>
+            <td style="border:1px solid #333; text-align:right;">' . number_format($item->rate, 2) . '</td>
+            <td style="border:1px solid #333; text-align:right;">' . number_format($amount, 2) . '</td>
+        </tr>';
+        }
+        $itemsHtml .= '</table>';
+
+        $pdf->writeHTML($itemsHtml, true, false, false, false, '');
+        $pdf->Ln(3);
+
+        $summaryHtml = '
+        <table cellpadding="4" cellspacing="0" width="100%">
+        <tr>
+            <td width="60%"></td>
+            <td width="40%">
+            <table cellpadding="4" cellspacing="0" width="100%" style="border:1px solid #333; font-size:10px;">
+                <tr><td width="50%">Amount</td><td width="50%" style="text-align:right;">' . number_format($order->subtotal, 2) . '</td></tr>';
+
+        if ($order->gst_applicable && $order->gst_amount > 0) {
+            $summaryHtml .= '<tr><td>GST (' . number_format($order->gst_rate, 2) . '%)</td><td style="text-align:right;">' . number_format($order->gst_amount, 2) . '</td></tr>';
+        }
+        if ($order->broker_commission_amount > 0) {
+            $summaryHtml .= '<tr><td>Broker Commission</td><td style="text-align:right;">' . number_format($order->broker_commission_amount, 2) . '</td></tr>';
+        }
+
+        $summaryHtml .= '
+                <tr style="font-weight:bold; background-color:#f0f0f0;">
+                <td>Net Total</td><td style="text-align:right;">' . number_format($order->total_amount, 2) . '</td>
+                </tr>
+            </table>
+            </td>
+        </tr>
+        </table>';
+
+        $pdf->writeHTML($summaryHtml, true, false, false, false, '');
+        $pdf->Ln(4);
+
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->MultiCell(0, 6, 'Amount in Words: ' . $pdf->convertCurrencyToWords(round($order->total_amount)), 0, 'L');
+        $pdf->SetFont('helvetica', '', 10);
+
+        if ($order->terms->isNotEmpty()) {
+            $pdf->Ln(3);
+            $pdf->writeHTML($this->termsHtml($order), true, false, false, false, '');
+        }
+
+        if ($order->remarks) {
+            $pdf->Ln(2);
+            $pdf->SetFont('helvetica', 'B', 9);
+            $pdf->Cell(0, 6, 'Remarks:', 0, 1, 'L');
+            $pdf->SetFont('helvetica', '', 9);
+            $pdf->MultiCell(0, 5, $order->remarks, 0, 'L');
+        }
+
+        $pdf->SetFont('helvetica', 'B', 12);
+        $pdf->Ln(15);
+        $lineWidth = 60;
+        $yPosition = $pdf->GetY();
+        $pdf->Line(28, $yPosition, 20 + $lineWidth, $yPosition);
+        $pdf->Line(130, $yPosition, 120 + $lineWidth, $yPosition);
+        $pdf->Ln(5);
+        $pdf->SetXY(23, $yPosition);
+        $pdf->Cell($lineWidth, 10, 'Prepared By', 0, 0, 'C');
+        $pdf->SetXY(125, $yPosition);
+        $pdf->Cell($lineWidth, 10, 'Approved By', 0, 0, 'C');
+
+        return $pdf->Output($order->order_no . '.pdf', 'I');
+    }
+
+    // Greige Fabric > Purchasing PO — same as print() but without the Total Bags column
+    private function printGreigePurchase(PurchaseOrder $order)
+    {
+        $pdf = new \App\Services\myPDF();
+
+        $pdf->setPrintHeader(false);
+        $pdf->setPrintFooter(true);
+        $pdf->SetCreator(PDF_CREATOR);
+        $pdf->SetMargins(10, 10, 10);
+        $pdf->SetAuthor('VISTEX (Private) Limited');
+        $pdf->SetTitle($order->order_no);
+        $pdf->SetSubject('Purchase Order');
+
+        $pdf->AddPage();
+        $pdf->SetFont('helvetica', '', 10);
+
+        $logoPath = public_path('assets/img/vistex-logo.png');
+        if (file_exists($logoPath)) {
+            $pdf->Image($logoPath, 6, 8, 60);
+        }
+
+        $pdf->SetFont('helvetica', 'B', 18);
+        $pdf->SetXY(120, 10);
+        $pdf->Cell(80, 8, 'PURCHASE ORDER', 0, 1, 'R');
+
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->SetXY(120, 20);
+        $pdf->Cell(80, 6, $order->order_no, 0, 1, 'R');
+
+        $pdf->Ln(10);
+
+        $vendorBox = '
+        <table cellpadding="6" cellspacing="0" width="100%">
+        <tr>
+            <td width="50%" style="border:1px solid #333; vertical-align:top;">
+            <b style="font-size:11px;">SUPPLIER</b><br><br>
+            <b>' . e($order->vendor->name ?? '-') . '</b><br>
+            NTN: ' . e($order->vendor->ntn_number ?? '-') . '<br>
+            STRN: ' . e($order->vendor->tax_id_number ?? '-') . '<br>
+            ' . nl2br(e($order->vendor->address ?? '-')) . '
+            </td>
+            <td width="4%"></td>
+            <td width="46%" style="border:1px solid #333; vertical-align:top;">
+            <b style="font-size:11px;">BUYER</b><br><br>
+            <b>VISTEX (Private) Limited</b><br>
+            NTN: 1234567-8<br>
+            STRN: 12-34-5678-901-23<br>
+            F-128, Hub River Road, SITE Area, Karachi 75600, Pakistan
+            </td>
+        </tr>
+        </table>';
+
+        $pdf->writeHTML($vendorBox, true, false, false, false, '');
+        $pdf->Ln(4);
+
+        $detailsHtml = '
+        <table cellpadding="4" cellspacing="0" width="100%" style="border:1px solid #333; font-size:10px;">
+        <tr>
+            <td width="25%"><b>PO Date</b><br>' . \Carbon\Carbon::parse($order->order_date)->format('d-M-Y') . '</td>
+            <td width="25%"><b>Expected Date</b><br>' . ($order->expected_date ? \Carbon\Carbon::parse($order->expected_date)->format('d-M-Y') : '-') . '</td>
+            <td width="25%"><b>Broker</b><br>' . e($order->broker->name ?? '-') . '</td>
+            <td width="25%"><b>Payment Terms</b><br>' . e(ucfirst($order->payment_term_type)) . ($order->payment_term_days ? ' (' . $order->payment_term_days . ' days)' : '') . '</td>
+        </tr>
+        </table>';
+
+        $pdf->writeHTML($detailsHtml, true, false, false, false, '');
+        $pdf->Ln(4);
+
+        // Total Bags column removed; its 14% width moved to Item (28% -> 42%)
+        $itemsHtml = '
+        <table cellpadding="4" cellspacing="0" width="100%" style="border:1px solid #333; font-size:10px;">
+        <tr style="font-weight:bold; background-color:#f0f0f0;">
+            <th width="6%" style="border:1px solid #333; text-align:center;">#</th>
+            <th width="42%" style="border:1px solid #333;">Item</th>
+            <th width="18%" style="border:1px solid #333; text-align:center;">Total Unit</th>
+            <th width="14%" style="border:1px solid #333; text-align:right;">Rate/Unit</th>
+            <th width="20%" style="border:1px solid #333; text-align:right;">Amount</th>
+        </tr>';
+
+        $count = 0;
+        foreach ($order->items as $item) {
+            $count++;
+            $amount = (float) $item->quantity * (float) $item->rate;
+            $itemsHtml .= '
+        <tr>
+            <td style="border:1px solid #333; text-align:center;">' . $count . '</td>
+            <td style="border:1px solid #333;">' . e($item->product->name ?? '') . '</td>
             <td style="border:1px solid #333; text-align:center;">' . number_format($item->quantity, 3) . ' ' . e($item->product->measurementUnit->shortcode ?? '') . '</td>
             <td style="border:1px solid #333; text-align:right;">' . number_format($item->rate, 2) . '</td>
             <td style="border:1px solid #333; text-align:right;">' . number_format($amount, 2) . '</td>
