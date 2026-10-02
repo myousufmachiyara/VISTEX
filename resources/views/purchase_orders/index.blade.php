@@ -41,7 +41,13 @@
               <td class="text-primary">{{ $order->order_no }} <small class="text-muted">(Rev {{ $order->revision_no }})</small></td>
               <td>{{ $order->category->name ?? '' }}</td>
               <td>{{ $order->vendor->name ?? '' }}</td>
-              <td class="small">{{ $order->items->map(fn($i) => $i->product->name ?? $i->pattern_code)->filter()->join(', ') }}</td>
+              <td class="small">
+                @if($order->type === 'weaving')
+                  {{ $order->greigeProduct->name ?? $order->item_name }}
+                @else
+                  {{ $order->items->map(fn($i) => $i->product->name ?? $i->pattern_code)->filter()->join(', ') }}
+                @endif
+              </td>
               <td class="text-end">
                 @if($order->type === 'weaving')
                   {{ number_format($order->total_meters_required, 3) }} m
