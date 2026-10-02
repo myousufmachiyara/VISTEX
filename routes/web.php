@@ -384,6 +384,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('uncleared',              [PdcController::class, 'uncleared']) ->name('uncleared')->middleware('check.permission:pdcs.index');
         Route::get('{id}',                   [PdcController::class, 'show'])      ->name('show')   ->middleware('check.permission:pdcs.index');
         Route::post('{id}/cheques',          [PdcController::class, 'addCheque']) ->name('add_cheque')->middleware('check.permission:pdcs.edit');
+        Route::post('{id}/cheques/batch',    [PdcController::class, 'addCheques'])->name('add_cheques')->middleware('check.permission:pdcs.edit');
         Route::post('cheques/{id}/signed',   [PdcController::class, 'markSigned']) ->name('mark_signed') ->middleware('check.permission:pdcs.edit');
         Route::post('cheques/{id}/issued',   [PdcController::class, 'markIssued']) ->name('mark_issued') ->middleware('check.permission:pdcs.edit');
         Route::post('cheques/{id}/cleared',  [PdcController::class, 'markCleared'])->name('mark_cleared')->middleware('check.permission:pdcs.edit');

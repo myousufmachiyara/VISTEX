@@ -11,14 +11,14 @@ class PdcCheque extends Model
 
     protected $fillable = [
         'pdc_id', 'sequence_no', 'amount', 'status',
-        'bank_account_id', 'cheque_no', 'unsigned_cheque_image', 'signed_cheque_image',
+        'bank_account_id', 'cheque_no', 'cheque_date', 'unsigned_cheque_image', 'signed_cheque_image',
         'issue_method', 'receiver_name', 'receiver_contact', 'receiver_cnic',
         'receipt_signed_image', 'bank_slip_image', 'issued_date',
         'cleared_date', 'bounced_date', 'bounced_reason', 'created_by', 'updated_by',
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2', 'issued_date' => 'date', 'cleared_date' => 'date', 'bounced_date' => 'date',
+        'amount' => 'decimal:2', 'cheque_date' => 'date', 'issued_date' => 'date', 'cleared_date' => 'date', 'bounced_date' => 'date',
     ];
 
     public function pdc()         { return $this->belongsTo(Pdc::class, 'pdc_id'); }

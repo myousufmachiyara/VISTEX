@@ -62,6 +62,42 @@ class PdcController extends Controller
         }
     }
 
+    // Several cheques against one PDC in a single submit — all saved, or none
+    public function addCheques(Request $request, $pdcId)
+    {
+        $pdc = Pdc::findOrFail($pdcId);
+        $request->validate([
+            'cheques'                         => 'required|array|min:1|max:50',
+            'cheques.*.amount'                => 'required|numeric|min:0.01',
+            'cheques.*.bank_account_id'       => 'required|exists:chart_of_accounts,id',
+            'cheques.*.cheque_no'             => 'required|string|max:50',
+            'cheques.*.cheque_date'           => 'nullable|date',
+            'cheques.*.unsigned_cheque_image' => 'required|file|image|max:5120',
+        ], [], [
+            'cheques.*.amount' => 'amount', 'cheques.*.bank_account_id' => 'bank',
+            'cheques.*.cheque_no' => 'cheque #', 'cheques.*.unsigned_cheque_image' => 'cheque image',
+        ]);
+
+        $stored = [];
+        try {
+            $rows = [];
+            foreach ($request->input('cheques') as $key => $row) {
+                $file = $request->file("cheques.{$key}.unsigned_cheque_image");
+                $stored[] = $row['unsigned_cheque_image'] = $file->store('pdc_cheques', 'public');
+                $rows[] = $row;
+            }
+
+            $created = $this->service->addCheques($pdc, $rows, auth()->id());
+            Log::info('[PdcCheque] Batch added', ['pdc' => $pdc->id, 'count' => count($created), 'by' => auth()->id()]);
+            return back()->with('success', count($created) . ' cheque(s) added — total ' . number_format(collect($created)->sum('amount'), 2) . '.');
+        } catch (\Exception $e) {
+            // Nothing was saved, so don't leave the uploaded images behind
+            foreach ($stored as $path) \Illuminate\Support\Facades\Storage::disk('public')->delete($path);
+            Log::error('[PdcCheque] Batch add failed', ['pdc' => $pdc->id, 'message' => $e->getMessage()]);
+            return back()->with('error', $e->getMessage());
+        }
+    }
+
     public function markSigned(Request $request, $chequeId)
     {
         $request->validate(['signed_cheque_image' => 'required|file|image|max:5120']);

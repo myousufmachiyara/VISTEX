@@ -21,23 +21,39 @@
       @endif
 
       @if($pdc->pending_amount > 0.01)
-      <div class="border rounded p-3 mb-4 bg-light" id="addChequesBlock" data-pending="{{ $pdc->pending_amount }}" data-action="{{ route('pdcs.add_cheque', $pdc->id) }}">
-        <div class="d-flex justify-content-between align-items-center mb-2">
+      @can('pdcs.edit')
+      <form action="{{ route('pdcs.add_cheques', $pdc->id) }}" method="POST" enctype="multipart/form-data" id="addChequesForm"
+            class="border rounded p-3 mb-4 bg-light" data-pending="{{ $pdc->pending_amount }}" onkeydown="return event.key != 'Enter';">
+        @csrf
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
           <h6 class="mb-0">Add Cheque(s)</h6>
-          <div>
-            Remaining Unallocated: <strong id="pendingDisplay">{{ number_format($pdc->pending_amount, 2) }}</strong> &nbsp;
-            Allocated in this batch: <strong id="batchTotalDisplay">0.00</strong>
-            <span id="batchOverWarning" class="text-danger ms-2" style="display:none">Exceeds remaining unallocated amount</span>
+          <div class="small">
+            Unallocated: <strong>{{ number_format($pdc->pending_amount, 2) }}</strong> &nbsp;·&nbsp;
+            This batch: <strong id="batchTotalDisplay">0.00</strong> &nbsp;·&nbsp;
+            Left after: <strong id="batchLeftDisplay">{{ number_format($pdc->pending_amount, 2) }}</strong>
           </div>
         </div>
-        <table class="table table-sm table-bordered mb-2" id="chequeRowsTable">
-          <thead><tr><th width="18%">Amount</th><th width="22%">Bank</th><th width="18%">Cheque #</th><th width="27%">Unsigned Cheque Image</th><th width="10%">Status</th><th></th></tr></thead>
+        @if($errors->any())
+          <div class="alert alert-danger py-2 small mb-2"><ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>
+        @endif
+        <div class="table-responsive">
+        <table class="table table-sm table-bordered mb-2 bg-white">
+          <thead><tr>
+            <th width="4%">#</th><th width="15%">Amount</th><th width="20%">Bank</th><th width="15%">Cheque #</th>
+            <th width="14%">Cheque Date</th><th width="27%">Unsigned Cheque Image</th><th width="5%"></th>
+          </tr></thead>
           <tbody id="chequeRowsBody"></tbody>
         </table>
-        <button type="button" class="btn btn-outline-primary btn-sm" id="addChequeRowBtn">+ Add Another Cheque</button>
-        <button type="button" class="btn btn-primary btn-sm" id="saveAllChequesBtn">Save Cheque(s)</button>
-        <div id="batchProgressMsg" class="small text-muted mt-2"></div>
-      </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <button type="button" class="btn btn-outline-primary btn-sm" id="addChequeRowBtn">+ Add Another Cheque</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="splitEqualBtn" title="Divide the unallocated amount equally across the rows">Split Equally</button>
+          <span id="batchOverWarning" class="text-danger small" style="display:none">Batch is more than the unallocated amount.</span>
+          <button type="submit" class="btn btn-primary btn-sm ms-auto" id="saveAllChequesBtn">Save Cheque(s)</button>
+        </div>
+        <div class="small text-muted mt-2">All cheques are saved together — if any row has a problem, none are saved.</div>
+      </form>
+      @endcan
       @endif
 
       <h6>Cheques Against This PDC</h6>
@@ -50,7 +66,7 @@
             <strong>Cheque #{{ $cheque->sequence_no }} — {{ number_format($cheque->amount, 2) }}</strong>
             <span class="badge bg-{{ match($cheque->status){'Cleared'=>'success','Bounced'=>'danger','Issued'=>'info',default=>'warning text-dark'} }}">{{ $cheque->status }}</span>
           </div>
-          <p class="small text-muted mb-2">Bank: {{ $cheque->bankAccount->name ?? '' }} — Cheque #: {{ $cheque->cheque_no }}</p>
+          <p class="small text-muted mb-2">Bank: {{ $cheque->bankAccount->name ?? '' }} — Cheque #: {{ $cheque->cheque_no }} — Dated: {{ ($cheque->cheque_date ?? $pdc->due_date)->format('d-M-Y') }}</p>
 
           @if($cheque->status === 'Created')
           <form action="{{ route('pdcs.mark_signed', $cheque->id) }}" method="POST" enctype="multipart/form-data" class="d-flex gap-2 align-items-end">
@@ -106,110 +122,66 @@ $(document).on('change', '.issue-method-select', function () {
   $('.bank-fields-' + id).toggle(val === 'bank_deposit');
 });
 
-// ── Add multiple cheques against this PDC in one go ──
-const bankOptionsHtml = `<option value="">Select Bank</option>@foreach($bankAccounts as $b)<option value="{{ $b->id }}">{{ $b->name }}</option>@endforeach`;
+// ── Add several cheques against this PDC in one submit ──
+const bankOptionsHtml = `<option value="">Select Bank</option>@foreach($bankAccounts as $b)<option value="{{ $b->id }}">{{ e($b->name) }}</option>@endforeach`;
+const PDC_DUE = @json($pdc->due_date->format('Y-m-d'));
 let chequeRowIndex = 0;
 
-function addChequeRow() {
-  const idx = chequeRowIndex++;
-  const pending = parseFloat($('#addChequesBlock').data('pending')) || 0;
+function addChequeRow(prefill = {}) {
+  const i = chequeRowIndex++;
   const row = $(`
-    <tr class="cheque-row" data-idx="${idx}">
-      <td><input type="number" class="form-control form-control-sm cheque-amount" step="any" min="0.01" max="${pending}" value="0"></td>
-      <td><select class="form-control form-control-sm cheque-bank">${bankOptionsHtml}</select></td>
-      <td><input type="text" class="form-control form-control-sm cheque-no"></td>
-      <td><input type="file" class="form-control form-control-sm cheque-image" accept="image/*"></td>
-      <td class="cheque-row-status text-muted small">Pending</td>
-      <td><button type="button" class="btn btn-sm btn-outline-danger remove-cheque-row">&times;</button></td>
-    </tr>
-  `);
+    <tr class="cheque-row">
+      <td class="row-no text-muted"></td>
+      <td><input type="number" name="cheques[${i}][amount]" class="form-control form-control-sm cheque-amount" step="0.01" min="0.01" required></td>
+      <td><select name="cheques[${i}][bank_account_id]" class="form-control form-control-sm cheque-bank" required>${bankOptionsHtml}</select></td>
+      <td><input type="text" name="cheques[${i}][cheque_no]" class="form-control form-control-sm" maxlength="50" required></td>
+      <td><input type="date" name="cheques[${i}][cheque_date]" class="form-control form-control-sm" value="${PDC_DUE}"></td>
+      <td><input type="file" name="cheques[${i}][unsigned_cheque_image]" class="form-control form-control-sm" accept="image/*" required></td>
+      <td><button type="button" class="btn btn-sm btn-outline-danger remove-cheque-row" title="Remove">&times;</button></td>
+    </tr>`);
+  // Same bank as the row above saves re-selecting it each time
+  const prevBank = $('#chequeRowsBody .cheque-bank').last().val();
+  if (prevBank) row.find('.cheque-bank').val(prevBank);
   $('#chequeRowsBody').append(row);
+  renumber(); recalcBatchTotal();
 }
-$('#addChequeRowBtn').on('click', addChequeRow);
-addChequeRow(); // start with one row
 
-$(document).on('click', '.remove-cheque-row', function () {
-  if ($('.cheque-row').length > 1) { $(this).closest('tr').remove(); recalcBatchTotal(); }
-});
-
-$(document).on('input', '.cheque-amount', recalcBatchTotal);
+function renumber() { $('#chequeRowsBody .cheque-row').each((n, r) => $(r).find('.row-no').text(n + 1)); }
 
 function recalcBatchTotal() {
+  const pending = parseFloat($('#addChequesForm').data('pending')) || 0;
   let total = 0;
-  $('.cheque-amount').each(function () { total += parseFloat($(this).val()) || 0; });
-  const pending = parseFloat($('#addChequesBlock').data('pending')) || 0;
-  $('#batchTotalDisplay').text(total.toFixed(2));
-  $('#batchOverWarning').toggle(total > pending + 0.005);
+  $('.cheque-amount').each(function () { total += parseFloat(this.value) || 0; });
+  const over = total > pending + 0.005;
+  $('#batchTotalDisplay').text(total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  $('#batchLeftDisplay').text((pending - total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+    .toggleClass('text-danger', over);
+  $('#batchOverWarning').toggle(over);
+  $('#saveAllChequesBtn').prop('disabled', over);
 }
 
-// Submits each row one at a time to the existing single-cheque endpoint
-// (unchanged backend), so multiple cheques can be raised in one sitting
-// without needing a new batch API.
-$('#saveAllChequesBtn').on('click', async function () {
-  const $btn = $(this);
-  const $rows = $('.cheque-row');
-  const actionUrl = $('#addChequesBlock').data('action');
-  const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+if ($('#addChequesForm').length) {
+  addChequeRow();
+  $('#addChequeRowBtn').on('click', () => addChequeRow());
+  $(document).on('click', '.remove-cheque-row', function () {
+    if ($('.cheque-row').length > 1) { $(this).closest('tr').remove(); renumber(); recalcBatchTotal(); }
+  });
+  $(document).on('input', '.cheque-amount', recalcBatchTotal);
 
-  const total = [...$('.cheque-amount')].reduce((s, el) => s + (parseFloat(el.value) || 0), 0);
-  const pending = parseFloat($('#addChequesBlock').data('pending')) || 0;
-  if (total > pending + 0.005) {
-    if (!confirm('The total of these cheques exceeds the remaining unallocated amount. Continue anyway?')) return;
-  }
+  // Divide the unallocated amount across the rows; any paisa remainder goes on the last cheque
+  $('#splitEqualBtn').on('click', function () {
+    const pending = parseFloat($('#addChequesForm').data('pending')) || 0;
+    const $amounts = $('.cheque-amount'); const n = $amounts.length;
+    const each = Math.floor((pending / n) * 100) / 100;
+    $amounts.each(function (k) { this.value = (k === n - 1 ? (pending - each * (n - 1)) : each).toFixed(2); });
+    recalcBatchTotal();
+  });
 
-  $btn.prop('disabled', true);
-  $('#addChequeRowBtn').prop('disabled', true);
-
-  let savedCount = 0;
-  for (let i = 0; i < $rows.length; i++) {
-    const $row = $rows.eq(i);
-    const amount = $row.find('.cheque-amount').val();
-    const bankId = $row.find('.cheque-bank').val();
-    const chequeNo = $row.find('.cheque-no').val();
-    const file = $row.find('.cheque-image')[0].files[0];
-    const $status = $row.find('.cheque-row-status');
-
-    if (!amount || parseFloat(amount) <= 0 || !bankId || !chequeNo || !file) {
-      $status.removeClass('text-muted').addClass('text-danger').text('Incomplete — skipped');
-      continue;
-    }
-
-    $status.removeClass('text-muted text-danger text-success').text('Saving…');
-    $('#batchProgressMsg').text(`Saving cheque ${i + 1} of ${$rows.length}…`);
-
-    const formData = new FormData();
-    formData.append('_token', csrfToken);
-    formData.append('amount', amount);
-    formData.append('bank_account_id', bankId);
-    formData.append('cheque_no', chequeNo);
-    formData.append('unsigned_cheque_image', file);
-
-    try {
-      const res = await fetch(actionUrl, { method: 'POST', body: formData, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-      const html = await res.text();
-      const failed = /alert-danger/.test(html);
-      if (failed) {
-        const match = html.match(/alert-danger[^>]*>\s*([\s\S]*?)\s*<\/div>/);
-        $status.removeClass('text-muted').addClass('text-danger').text('Failed');
-        $('#batchProgressMsg').html(`<span class="text-danger">Cheque ${i + 1} failed${match ? ': ' + match[1].trim() : ''}. Remaining rows were not submitted — fix and try again.</span>`);
-        break;
-      }
-      $status.removeClass('text-muted').addClass('text-success').text('Saved');
-      savedCount++;
-    } catch (e) {
-      $status.removeClass('text-muted').addClass('text-danger').text('Failed');
-      $('#batchProgressMsg').html('<span class="text-danger">Network error — remaining rows were not submitted.</span>');
-      break;
-    }
-  }
-
-  if (savedCount > 0) {
-    $('#batchProgressMsg').append(`<br>${savedCount} cheque(s) saved. Reloading…`);
-    setTimeout(() => window.location.reload(), 900);
-  } else {
-    $btn.prop('disabled', false);
-    $('#addChequeRowBtn').prop('disabled', false);
-  }
-});
+  $('#addChequesForm').on('submit', function () {
+    const n = $('.cheque-row').length;
+    $('#saveAllChequesBtn').prop('disabled', true).text('Saving…');
+    return true;
+  });
+}
 </script>
 @endsection

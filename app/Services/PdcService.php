@@ -22,33 +22,66 @@ class PdcService
         ]);
     }
 
-    // Add a new cheque against a PDC — total across all cheques must not exceed pdc.amount
+    // Add a single cheque against a PDC (kept for existing callers)
     public function addCheque(Pdc $pdc, array $data, ?int $userId = null): PdcCheque
     {
-        return DB::transaction(function () use ($pdc, $data, $userId) {
-            $amount = (float) $data['amount'];
+        return $this->addCheques($pdc, [$data], $userId)[0];
+    }
+
+    /**
+     * Add several cheques against one PDC in a single, all-or-nothing step.
+     * Rows: amount, bank_account_id, cheque_no, cheque_date (optional, defaults
+     * to the PDC due date), unsigned_cheque_image.
+     * The batch total must not exceed what is still unallocated on the PDC.
+     */
+    public function addCheques(Pdc $pdc, array $rows, ?int $userId = null): array
+    {
+        if (empty($rows)) throw new \Exception('Add at least one cheque.');
+
+        return DB::transaction(function () use ($pdc, $rows, $userId) {
+            // Lock the PDC so two people can't over-allocate it at the same moment
+            $pdc = Pdc::whereKey($pdc->id)->lockForUpdate()->firstOrFail();
             $remaining = $pdc->pending_amount;
 
-            if ($amount > $remaining + 0.01) {
-                throw new \Exception("Cheque amount ({$amount}) exceeds remaining PDC balance ({$remaining}).");
-            }
-            if ($amount <= 0) {
-                throw new \Exception('Cheque amount must be greater than zero.');
+            $total = 0; $seen = [];
+            foreach ($rows as $i => $row) {
+                $n = $i + 1;
+                $amount = round((float) ($row['amount'] ?? 0), 2);
+                if ($amount <= 0) throw new \Exception("Cheque {$n}: amount must be greater than zero.");
+                $total += $amount;
+
+                $key = ($row['bank_account_id'] ?? '') . '|' . strtolower(trim((string) ($row['cheque_no'] ?? '')));
+                if (isset($seen[$key])) throw new \Exception("Cheque {$n}: cheque # {$row['cheque_no']} is entered twice for the same bank.");
+                $seen[$key] = true;
+
+                $exists = PdcCheque::where('bank_account_id', $row['bank_account_id'])
+                    ->where('cheque_no', trim((string) $row['cheque_no']))
+                    ->where('status', '!=', 'Bounced')->exists();
+                if ($exists) throw new \Exception("Cheque {$n}: cheque # {$row['cheque_no']} already exists for this bank.");
             }
 
-            $nextSeq = ($pdc->cheques()->max('sequence_no') ?? 0) + 1;
+            $total = round($total, 2);
+            if ($total > $remaining + 0.01) {
+                throw new \Exception('These cheques total ' . number_format($total, 2) . ' but only ' . number_format($remaining, 2) . ' is unallocated on ' . $pdc->pdc_no . '.');
+            }
 
-            return PdcCheque::create([
-                'pdc_id'                => $pdc->id,
-                'sequence_no'           => $nextSeq,
-                'amount'                => $amount,
-                'status'                => 'Created',
-                'bank_account_id'       => $data['bank_account_id'],
-                'cheque_no'             => $data['cheque_no'],
-                'unsigned_cheque_image' => $data['unsigned_cheque_image'],
-                'created_by'            => $userId,
-                'updated_by'            => $userId,
-            ]);
+            $seq = (int) ($pdc->cheques()->withTrashed()->max('sequence_no') ?? 0);
+            $created = [];
+            foreach ($rows as $row) {
+                $created[] = PdcCheque::create([
+                    'pdc_id'                => $pdc->id,
+                    'sequence_no'           => ++$seq,
+                    'amount'                => round((float) $row['amount'], 2),
+                    'status'                => 'Created',
+                    'bank_account_id'       => $row['bank_account_id'],
+                    'cheque_no'             => trim((string) $row['cheque_no']),
+                    'cheque_date'           => !empty($row['cheque_date']) ? $row['cheque_date'] : $pdc->due_date,
+                    'unsigned_cheque_image' => $row['unsigned_cheque_image'],
+                    'created_by'            => $userId,
+                    'updated_by'            => $userId,
+                ]);
+            }
+            return $created;
         });
     }
 
