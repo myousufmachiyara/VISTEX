@@ -624,8 +624,8 @@ class PurchaseOrderController extends Controller
         <table cellpadding="4" cellspacing="0" width="100%" style="border:0.75px solid #000; font-size:9px;">
  
         <tr style="background-color:#f0f0f0;">
-            <td width="34%" style="border:0.75px solid #000;"><b>Warp Yarn Wt. Required Lbs</b></td>
-            <td width="33%" style="border:0.75px solid #000;"><b>Weft Yarn Wt. Required Lbs</b></td>
+            <td width="34%" style="border:0.75px solid #000;"><b>Warp Yarn Required Lbs</b></td>
+            <td width="33%" style="border:0.75px solid #000;"><b>Weft Yarn Required Lbs</b></td>
             <td width="33%" style="border:0.75px solid #000;"><b>Total Yarn Required Lbs</b></td>
         </tr>
         <tr>
