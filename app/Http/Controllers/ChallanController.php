@@ -9,6 +9,13 @@ use Illuminate\Support\Facades\Log;
 
 class ChallanController extends Controller
 {
+    public const TRANSPORT_FIELDS = ['vehicle_no', 'driver_name', 'driver_contact'];
+    public const TRANSPORT_RULES = [
+        'vehicle_no'     => 'nullable|string|max:30',
+        'driver_name'    => 'nullable|string|max:100',
+        'driver_contact' => ['nullable', 'string', 'max:30', 'regex:/^[0-9+\-\s()]{5,30}$/'],
+    ];
+
     public function __construct(
         private ChallanService $service,
         private ChallanReviewService $reviewService,
@@ -79,6 +86,7 @@ class ChallanController extends Controller
         $request->validate([
             'purchase_order_id'              => 'required|exists:purchase_orders,id',
             'vendor_challan_no'              => 'nullable|string|max:50',
+            ...self::TRANSPORT_RULES,
             'received_date'                  => 'required|date',
             'challan_images'                 => 'required|array|min:1',
             'challan_images.*'               => 'file|image|max:5120',
@@ -99,6 +107,7 @@ class ChallanController extends Controller
             $challan = $this->service->create([
                 'purchase_order_id' => $request->purchase_order_id,
                 'vendor_challan_no' => $request->vendor_challan_no,
+                ...$request->only(self::TRANSPORT_FIELDS),
                 'received_date'     => $request->received_date,
                 'challan_images'    => $images,
                 'has_objection'     => $request->boolean('has_objection'),
@@ -120,6 +129,7 @@ class ChallanController extends Controller
         $request->validate([
             'category_id'                 => 'required|exists:product_categories,id',
             'vendor_name'                 => 'required|string|max:191',
+            ...self::TRANSPORT_RULES,
             'received_date'               => 'required|date',
             'challan_images'              => 'required|array|min:1',
             'challan_images.*'            => 'file|image|max:5120',
@@ -138,6 +148,7 @@ class ChallanController extends Controller
             $challan = $this->service->createDirect([
                 'category_id'    => $request->category_id,
                 'vendor_name'    => $request->vendor_name,
+                ...$request->only(self::TRANSPORT_FIELDS),
                 'received_date'  => $request->received_date,
                 'challan_images' => $images,
                 'remarks'        => $request->remarks,
@@ -159,6 +170,89 @@ class ChallanController extends Controller
         )->findOrFail($id);
 
         return view('challans.show', compact('challan'));
+    }
+
+    // ── Edit (gatekeeper / incharge, until the incharge decides) ───────
+    public function edit($id)
+    {
+        $challan = Challan::with('purchaseOrder.vendor', 'purchaseOrder.category', 'category', 'items.product', 'items.purchaseOrderItem', 'directItems')->findOrFail($id);
+        if (!$challan->canBeEditedBy(auth()->user())) {
+            return redirect()->route('challans.show', $id)->with('error', $challan->isAwaitingReview()
+                ? 'You can only edit challans you logged, or those of your category.'
+                : "This challan is {$challan->status_label} and can no longer be edited.");
+        }
+
+        $categories = ProductCategory::orderBy('name')->get(['id', 'name']);
+        return view('challans.edit', compact('challan', 'categories'));
+    }
+
+    public function update(Request $request, $id)
+    {
+        $challan = Challan::findOrFail($id);
+        if (!$challan->canBeEditedBy(auth()->user())) {
+            return redirect()->route('challans.show', $id)->with('error', 'This challan can no longer be edited.');
+        }
+
+        $rules = [
+            'received_date'    => 'required|date',
+            'remarks'          => 'nullable|string',
+            'keep_images'      => 'nullable|array',
+            'keep_images.*'    => 'string',
+            'challan_images'   => 'nullable|array',
+            'challan_images.*' => 'file|image|max:5120',
+            ...self::TRANSPORT_RULES,
+        ];
+        $rules += $challan->entry_type === 'direct' ? [
+            'category_id'                => 'required|exists:product_categories,id',
+            'vendor_name'                => 'required|string|max:191',
+            'direct_items'               => 'required|array|min:1',
+            'direct_items.*.description' => 'required|string|max:255',
+            'direct_items.*.quantity'    => 'required|numeric|min:0.001',
+            'direct_items.*.unit'        => 'nullable|string|max:30',
+            'direct_items.*.unit_price'  => 'required|numeric|min:0',
+        ] : [
+            'vendor_challan_no'    => 'nullable|string|max:50',
+            'has_objection'        => 'nullable|boolean',
+            'objection_remarks'    => 'nullable|string|max:1000',
+            'remove_voice'         => 'nullable|boolean',
+            'items'                => 'nullable|array',
+            'items.*.id'           => 'required|integer',
+            'items.*.received_qty' => 'required|numeric|min:0',
+        ];
+        $request->validate($rules);
+
+        $newFiles = [];
+        try {
+            // Photos: the ones ticked to keep + any new uploads
+            $keep = array_values(array_intersect($challan->challan_images ?? [], (array) $request->input('keep_images', [])));
+            foreach ($request->file('challan_images', []) as $file) $newFiles[] = $file->store('challan_images', 'public');
+
+            $data = [
+                'received_date'  => $request->received_date,
+                'challan_images' => array_merge($keep, $newFiles),
+                ...$request->only([...self::TRANSPORT_FIELDS, 'remarks', 'vendor_challan_no']),
+            ];
+
+            if ($challan->entry_type === 'direct') {
+                $data += ['category_id' => $request->category_id, 'vendor_name' => $request->vendor_name];
+                $items = $request->input('direct_items', []);
+            } else {
+                $data += [
+                    'has_objection'        => $request->boolean('has_objection'),
+                    'objection_remarks'    => $request->objection_remarks,
+                    'objection_voice_note' => $request->boolean('remove_voice') ? null : $challan->objection_voice_note,
+                ];
+                $items = $request->input('items', []);
+            }
+
+            $challan = $this->service->update($challan, $data, $items, auth()->id());
+            Log::info('[Challan] Updated', ['id' => $challan->id, 'by' => auth()->id()]);
+            return redirect()->route('challans.show', $challan->id)->with('success', $challan->challan_no . ' updated.');
+        } catch (\Exception $e) {
+            foreach ($newFiles as $f) \Illuminate\Support\Facades\Storage::disk('public')->delete($f);
+            Log::error('[Challan] Update failed', ['id' => $id, 'message' => $e->getMessage()]);
+            return back()->withInput()->with('error', $e->getMessage());
+        }
     }
 
     // ── Incharge review of a PO challan ────────────────────────────────

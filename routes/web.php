@@ -293,6 +293,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('po-items/{poId}',     [ChallanController::class, 'poItems'])          ->name('po_items')->middleware('check.permission:challans.index');
         Route::post('/',                  [ChallanController::class, 'store'])            ->name('store')  ->middleware('check.permission:challans.create');
         Route::get('{id}',                [ChallanController::class, 'show'])             ->name('show')   ->middleware('check.permission:challans.index');
+        Route::get('{id}/edit',           [ChallanController::class, 'edit'])             ->name('edit')   ->middleware('check.permission:challans.edit');
+        Route::put('{id}',                [ChallanController::class, 'update'])           ->name('update') ->middleware('check.permission:challans.edit');
         // Category incharge inspection (further restricted to the category's incharges in the controller)
         Route::get('{id}/review',         [ChallanController::class, 'reviewForm'])       ->name('review_form')->middleware('check.permission:challans.index');
         Route::post('{id}/review',        [ChallanController::class, 'review'])           ->name('review')     ->middleware('check.permission:challans.index');

@@ -2,6 +2,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\ChallanController as WebChallan;
 use App\Models\{Challan, CategoryIncharge, PurchaseOrder, ProductCategory};
 use App\Services\{ChallanReviewService, ChallanService};
 use Illuminate\Http\Request;
@@ -110,9 +111,15 @@ class ChallanApiController extends Controller
             'category_name' => $c->category->name ?? null,
             'vendor_name' => $c->display_vendor_name,
             'po' => $c->purchaseOrder ? ['id' => $c->purchaseOrder->id, 'order_no' => $c->purchaseOrder->order_no, 'type' => $c->purchaseOrder->type] : null,
+            'category_id' => $c->category_id ?? $c->purchaseOrder?->product_category_id,
+            'direct_vendor_name' => $c->direct_vendor_name,
             'vendor_challan_no' => $c->vendor_challan_no,
+            'vehicle_no' => $c->vehicle_no, 'driver_name' => $c->driver_name, 'driver_contact' => $c->driver_contact,
             'received_date' => $c->received_date->format('Y-m-d'),
             'images' => collect($c->challan_images)->map(fn($p) => \App\Support\Media::url($p))->values(),
+            // raw paths, sent back as keep_images[] when editing
+            'image_paths' => collect($c->challan_images)->values(),
+            'can_edit' => $c->canBeEditedBy(request()->user()),
             'status' => $c->status, 'status_label' => $c->status_label,
             'decision' => $c->decision, 'decision_remarks' => $c->decision_remarks,
             'reviewed_by' => $c->reviewedBy->name ?? null,
@@ -139,6 +146,7 @@ class ChallanApiController extends Controller
         $request->validate([
             'purchase_order_id' => 'required|exists:purchase_orders,id',
             'vendor_challan_no' => 'nullable|string|max:50',
+            ...WebChallan::TRANSPORT_RULES,
             'received_date' => 'required|date',
             'has_objection' => 'nullable|boolean',
             'objection_remarks' => 'nullable|string|max:1000',
@@ -159,13 +167,8 @@ class ChallanApiController extends Controller
         try {
             $voicePath = null;
             if ($request->hasFile('objection_voice')) {
-                $file = $request->file('objection_voice');
-                if (!in_array(strtolower($file->getClientOriginalExtension()), self::VOICE_EXT)) {
-                    return response()->json(['message' => 'Unsupported voice note format.'], 422);
-                }
-                // Keep the recorder's extension (.m4a) — content sniffing often mislabels
-                // AAC audio, and browsers won't play a file saved as .bin/.mp4-video.
-                $voicePath = $file->storeAs('challan_voice', \Illuminate\Support\Str::random(40) . '.' . strtolower($file->getClientOriginalExtension()), 'public');
+                $voicePath = $this->storeVoice($request->file('objection_voice'));
+                if (!$voicePath) return response()->json(['message' => 'Unsupported voice note format.'], 422);
             }
 
             $images = [];
@@ -173,6 +176,7 @@ class ChallanApiController extends Controller
 
             $challan = $this->service->create([
                 'purchase_order_id' => $request->purchase_order_id, 'vendor_challan_no' => $request->vendor_challan_no,
+                ...$request->only(WebChallan::TRANSPORT_FIELDS),
                 'received_date' => $request->received_date, 'has_objection' => $request->boolean('has_objection'),
                 'objection_remarks' => $request->objection_remarks, 'objection_voice_note' => $voicePath,
                 'challan_images' => $images, 'remarks' => $request->remarks,
@@ -192,6 +196,7 @@ class ChallanApiController extends Controller
         $request->validate([
             'category_id' => 'required|exists:product_categories,id',
             'vendor_name' => 'required|string|max:191',
+            ...WebChallan::TRANSPORT_RULES,
             'received_date' => 'required|date',
             'remarks' => 'nullable|string',
             'challan_images' => 'required|array|min:1', 'challan_images.*' => 'file|image|max:5120',
@@ -208,6 +213,7 @@ class ChallanApiController extends Controller
 
             $challan = $this->service->createDirect([
                 'category_id' => $request->category_id, 'vendor_name' => $request->vendor_name,
+                ...$request->only(WebChallan::TRANSPORT_FIELDS),
                 'received_date' => $request->received_date, 'challan_images' => $images, 'remarks' => $request->remarks,
             ], $request->items, $request->user()->id);
 
@@ -218,6 +224,97 @@ class ChallanApiController extends Controller
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
+    }
+
+    // Edit before the incharge decides. Multipart POST:
+    //   received_date, remarks, vehicle_no, driver_name, driver_contact,
+    //   keep_images[] (paths from show.image_paths), challan_images[] (new photos),
+    //   PO:     vendor_challan_no, has_objection, objection_remarks, objection_voice (new file), remove_voice, items[i][id], items[i][received_qty]
+    //   direct: category_id, vendor_name, items[i][description|quantity|unit|unit_price]
+    public function update(Request $request, $id)
+    {
+        $challan = Challan::findOrFail($id);
+        if (!$challan->canBeEditedBy($request->user())) {
+            return response()->json(['message' => $challan->isAwaitingReview()
+                ? 'You can only edit challans you logged, or those of your category.'
+                : "This challan is {$challan->status_label} and can no longer be edited."], 403);
+        }
+
+        $rules = [
+            'received_date'    => 'required|date',
+            'remarks'          => 'nullable|string',
+            'keep_images'      => 'nullable|array',
+            'keep_images.*'    => 'string',
+            'challan_images'   => 'nullable|array',
+            'challan_images.*' => 'file|image|max:5120',
+            ...WebChallan::TRANSPORT_RULES,
+        ];
+        $rules += $challan->entry_type === 'direct' ? [
+            'category_id'         => 'required|exists:product_categories,id',
+            'vendor_name'         => 'required|string|max:191',
+            'items'               => 'required|array|min:1',
+            'items.*.description' => 'required|string|max:255',
+            'items.*.quantity'    => 'required|numeric|min:0.001',
+            'items.*.unit'        => 'nullable|string|max:30',
+            'items.*.unit_price'  => 'required|numeric|min:0',
+        ] : [
+            'vendor_challan_no'    => 'nullable|string|max:50',
+            'has_objection'        => 'nullable|boolean',
+            'objection_remarks'    => 'nullable|string|max:1000',
+            'objection_voice'      => 'nullable|file|max:10240',
+            'remove_voice'         => 'nullable|boolean',
+            'items'                => 'nullable|array',
+            'items.*.id'           => 'required|integer',
+            'items.*.received_qty' => 'required|numeric|min:0',
+        ];
+        $request->validate($rules);
+
+        $newFiles = [];
+        try {
+            $keep = array_values(array_intersect($challan->challan_images ?? [], (array) $request->input('keep_images', [])));
+            foreach ($request->file('challan_images', []) as $f) $newFiles[] = $f->store('challan_images', 'public');
+
+            $data = [
+                'received_date'  => $request->received_date,
+                'challan_images' => array_merge($keep, $newFiles),
+                ...$request->only([...WebChallan::TRANSPORT_FIELDS, 'remarks', 'vendor_challan_no']),
+            ];
+
+            if ($challan->entry_type === 'direct') {
+                $data += ['category_id' => $request->category_id, 'vendor_name' => $request->vendor_name];
+            } else {
+                $voice = $request->boolean('remove_voice') ? null : $challan->objection_voice_note;
+                if ($request->hasFile('objection_voice')) {
+                    $voice = $this->storeVoice($request->file('objection_voice'));
+                    if (!$voice) throw new \Exception('Unsupported voice note format.');
+                    $newFiles[] = $voice;
+                }
+                $data += [
+                    'has_objection'        => $request->boolean('has_objection'),
+                    'objection_remarks'    => $request->objection_remarks,
+                    'objection_voice_note' => $voice,
+                ];
+            }
+
+            $challan = $this->service->update($challan, $data, $request->input('items', []), $request->user()->id);
+
+            return response()->json([
+                'id' => $challan->id, 'challan_no' => $challan->challan_no, 'status' => $challan->status,
+                'message' => $challan->challan_no . ' updated.',
+            ]);
+        } catch (\Exception $e) {
+            foreach ($newFiles as $f) \Illuminate\Support\Facades\Storage::disk('public')->delete($f);
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    // Keep the recorder's extension (.m4a) — content sniffing often mislabels
+    // AAC audio, and browsers won't play a file saved as .bin/.mp4-video.
+    private function storeVoice(\Illuminate\Http\UploadedFile $file): ?string
+    {
+        $ext = strtolower($file->getClientOriginalExtension());
+        if (!in_array($ext, self::VOICE_EXT)) return null;
+        return $file->storeAs('challan_voice', \Illuminate\Support\Str::random(40) . '.' . $ext, 'public');
     }
 
     // ── Category incharge inspection ─────────────────────────────────

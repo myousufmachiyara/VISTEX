@@ -28,6 +28,7 @@
       @endif
 
       <div class="mb-3"><strong>Received at gate:</strong> {{ $challan->received_date->format('d-M-Y') }} by {{ $challan->receivedBy->name ?? '' }}</div>
+      @include('challans._transport_show')
       @if($challan->remarks)<div class="mb-3"><strong>Remarks:</strong> {{ $challan->remarks }}</div>@endif
 
       @if($challan->has_objection)
@@ -106,6 +107,9 @@
     </div>
     <footer class="card-footer d-flex justify-content-between">
       <div>
+        @if($challan->canBeEditedBy(auth()->user()) && auth()->user()->can('challans.edit'))
+          <a href="{{ route('challans.edit', $challan->id) }}" class="btn btn-outline-primary">Edit</a>
+        @endif
         @if($challan->isAwaitingReview() && $challan->canBeReviewedBy(auth()->user()))
           @if($challan->entry_type === 'direct')
             <a href="{{ route('challans.review_direct_form', $challan->id) }}" class="btn btn-primary">Review Purchase</a>

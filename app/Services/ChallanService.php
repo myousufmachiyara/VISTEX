@@ -3,6 +3,7 @@ namespace App\Services;
 
 use App\Models\{Challan, ChallanDirectItem, ChallanItem, PurchaseOrder, Product, ProductCategory, LocationStockLedger};
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class ChallanService
@@ -28,6 +29,7 @@ class ChallanService
                 'category_id'          => $po->product_category_id,
                 'purchase_order_id'    => $po->id,
                 'vendor_challan_no'    => $data['vendor_challan_no'] ?? null,
+                ...$this->transport($data),
                 'received_date'        => $data['received_date'],
                 'challan_images'       => $images,
                 'status'               => 'AwaitingInspection',
@@ -72,8 +74,7 @@ class ChallanService
     public function createDirect(array $data, array $items, ?int $userId = null): Challan
     {
         return DB::transaction(function () use ($data, $items, $userId) {
-            $items = array_values(array_filter($items, fn($i) => (float) ($i['quantity'] ?? 0) > 0 && trim($i['description'] ?? '') !== ''));
-            if (empty($items)) throw new \Exception('Enter at least one item.');
+            $items = $this->cleanDirectItems($items);
 
             $images = $data['challan_images'] ?? [];
             if (empty($images)) throw new \Exception('At least one photo of the challan is required.');
@@ -83,6 +84,7 @@ class ChallanService
                 'entry_type'         => 'direct',
                 'category_id'        => $data['category_id'],
                 'direct_vendor_name' => trim($data['vendor_name']),
+                ...$this->transport($data),
                 'received_date'      => $data['received_date'],
                 'challan_images'     => $images,
                 'status'             => 'AwaitingInspection',
@@ -90,14 +92,7 @@ class ChallanService
                 'received_by' => $userId, 'created_by' => $userId, 'updated_by' => $userId,
             ]);
 
-            foreach ($items as $item) {
-                $qty = (float) $item['quantity']; $price = (float) ($item['unit_price'] ?? 0);
-                ChallanDirectItem::create([
-                    'challan_id' => $challan->id, 'description' => trim($item['description']),
-                    'quantity' => $qty, 'unit' => $item['unit'] ?? null,
-                    'unit_price' => $price, 'amount' => round($qty * $price, 2),
-                ]);
-            }
+            $this->writeDirectItems($challan, $items);
 
             $this->notificationService->notifyCategoryIncharges(
                 $challan->category_id, 'challan_received', 'Purchase Without PO — Review Needed',
@@ -107,6 +102,146 @@ class ChallanService
 
             return $challan->load('directItems');
         });
+    }
+
+    // ── Edit a challan before the incharge decides ──
+    // $data: received_date, remarks, transport fields, challan_images (the final list: kept + new uploads),
+    //        PO: vendor_challan_no, has_objection, objection_remarks, objection_voice_note (final value or null)
+    //        direct: category_id, vendor_name
+    // $items: PO → [['id' => challan_item_id, 'received_qty' => x]], direct → full replacement list
+    public function update(Challan $challan, array $data, array $items, ?int $userId = null): Challan
+    {
+        $oldImages = $challan->challan_images ?? [];
+        $oldVoice  = $challan->objection_voice_note;
+
+        $challan = DB::transaction(function () use ($challan, $data, $items, $userId) {
+            $challan = Challan::lockForUpdate()->findOrFail($challan->id);
+            if ($challan->status !== Challan::AWAITING) {
+                throw new \Exception("This challan is {$challan->status_label} and can no longer be edited.");
+            }
+
+            $images = array_values(array_filter($data['challan_images'] ?? []));
+            if (empty($images)) throw new \Exception('At least one photo of the challan is required.');
+
+            // Optional fields change only when sent, so a partial update never wipes them.
+            $header = [
+                'received_date'  => $data['received_date'] ?? $challan->received_date,
+                'challan_images' => $images,
+                'updated_by'     => $userId,
+                ...array_intersect_key($this->transport($data), $data),
+            ];
+            if (array_key_exists('remarks', $data)) $header['remarks'] = $data['remarks'];
+
+            if ($challan->entry_type === 'direct') {
+                $vendor = trim($data['vendor_name'] ?? '');
+                if ($vendor === '') throw new \Exception('Enter the vendor name.');
+                $items = $this->cleanDirectItems($items);
+
+                $challan->update($header + [
+                    'category_id'        => $data['category_id'] ?? $challan->category_id,
+                    'direct_vendor_name' => $vendor,
+                ]);
+                $challan->directItems()->delete();
+                $this->writeDirectItems($challan, $items);
+            } else {
+                $hasObjection = (bool) ($data['has_objection'] ?? false);
+                $voice = $hasObjection ? ($data['objection_voice_note'] ?? null) : null;
+                $remarks = $hasObjection ? trim((string) ($data['objection_remarks'] ?? '')) : '';
+                if ($hasObjection && $remarks === '' && !$voice) {
+                    throw new \Exception('Add an objection note or a voice note.');
+                }
+
+                if (array_key_exists('vendor_challan_no', $data)) $header['vendor_challan_no'] = $data['vendor_challan_no'];
+                $challan->update($header + [
+                    'has_objection'        => $hasObjection,
+                    'objection_remarks'    => $remarks ?: null,
+                    'objection_voice_note' => $voice,
+                ]);
+
+                $rows = $challan->items()->get()->keyBy('id');
+                foreach ($items as $row) {
+                    $item = $rows->get((int) ($row['id'] ?? 0));
+                    if (!$item) continue;
+                    $qty = (float) ($row['received_qty'] ?? 0);
+                    if ($qty < 0) throw new \Exception('Received quantity cannot be negative.');
+                    $item->update(['received_qty' => $qty]);
+                }
+
+                $this->syncGateObjection($challan, $userId);
+            }
+
+            // Tell the category incharges (not the person who made the edit)
+            $categoryId = $challan->category_id ?? $challan->purchaseOrder?->product_category_id;
+            $incharges = $categoryId ? (ProductCategory::find($categoryId)?->incharges()->pluck('user_id')->all() ?? []) : [];
+            $this->notificationService->notifyUsers(
+                array_diff($incharges, [$userId]), 'challan_updated', 'Challan Updated',
+                "Challan {$challan->challan_no} was edited before inspection.", 'challan', $challan->id
+            );
+
+            return $challan;
+        });
+
+        // Files are removed only after the update is committed.
+        $disk = Storage::disk('public');
+        foreach (array_diff($oldImages, $challan->challan_images ?? []) as $gone) {
+            if ($gone && $disk->exists($gone)) $disk->delete($gone);
+        }
+        if ($oldVoice && $oldVoice !== $challan->objection_voice_note && $disk->exists($oldVoice)) $disk->delete($oldVoice);
+
+        return $challan->fresh(['items', 'directItems']);
+    }
+
+    // Keep the PO's gate objection in step with the challan.
+    private function syncGateObjection(Challan $challan, ?int $userId): void
+    {
+        $objection = $challan->objection_id ? \App\Models\PurchaseOrderObjection::find($challan->objection_id) : null;
+
+        if ($challan->has_objection) {
+            $text = $challan->objection_remarks ?: 'Objection raised at gate (see voice note).';
+            if ($objection) {
+                $objection->update(['remarks' => $text]);
+            } else {
+                $objection = \App\Models\PurchaseOrderObjection::create([
+                    'purchase_order_id' => $challan->purchase_order_id, 'source' => 'gate', 'challan_id' => $challan->id,
+                    'remarks' => $text, 'status' => 'Open', 'raised_by' => $userId,
+                ]);
+                $challan->update(['objection_id' => $objection->id]);
+            }
+        } elseif ($objection) {
+            // Withdrawn at the gate before anyone acted on it
+            if ($objection->source === 'gate' && $objection->status === 'Open') $objection->delete();
+            $challan->update(['objection_id' => null]);
+        }
+    }
+
+    private function transport(array $data): array
+    {
+        $clean = fn($v) => ($v = trim((string) $v)) === '' ? null : $v;
+        $vehicle = $clean($data['vehicle_no'] ?? null);
+        return [
+            'vehicle_no'     => $vehicle ? strtoupper($vehicle) : null,
+            'driver_name'    => $clean($data['driver_name'] ?? null),
+            'driver_contact' => $clean($data['driver_contact'] ?? null),
+        ];
+    }
+
+    private function cleanDirectItems(array $items): array
+    {
+        $items = array_values(array_filter($items, fn($i) => (float) ($i['quantity'] ?? 0) > 0 && trim($i['description'] ?? '') !== ''));
+        if (empty($items)) throw new \Exception('Enter at least one item.');
+        return $items;
+    }
+
+    private function writeDirectItems(Challan $challan, array $items): void
+    {
+        foreach ($items as $item) {
+            $qty = (float) $item['quantity']; $price = (float) ($item['unit_price'] ?? 0);
+            ChallanDirectItem::create([
+                'challan_id' => $challan->id, 'description' => trim($item['description']),
+                'quantity' => $qty, 'unit' => $item['unit'] ?? null,
+                'unit_price' => $price, 'amount' => round($qty * $price, 2),
+            ]);
+        }
     }
 
     // ── Incharge review of a no-PO challan: links accounts, stock and expense, posts ledger ──

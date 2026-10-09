@@ -33,6 +33,7 @@ class ChallanReviewService
                 'id' => $challan->id, 'challan_no' => $challan->challan_no, 'status' => $challan->status,
                 'status_label' => $challan->status_label, 'received_date' => $challan->received_date->format('Y-m-d'),
                 'vendor_challan_no' => $challan->vendor_challan_no, 'received_by' => $challan->receivedBy->name ?? '',
+                'vehicle_no' => $challan->vehicle_no, 'driver_name' => $challan->driver_name, 'driver_contact' => $challan->driver_contact,
                 'has_objection' => (bool) $challan->has_objection, 'objection_remarks' => $challan->objection_remarks,
                 'objection_voice_url' => $challan->objection_voice_note ? \App\Support\Media::url($challan->objection_voice_note) : null,
                 'remarks' => $challan->remarks,

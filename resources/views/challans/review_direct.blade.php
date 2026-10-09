@@ -19,6 +19,7 @@
           <div class="col-md-3"><strong>Date:</strong> {{ $challan->received_date->format('d-M-Y') }}</div>
           <div class="col-md-3"><strong>Logged by:</strong> {{ $challan->receivedBy->name ?? '' }}</div>
         </div>
+        @include('challans._transport_show')
         @if($challan->remarks)<div class="alert alert-secondary py-2"><strong>Remarks:</strong> {{ $challan->remarks }}</div>@endif
         <div class="mb-3">
           @foreach($challan->challan_images as $img)

@@ -27,6 +27,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/challans/{id}', [ChallanApiController::class, 'show']);
     Route::post('/challans', [ChallanApiController::class, 'store']);
     Route::post('/challans/direct', [ChallanApiController::class, 'storeDirect']);
+    Route::post('/challans/{id}/update', [ChallanApiController::class, 'update']); // multipart, so POST
 
     // Purchase Orders (read-only for mobile, for now)
     Route::get('/purchase-orders', [PurchaseOrderApiController::class, 'index']);

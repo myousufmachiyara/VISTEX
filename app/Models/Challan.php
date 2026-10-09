@@ -35,6 +35,7 @@ class Challan extends Model
 
     protected $fillable = [
         'challan_no', 'entry_type', 'category_id', 'purchase_order_id', 'vendor_challan_no', 'vendor_id', 'direct_vendor_name',
+        'vehicle_no', 'driver_name', 'driver_contact',
         'received_date', 'challan_images', 'status',
         'decision', 'decision_remarks', 'amendment_id', 'objection_id',
         'has_objection', 'objection_remarks', 'objection_voice_note',
@@ -109,6 +110,19 @@ class Challan extends Model
                ->orWhereHas('purchaseOrder.category.incharges', fn($q3) => $q3->where('user_id', $user->id))
                ->orWhereHas('category.incharges', fn($q3) => $q3->where('user_id', $user->id));
         });
+    }
+
+    public function hasTransportDetails(): bool
+    {
+        return (bool) ($this->vehicle_no || $this->driver_name || $this->driver_contact);
+    }
+
+    // Editable until the incharge decides: by whoever logged it, the category incharge, or a superadmin.
+    public function canBeEditedBy(?User $user): bool
+    {
+        if (!$user || $this->status !== self::AWAITING) return false;
+        if ($user->hasRole('superadmin') || (int) $this->received_by === (int) $user->id) return true;
+        return $this->canBeReviewedBy($user);
     }
 
     public function canBeReviewedBy(User $user): bool

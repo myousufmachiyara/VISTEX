@@ -99,7 +99,7 @@ class DatabaseSeeder extends Seeder
         $gatekeeperRole->syncPermissions(Permission::whereIn('name', [
             'locations.index',
             'purchase_receivings.index', 'purchase_receivings.create',
-            'challans.index', 'challans.create',
+            'challans.index', 'challans.create', 'challans.edit',
         ])->get());
     }
 

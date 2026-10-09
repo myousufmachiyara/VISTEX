@@ -25,6 +25,7 @@
           <div class="col-md-2"><strong>Arrived: {{ \Carbon\Carbon::parse($c['received_date'])->format('d-M-Y') }} ({{ $c['received_by'] }})</strong></div>
           <div class="col-md-2"><strong>Vendor Challan #: {{ $c['vendor_challan_no'] ?? '—' }}</strong></div>
         </div>
+        @include('challans._transport_show')
 
         @if($c['has_objection'])
           <div class="alert alert-warning"><strong>Gatekeeper objection:</strong> {{ $c['objection_remarks'] }}

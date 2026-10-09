@@ -71,6 +71,8 @@
           <button type="button" class="btn btn-outline-primary btn-sm mb-3" id="addDirectRowBtn">Add Item</button>
         </div>
 
+        @include('challans._transport', ['challan' => null])
+
         <div class="row">
           <div class="col-md-6 mb-3"><label>Photo(s) of Challan <span class="text-danger">*</span></label><input type="file" name="challan_images[]" class="form-control" accept="image/*" multiple capture="environment" required></div>
           <div class="col-md-6 mb-3"><label>Remarks</label><textarea name="remarks" class="form-control" rows="1">{{ old('remarks') }}</textarea></div>
