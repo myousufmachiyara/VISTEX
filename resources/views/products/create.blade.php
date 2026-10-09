@@ -43,6 +43,10 @@
             <input type="number" name="opening_stock" class="form-control" step="any" min="0" value="0">
           </div>
           <div class="col-md-3 mb-3">
+            <label>Reorder Level <small class="text-muted">(alert when stock falls to this)</small></label>
+            <input type="number" name="reorder_level" class="form-control" step="any" min="0" value="{{ old('reorder_level') }}">
+          </div>
+          <div class="col-md-3 mb-3">
             <label>Selling Price</label>
             <input type="number" name="selling_price" class="form-control" step="any" min="0" value="0">
           </div>

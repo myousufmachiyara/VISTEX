@@ -88,6 +88,10 @@ class DatabaseSeeder extends Seeder
             }
         }
 
+        foreach (['reports.yarn', 'reports.greige', 'reports.packaging'] as $name) {
+            Permission::firstOrCreate(['name' => $name]);
+        }
+
         $superAdminRole = Role::findByName('superadmin');
         $superAdminRole->syncPermissions(Permission::all());
 

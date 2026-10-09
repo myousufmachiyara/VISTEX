@@ -97,6 +97,12 @@
             </div>
 
             <div class="col-md-3 mb-3">
+              <label class="form-label">Reorder Level <small class="text-muted">(alert when stock falls to this)</small></label>
+              <input type="number" step="any" min="0" name="reorder_level" class="form-control"
+                     value="{{ old('reorder_level', $product->reorder_level) }}">
+            </div>
+
+            <div class="col-md-3 mb-3">
               <label class="form-label">Status</label>
               <select name="is_active" class="form-control">
                 <option value="1" {{ old('is_active', $product->is_active) == 1 ? 'selected' : '' }}>Active</option>

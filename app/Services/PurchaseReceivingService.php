@@ -170,14 +170,14 @@ class PurchaseReceivingService
 
                 LocationStockLedger::create([
                     'doc_no' => $receiving->receiving_no, 'location_id' => $defaultLocationId, 'product_id' => $item->product_id,
-                    'status' => 'fresh', 'quantity' => $item->quantity_accepted, 'amount' => $item->amount,
+                    'status' => 'fresh', 'lot_no' => $po->order_no, 'quantity' => $item->quantity_accepted, 'amount' => $item->amount,
                     'reference_type' => 'PurchaseReceiving', 'reference_id' => $receiving->id, 'entry_date' => $receiving->receiving_date,
                 ]);
 
                 if ($item->quantity_rejected > 0) {
                     LocationStockLedger::create([
                         'doc_no' => $receiving->receiving_no, 'location_id' => $defaultLocationId, 'product_id' => $item->product_id,
-                        'status' => 'rejected', 'quantity' => $item->quantity_rejected, 'amount' => 0,
+                        'status' => 'rejected', 'lot_no' => $po->order_no, 'quantity' => $item->quantity_rejected, 'amount' => 0,
                         'reference_type' => 'PurchaseReceivingRejection', 'reference_id' => $receiving->id, 'entry_date' => $receiving->receiving_date,
                         'remarks' => 'Awaiting return to vendor',
                     ]);
@@ -216,7 +216,7 @@ class PurchaseReceivingService
 
         LocationStockLedger::create([
             'doc_no' => $receiving->receiving_no, 'location_id' => $defaultLocationId, 'product_id' => $item->product_id,
-            'status' => 'fresh', 'quantity' => $item->quantity_received, 'amount' => $item->amount,
+            'status' => 'fresh', 'lot_no' => $po->order_no, 'quantity' => $item->quantity_received, 'amount' => $item->amount,
             'reference_type' => 'PurchaseReceiving', 'reference_id' => $receiving->id, 'entry_date' => $receiving->receiving_date,
         ]);
 

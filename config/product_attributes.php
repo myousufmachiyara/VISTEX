@@ -39,6 +39,7 @@ return [
     ],
 
     'yarn' => [
+        ['key' => 'brand',   'label' => 'Brand',   'type' => 'text'],
         ['key' => 'count',   'label' => 'Count',   'type' => 'text'],
         ['key' => 'blend',   'label' => 'Blend',   'type' => 'text'],
         ['key' => 'quality', 'label' => 'Quality',  'type' => 'text'],

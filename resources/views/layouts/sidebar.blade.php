@@ -151,6 +151,21 @@
         </li>
         @endif
 
+        {{-- ═══════════════════════════════════════════════════════ --}}
+        {{-- REPORTS — Yarn, Greige, Packaging Material                  --}}
+        {{-- ═══════════════════════════════════════════════════════ --}}
+        @if(auth()->user()->canAny(['reports.yarn','reports.greige','reports.packaging']))
+        <li class="nav-parent {{ request()->routeIs('reports.*') ? 'nav-expanded active' : '' }}">
+          <a class="nav-link" href="#"><i class="fa fa-chart-bar"></i><span>Reports</span></a>
+          <ul class="nav nav-children">
+            <li class="{{ request()->routeIs('reports.index')?'active':'' }}"><a class="nav-link" href="{{ route('reports.index') }}">All Reports</a></li>
+            @can('reports.yarn')<li class="{{ request()->is('reports/yarn/*')?'active':'' }}"><a class="nav-link" href="{{ route('reports.index') }}#yarn">Yarn</a></li>@endcan
+            @can('reports.greige')<li class="{{ request()->is('reports/greige/*')?'active':'' }}"><a class="nav-link" href="{{ route('reports.index') }}#greige">Greige Fabric</a></li>@endcan
+            @can('reports.packaging')<li class="{{ request()->is('reports/packaging/*')?'active':'' }}"><a class="nav-link" href="{{ route('reports.index') }}#packaging">Packaging Material</a></li>@endcan
+          </ul>
+        </li>
+        @endif
+
       </ul>
     </nav>
   </div></div>

@@ -323,6 +323,11 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ════════════════════════════════════════════════════════════════
+    // REPORTS — Yarn, Greige, Packaging Material (each family has its own reports.* permission)
+    Route::get('reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports.index');
+    Route::get('reports/{group}/{key}', [\App\Http\Controllers\ReportController::class, 'show'])
+        ->where(['group' => 'yarn|greige|packaging', 'key' => '[a-z_]+'])->name('reports.show');
+
     // OPERATIONAL 6 — ISSUANCE (Yarn for Weaving, Greige for Processing, …)
     // ════════════════════════════════════════════════════════════════
     Route::prefix('issuances')->name('issuances.')->group(function () {

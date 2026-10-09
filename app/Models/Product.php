@@ -13,13 +13,14 @@ class Product extends Model
 
     protected $fillable = [
         'category_id', 'name', 'sku', 'description', 'attributes',
-        'opening_stock', 'selling_price', 'measurement_unit',
+        'opening_stock', 'reorder_level', 'selling_price', 'measurement_unit',
         'is_active', 'track_lots', 'created_by', 'updated_by',
     ];
 
     protected $casts = [
         'attributes'      => 'array',
         'opening_stock'   => 'decimal:3',
+        'reorder_level'   => 'decimal:3',
         'selling_price'   => 'decimal:2',
         'is_active'       => 'boolean',
         'track_lots'      => 'boolean',

@@ -162,6 +162,9 @@ class IssuanceService
         $perProduct = [];
         foreach ($grouped as $g) $perProduct[$g['product_id']] = ($perProduct[$g['product_id']] ?? 0) + $g['quantity'];
 
+        // "Any lot": take the oldest lots first so every issued line records which lot (PO) it came from
+        $grouped = $this->allocateFifo($grouped, $sourceId);
+
         if ($isYarn) {
             foreach ($perProduct as $productId => $qty) {
                 if (!isset($requirement[$productId])) {
@@ -209,10 +212,10 @@ class IssuanceService
                 $acc = $product->category->stock_account_id ?? $this->mappingService->accountId('stock_in_hand');
                 $stockCredits[$acc] = ($stockCredits[$acc] ?? 0) + $amount;
             } else {
-                // Same goods, new place: lot defaults to the issuance number so the mill can track it
+                // Same goods, new place: at the mill the lot is the issuance number, which ties it to the Processing PO
                 LocationStockLedger::create([
                     'doc_no' => $issuance->issue_no, 'location_id' => $issuance->destination_location_id, 'product_id' => $product->id,
-                    'status' => 'fresh', 'lot_no' => $g['lot_no'] ?? $issuance->issue_no, 'quantity' => $g['quantity'], 'amount' => $amount,
+                    'status' => 'fresh', 'lot_no' => $issuance->issue_no, 'quantity' => $g['quantity'], 'amount' => $amount,
                     'reference_type' => 'Issuance', 'reference_id' => $issuance->id, 'entry_date' => $issuance->issue_date,
                     'remarks' => "At mill for {$po->order_no}",
                 ]);
@@ -234,6 +237,44 @@ class IssuanceService
         }
     }
 
+    /**
+     * Split lines without a lot across the lots in stock, oldest first.
+     * Untracked stock (no lot) is used last. If there isn't enough stock the line
+     * is left as-is and the normal stock check reports the shortage.
+     */
+    private function allocateFifo(array $grouped, int $sourceId): array
+    {
+        $out = [];
+        foreach ($grouped as $g) {
+            if ($g['lot_no'] !== null) { $out[] = $g; continue; }
+
+            $buckets = LocationStockLedger::where('location_id', $sourceId)->where('product_id', $g['product_id'])
+                ->where('status', 'fresh')->groupBy('lot_no')
+                ->selectRaw('lot_no, SUM(quantity) as qty, MIN(entry_date) as first_date')
+                ->havingRaw('SUM(quantity) > 0.0005')->get()
+                ->sortBy(fn($b) => [$b->lot_no === null ? 1 : 0, $b->first_date, $b->lot_no])->values();
+
+            if ($buckets->sum('qty') + 0.001 < $g['quantity']) { $out[] = $g; continue; }
+
+            $left = $g['quantity'];
+            foreach ($buckets as $b) {
+                if ($left <= 0.0005) break;
+                $take = round(min($left, (float) $b->qty), 3);
+                $out[] = array_merge($g, ['lot_no' => $b->lot_no, 'quantity' => $take]);
+                $left = round($left - $take, 3);
+            }
+        }
+
+        // merge back any lines that landed on the same product + lot
+        $merged = [];
+        foreach ($out as $g) {
+            $k = $g['product_id'] . '|' . $g['lot_no'];
+            if (isset($merged[$k])) $merged[$k]['quantity'] = round($merged[$k]['quantity'] + $g['quantity'], 3);
+            else $merged[$k] = $g;
+        }
+        return array_values($merged);
+    }
+
     private function reverse(Issuance $issuance): void
     {
         LocationStockLedger::where('reference_type', 'Issuance')->where('reference_id', $issuance->id)->delete();
@@ -251,10 +292,10 @@ class IssuanceService
         }
 
         if ($issuance->issue_type === 'greige_processing') {
-            foreach ($issuance->items as $item) {
-                $lot = $item->lot_no ?? $issuance->issue_no;
-                $left = LocationStockLedger::balance($issuance->destination_location_id, $item->product_id, 'fresh', $lot);
-                if ($left < (float) $item->quantity - 0.001) {
+            $lot = $issuance->issue_no;
+            foreach ($issuance->items->groupBy('product_id') as $productId => $lines) {
+                $left = LocationStockLedger::balance($issuance->destination_location_id, $productId, 'fresh', $lot);
+                if ($left < (float) $lines->sum('quantity') - 0.001) {
                     throw new \Exception("Cannot change this issuance — the mill has already used part of lot {$lot}.");
                 }
             }

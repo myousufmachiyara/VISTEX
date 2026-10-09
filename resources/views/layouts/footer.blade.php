@@ -61,6 +61,17 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
 {{-- ── 14. Porto Theme ──────────────────────────────────────────── --}}
+{{-- Porto's theme.js needs three things this layout never loaded:
+     $.browser (removed from jQuery 3), Modernizr, and the nanoScroller plugin.
+     Without them theme.js crashed at "$.browser.chrome" and theme.init.js then
+     failed on theme.Skeleton (sidebar/menu scripts). --}}
+<script>
+  if (window.jQuery && !jQuery.browser) {
+    jQuery.browser = { mobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) };
+  }
+  window.Modernizr = window.Modernizr || { overflowscrolling: 'WebkitOverflowScrolling' in document.documentElement.style };
+</script>
+<script src="{{ asset('assets/vendor/nanoscroller/nanoscroller.js') }}"></script>
 <script src="{{ asset('assets/js/theme.js') }}"></script>
 <script src="{{ asset('assets/js/custom.js') }}"></script>
 <script src="{{ asset('assets/js/theme.init.js') }}"></script>

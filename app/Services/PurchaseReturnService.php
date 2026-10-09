@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
 use App\Models\PurchaseReceiving;
+use App\Models\LocationStockLedger;
+use App\Models\Location;
 use Illuminate\Support\Facades\DB;
 
 class PurchaseReturnService
@@ -16,7 +18,8 @@ class PurchaseReturnService
     {
         return DB::transaction(function () use ($data, $items, $userId) {
 
-            $receiving = PurchaseReceiving::with('items')->findOrFail($data['purchase_receiving_id']);
+            $receiving = PurchaseReceiving::with('items', 'purchaseOrder')->findOrFail($data['purchase_receiving_id']);
+            $lot = $receiving->purchaseOrder->order_no ?? null;
 
             $items = array_values(array_filter($items, fn($i) => (float) ($i['quantity_returned'] ?? 0) > 0));
             if (empty($items)) {
@@ -50,6 +53,18 @@ class PurchaseReturnService
                 ]);
 
                 $receivingItem->increment('quantity_returned', $qty);
+
+                // Returned goods leave "rejected" stock at the place they were held
+                $locationId = LocationStockLedger::where('reference_type', 'PurchaseReceivingRejection')
+                    ->where('reference_id', $receiving->id)->where('product_id', $receivingItem->product_id)
+                    ->value('location_id') ?? Location::defaultId();
+                if ($receivingItem->product_id && $locationId) {
+                    LocationStockLedger::create([
+                        'doc_no' => $return->return_no, 'location_id' => $locationId, 'product_id' => $receivingItem->product_id,
+                        'status' => 'rejected', 'lot_no' => $lot, 'quantity' => -$qty, 'amount' => 0,
+                        'reference_type' => 'PurchaseReturn', 'reference_id' => $return->id, 'entry_date' => $data['return_date'],
+                    ]);
+                }
             }
 
             return $return->load('items.purchaseReceivingItem.product');
