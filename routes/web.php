@@ -325,6 +325,14 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ════════════════════════════════════════════════════════════════
+    // DESIGN PREVIEW — static mockups for client feedback (no saving, no controllers). Remove once built.
+    // ════════════════════════════════════════════════════════════════
+    Route::prefix('design-preview')->name('design_preview.')->group(function () {
+        Route::view('job-order', 'design_preview.job_order')->name('job_order');
+        Route::view('processing-po', 'design_preview.processing_po')->name('processing_po');
+    });
+
+    // ════════════════════════════════════════════════════════════════
     // REPORTS — Yarn, Greige, Packaging Material (each family has its own reports.* permission)
     Route::get('reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports.index');
     Route::get('reports/{group}/{key}', [\App\Http\Controllers\ReportController::class, 'show'])

@@ -152,6 +152,19 @@
         @endif
 
         {{-- ═══════════════════════════════════════════════════════ --}}
+        {{-- DESIGN PREVIEW — mockups for client review (superadmin)     --}}
+        {{-- ═══════════════════════════════════════════════════════ --}}
+        @if(auth()->user()->hasRole('superadmin'))
+        <li class="nav-parent {{ request()->routeIs('design_preview.*') ? 'nav-expanded active' : '' }}">
+          <a class="nav-link" href="#"><i class="fa fa-drafting-compass"></i><span>Design Preview</span></a>
+          <ul class="nav nav-children">
+            <li class="{{ request()->routeIs('design_preview.job_order')?'active':'' }}"><a class="nav-link" href="{{ route('design_preview.job_order') }}">Customer Order (Job Order)</a></li>
+            <li class="{{ request()->routeIs('design_preview.processing_po')?'active':'' }}"><a class="nav-link" href="{{ route('design_preview.processing_po') }}">Processing PO</a></li>
+          </ul>
+        </li>
+        @endif
+
+        {{-- ═══════════════════════════════════════════════════════ --}}
         {{-- REPORTS — Yarn, Greige, Packaging Material                  --}}
         {{-- ═══════════════════════════════════════════════════════ --}}
         @if(auth()->user()->canAny(['reports.yarn','reports.greige','reports.packaging']))
