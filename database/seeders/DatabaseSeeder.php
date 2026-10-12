@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
         $this->seedTaxMaster($now);
         $this->seedMeasurementUnits($now);
         $this->seedProductCategories($now);
+        \App\Support\PutUps::seed();
         $this->seedServiceTypes($now);
         $this->seedTermsAndConditions($now);
     }

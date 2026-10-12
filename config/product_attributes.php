@@ -8,6 +8,8 @@
 return [
 
     // Processed / SKU / Rejection / Leftover share this field set
+    // SKU = a sellable put-up (bolt, flat fold, fat quarter bundle, precut).
+    // meters_per_unit = fabric consumed by one piece of this put-up.
     'sku' => [
         ['key' => 'construction',    'label' => 'Construction',    'type' => 'text'],
         ['key' => 'width',           'label' => 'Width',           'type' => 'text'],
@@ -16,6 +18,10 @@ return [
         ['key' => 'finished_width',  'label' => 'Finished Width',  'type' => 'text'],
         ['key' => 'design_code',     'label' => 'Design Code',     'type' => 'text'],
         ['key' => 'color',           'label' => 'Color',           'type' => 'text'],
+        ['key' => 'put_up_group',    'label' => 'Put-Up Group',    'type' => 'text'],
+        ['key' => 'put_up_type',     'label' => 'Put-Up Type',     'type' => 'text'],
+        ['key' => 'meters_per_unit', 'label' => 'Meters per Piece','type' => 'number'],
+        ['key' => 'size_inches',     'label' => 'Size (inches)',   'type' => 'text'],
     ],
 
     'rejection' => [
@@ -55,14 +61,8 @@ return [
         ['key' => 'warp_yarn_quality', 'label' => 'Warp Yarn Quality',   'type' => 'text'],
     ],
 
-    // Cut pieces / put-ups (bolts, flat folds, fat quarters, precuts).
-    // meters_per_unit = fabric consumed by one piece of this put-up.
     'cut_pcs' => [
-        ['key' => 'width',           'label' => 'Width',              'type' => 'text'],
-        ['key' => 'put_up_group',    'label' => 'Put-Up Group',       'type' => 'text'],
-        ['key' => 'put_up_type',     'label' => 'Put-Up Type',        'type' => 'text'],
-        ['key' => 'meters_per_unit', 'label' => 'Meters per Piece',   'type' => 'number'],
-        ['key' => 'size_inches',     'label' => 'Size (inches)',      'type' => 'text'],
+        ['key' => 'width', 'label' => 'Width', 'type' => 'text'],
     ],
 
     // 'packaging' intentionally has no entry — generic fields only
