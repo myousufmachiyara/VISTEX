@@ -23,7 +23,7 @@ class Issuance extends Model
         ],
         'greige_processing' => [
             'label' => 'Greige for Processing', 'against' => 'Processing PO', 'po_type' => 'processing', 'active' => true,
-            'help'  => 'Greige is transferred from our warehouse to the processing mill\'s location (still our stock).',
+            'help'  => 'The mill\'s location in-charge issues greige already at the mill (sent by Stock Movement, under the mill\'s lot #) to this Processing PO. It is then "in process" for the PO.',
         ],
         'greige_sale' => [
             'label' => 'Greige against Sale Order', 'against' => 'Sale Order', 'po_type' => null, 'active' => false,
@@ -64,5 +64,18 @@ class Issuance extends Model
     public static function activeTypes(): array
     {
         return array_filter(self::TYPES, fn($t) => $t['active']);
+    }
+
+    // Issued before greige was issued at the mill: those sent greige straight from our warehouse
+    public function isWarehouseToMill(): bool
+    {
+        return $this->issue_type === 'greige_processing' && $this->destination_location_id !== null;
+    }
+
+    // Greige for processing is issued by the mill location's in-charge (or a superadmin)
+    public static function canIssueAt(?Location $location, User $user): bool
+    {
+        if ($user->hasRole('superadmin')) return true;
+        return $location && (int) $location->in_charge_user_id === (int) $user->id;
     }
 }

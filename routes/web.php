@@ -226,7 +226,7 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ════════════════════════════════════════════════════════════════
-    // OPERATIONAL 2 — JOBS / CUSTOMER ORDERS
+    // OPERATIONAL 2 — CUSTOMER ORDERS (JOBS)
     // ════════════════════════════════════════════════════════════════
     Route::prefix('jobs')->name('jobs.')->group(function () {
         Route::get('/',              [JobController::class, 'index'])       ->name('index')  ->middleware('check.permission:jobs.index');
@@ -235,6 +235,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/',             [JobController::class, 'store'])       ->name('store')  ->middleware('check.permission:jobs.create');
         Route::get('{id}',           [JobController::class, 'show'])        ->name('show')   ->middleware('check.permission:jobs.index');
         Route::get('{id}/edit',      [JobController::class, 'edit'])        ->name('edit')   ->middleware('check.permission:jobs.edit');
+        Route::get('{id}/print',     [JobController::class, 'print'])       ->name('print')  ->middleware('check.permission:jobs.print');
         Route::put('{id}',           [JobController::class, 'update'])      ->name('update') ->middleware('check.permission:jobs.edit');
         Route::post('{id}/approve',  [JobController::class, 'approve'])     ->name('approve')->middleware('check.permission:jobs.edit');
         Route::post('{id}/reject',   [JobController::class, 'reject'])      ->name('reject') ->middleware('check.permission:jobs.edit');
@@ -325,14 +326,6 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ════════════════════════════════════════════════════════════════
-    // DESIGN PREVIEW — static mockups for client feedback (no saving, no controllers). Remove once built.
-    // ════════════════════════════════════════════════════════════════
-    Route::prefix('design-preview')->name('design_preview.')->group(function () {
-        Route::view('job-order', 'design_preview.job_order')->name('job_order');
-        Route::view('processing-po', 'design_preview.processing_po')->name('processing_po');
-    });
-
-    // ════════════════════════════════════════════════════════════════
     // REPORTS — Yarn, Greige, Packaging Material (each family has its own reports.* permission)
     Route::get('reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports.index');
     Route::get('reports/{group}/{key}', [\App\Http\Controllers\ReportController::class, 'show'])
@@ -356,16 +349,21 @@ Route::middleware(['auth'])->group(function () {
     Route::redirect('yarn-issues/create', 'issuances/create?type=yarn_weaving');
 
     // ════════════════════════════════════════════════════════════════
-    // OPERATIONAL 7 — STOCK MOVEMENT (Warehouse ↔ Warehouse ↔ Vendor)
+    // OPERATIONAL 7 — STOCK MOVEMENT + GATE PASS / CHALLAN OUT
     // ════════════════════════════════════════════════════════════════
     Route::prefix('stock-movements')->name('stock_movements.')->group(function () {
-        Route::get('/',              [StockMovementController::class, 'index'])         ->name('index')  ->middleware('check.permission:stock_movements.index');
-        Route::get('create',         [StockMovementController::class, 'create'])        ->name('create') ->middleware('check.permission:stock_movements.create');
+        Route::get('/',              [StockMovementController::class, 'index'])         ->name('index')   ->middleware('check.permission:stock_movements.index');
+        Route::get('gate',           [StockMovementController::class, 'gate'])          ->name('gate')    ->middleware('check.permission:stock_movements.gate');
+        Route::get('create',         [StockMovementController::class, 'create'])        ->name('create')  ->middleware('check.permission:stock_movements.create');
         Route::get('available-lots', [StockMovementController::class, 'availableLots']) ->name('available_lots')->middleware('check.permission:stock_movements.index');
-        Route::post('/',             [StockMovementController::class, 'store'])         ->name('store')  ->middleware('check.permission:stock_movements.create');
-        Route::get('{id}',           [StockMovementController::class, 'show'])          ->name('show')   ->middleware('check.permission:stock_movements.index');
-        Route::post('{id}/approve',  [StockMovementController::class, 'approve'])       ->name('approve')->middleware('check.permission:stock_movements.edit');
-        Route::post('{id}/reject',   [StockMovementController::class, 'reject'])        ->name('reject') ->middleware('check.permission:stock_movements.edit');
+        Route::post('/',             [StockMovementController::class, 'store'])         ->name('store')   ->middleware('check.permission:stock_movements.create');
+        Route::get('{id}',           [StockMovementController::class, 'show'])          ->name('show')    ->middleware('check.permission:stock_movements.index');
+        Route::get('{id}/gate-pass', [StockMovementController::class, 'gatePass'])      ->name('gate_pass')->middleware('check.permission:stock_movements.index');
+        // approve / reject / receive are further limited to the location in-charge (or superadmin) in the controller
+        Route::post('{id}/approve',  [StockMovementController::class, 'approve'])       ->name('approve') ->middleware('check.permission:stock_movements.index');
+        Route::post('{id}/reject',   [StockMovementController::class, 'reject'])        ->name('reject')  ->middleware('check.permission:stock_movements.index');
+        Route::post('{id}/gate-out', [StockMovementController::class, 'gateOut'])       ->name('gate_out')->middleware('check.permission:stock_movements.gate');
+        Route::post('{id}/receive',  [StockMovementController::class, 'receive'])       ->name('receive') ->middleware('check.permission:stock_movements.index');
     });
 
     // ════════════════════════════════════════════════════════════════

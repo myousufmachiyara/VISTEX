@@ -5,7 +5,7 @@
   <form action="{{ route('purchase_orders.update', $order->id) }}" method="POST" onkeydown="return event.key != 'Enter';" enctype="multipart/form-data">
     @csrf
     @method('PUT')
-    <input type="hidden" name="type" value="{{ $order->type }}">
+    <input type="hidden" name="type" id="po_type" value="{{ $order->type }}">
     <section class="card">
       <header class="card-header d-flex justify-content-between align-items-center">
         <h2 class="card-title">Edit Purchase Order — {{ $order->order_no }} <small class="text-muted">(Rev {{ $order->revision_no }})</small></h2>
@@ -285,6 +285,10 @@
         </div>
         @endif
 
+        @if($order->type === 'processing')
+          @include('purchase_orders._processing', ['order' => $order])
+        @endif
+
         @include('purchase_orders._terms', [
           'terms' => $terms,
           'selectedIds' => old('term_ids', $order->terms->pluck('term_id')->filter()->all()),
@@ -343,6 +347,10 @@
 
     @if($order->type === 'weaving')
       recalcCpo();
+    @endif
+    @if($order->type === 'processing')
+      $('#processingSection').show();
+      procInit();
     @endif
   });
 

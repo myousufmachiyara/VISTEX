@@ -19,7 +19,7 @@ class TermAndConditionController extends Controller
         $request->validate([
             'title'               => 'required|string|max:255',
             'description'         => 'required|string',
-            'applies_to'          => 'required|in:all,purchase,weaving,processing',
+            'applies_to'          => 'required|in:all,purchase,weaving,processing,customer_order',
             'is_default_checked'  => 'nullable|boolean',
             'sort_order'          => 'nullable|integer',
             'is_active'           => 'nullable|boolean',
@@ -61,7 +61,7 @@ class TermAndConditionController extends Controller
         $request->validate([
             'title'               => 'required|string|max:255',
             'description'         => 'required|string',
-            'applies_to'          => 'required|in:all,purchase,weaving,processing',
+            'applies_to'          => 'required|in:all,purchase,weaving,processing,customer_order',
             'is_default_checked'  => 'nullable|boolean',
             'sort_order'          => 'nullable|integer',
             'is_active'           => 'nullable|boolean',

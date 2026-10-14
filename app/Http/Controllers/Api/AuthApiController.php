@@ -53,6 +53,7 @@ class AuthApiController extends Controller
             'role'        => $user->roles->first()->name ?? null,
             'permissions' => $user->getAllPermissions()->pluck('name')->values(),
             'is_incharge' => $user->hasRole('superadmin') || \App\Models\CategoryIncharge::where('user_id', $user->id)->exists(),
+            'can_gate_out' => $user->can('stock_movements.gate'),
         ];
     }
 }

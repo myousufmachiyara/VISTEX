@@ -18,7 +18,7 @@
       </div>
       <div class="row mb-3">
         <div class="col-md-3"><strong>From:</strong> {{ $issuance->sourceLocation->name ?? '—' }}</div>
-        <div class="col-md-3"><strong>To:</strong> {{ $issuance->destinationLocation->name ?? ($issuance->issue_type === 'yarn_weaving' ? 'Weaving mill (yarn in process)' : '—') }}</div>
+        <div class="col-md-3"><strong>To:</strong> {{ $issuance->destinationLocation->name ?? ($issuance->issue_type === 'yarn_weaving' ? 'Weaving mill (yarn in process)' : 'In process for ' . ($issuance->purchaseOrder->order_no ?? 'the PO')) }}</div>
       </div>
       <table class="table table-bordered">
         <thead><tr><th>Item</th><th>Lot</th><th class="text-end">Qty</th><th>Unit</th><th class="text-end">Rate</th><th class="text-end">Value</th></tr></thead>

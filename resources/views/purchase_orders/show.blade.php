@@ -112,7 +112,9 @@
       </div>
       @endif
 
-      @if(in_array($order->type, ['purchase', 'processing']))
+      @if($order->type === 'processing')
+        @include('purchase_orders._processing_show')
+      @elseif($order->type === 'purchase')
         <table class="table table-bordered">
           <thead><tr><th>Item</th><th>Unit</th><th class="text-end">Qty</th><th class="text-end">Received</th><th class="text-end">Outstanding</th><th class="text-end">Rate</th><th class="text-end">Amount</th></tr></thead>
           <tbody>

@@ -89,7 +89,7 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        foreach (['reports.yarn', 'reports.greige', 'reports.packaging'] as $name) {
+        foreach (['reports.yarn', 'reports.greige', 'reports.packaging', 'stock_movements.gate'] as $name) {
             Permission::firstOrCreate(['name' => $name]);
         }
 
@@ -101,6 +101,7 @@ class DatabaseSeeder extends Seeder
             'locations.index',
             'purchase_receivings.index', 'purchase_receivings.create',
             'challans.index', 'challans.create', 'challans.edit',
+            'stock_movements.index', 'stock_movements.gate',
         ])->get());
     }
 

@@ -28,4 +28,39 @@ class LocationStockLedger extends Model
             ->groupBy('lot_no')->selectRaw('lot_no, SUM(quantity) as qty')
             ->having('qty', '>', 0.001)->pluck('qty', 'lot_no');
     }
+
+    /**
+     * Which lots to take $qty from at a location, oldest first (unlotted stock last).
+     * With $lotNo, takes only from that lot. Returns [['lot_no' => ?string, 'quantity' => float], ...].
+     */
+    public static function allocate(int $locationId, int $productId, float $qty, ?string $lotNo = null): array
+    {
+        $buckets = self::where('location_id', $locationId)->where('product_id', $productId)->where('status', 'fresh')
+            ->when($lotNo !== null && $lotNo !== '', fn($q) => $q->where('lot_no', $lotNo))
+            ->groupBy('lot_no')->selectRaw('lot_no, SUM(quantity) AS qty, MIN(entry_date) AS first_date')
+            ->havingRaw('SUM(quantity) > 0.0005')->get()
+            ->sortBy(fn($b) => [$b->lot_no === null ? 1 : 0, $b->first_date, $b->lot_no])->values();
+
+        $out = []; $left = round($qty, 3);
+        foreach ($buckets as $b) {
+            if ($left <= 0.0005) break;
+            $take = round(min($left, (float) $b->qty), 3);
+            $out[] = ['lot_no' => $b->lot_no, 'quantity' => $take];
+            $left = round($left - $take, 3);
+        }
+        if ($left > 0.0005) {
+            $have = round($qty - $left, 3);
+            throw new \Exception("Not enough stock" . ($lotNo ? " in lot {$lotNo}" : '') . " — available {$have}, needed {$qty}.");
+        }
+        return $out;
+    }
+
+    // Cost per unit of one lot at a location (a lot is one PO's price); falls back to the location average
+    public static function lotRate(int $locationId, int $productId, ?string $lotNo, float $fallback): float
+    {
+        if ($lotNo === null || $lotNo === '') return $fallback;
+        $r = self::where('location_id', $locationId)->where('product_id', $productId)->where('status', 'fresh')
+            ->where('lot_no', $lotNo)->selectRaw('SUM(quantity) AS q, SUM(amount) AS a')->first();
+        return ($r && (float) $r->q > 0.0005) ? (float) $r->a / (float) $r->q : $fallback;
+    }
 }

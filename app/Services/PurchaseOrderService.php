@@ -118,11 +118,8 @@ class PurchaseOrderService
 
     private function createProcessingType(array $data, array $items, ?int $userId): PurchaseOrder
     {
-        $items = array_values(array_filter($items, fn($i) => (float) ($i['quantity'] ?? 0) > 0));
-        if (empty($items)) throw new \Exception('Enter at least one processing line item.');
-
-        $subtotal = 0;
-        foreach ($items as $item) $subtotal += (float) $item['quantity'] * (float) $item['rate'];
+        $items = $this->cleanProcessingItems($items);
+        $subtotal = array_sum(array_map(fn($i) => round((float) $i['quantity'] * (float) $i['rate'], 2), $items));
         [$taxRate, $gstAmount] = $this->calcTax($data, $subtotal);
 
         $order = PurchaseOrder::create(array_merge(
@@ -130,21 +127,71 @@ class PurchaseOrderService
                 'subtotal' => $subtotal, 'gst_amount' => $gstAmount, 'gst_rate' => $taxRate,
                 'total_amount' => $subtotal + $gstAmount,
             ]),
-            ['job_id' => $data['job_id'] ?? null, 'program' => $data['program'] ?? null, 'fabric_specs' => $data['fabric_specs'] ?? null]
+            $this->processingFieldsPayload($data)
         ));
+        $this->writeProcessingItems($order, $items);
+
+        return $order->load('items', 'vendor', 'category', 'serviceType', 'job', 'tax');
+    }
+
+    // Processing PO header extras: customer order, program, greige quality, fabric details, lab requirements, notes
+    private function processingFieldsPayload(array $data): array
+    {
+        $specs = (array) ($data['fabric_specs'] ?? []);
+        $clean = fn($v) => is_string($v) ? (trim($v) === '' ? null : trim($v)) : $v;
+
+        $lab = collect($specs['lab_requirements'] ?? [])
+            ->map(fn($r) => ['label' => trim($r['label'] ?? ''), 'value' => trim($r['value'] ?? '')])
+            ->filter(fn($r) => $r['label'] !== '' && $r['value'] !== '')->values()->all();
+        $notes = collect($specs['notes'] ?? [])->map(fn($n) => trim((string) $n))->filter()->values()->all();
+
+        return [
+            'job_id'            => $data['job_id'] ?? null,
+            'program'           => $clean($data['program'] ?? null),
+            'greige_product_id' => $data['greige_product_id'] ?? null,
+            'fabric_specs'      => array_filter([
+                'po_kind'          => $clean($specs['po_kind'] ?? null) ?? 'Outsource Processing',
+                'is_sample'        => !empty($specs['is_sample']),
+                'greige_width'     => $clean($specs['greige_width'] ?? null),
+                'finished_width'   => $clean($specs['finished_width'] ?? null),
+                'finished_gsm'     => $clean($specs['finished_gsm'] ?? null),
+                'dyestuff'         => $clean($specs['dyestuff'] ?? null),
+                'finish'           => $clean($specs['finish'] ?? null),
+                'lab_requirements' => $lab,
+                'notes'            => $notes,
+            ], fn($v) => $v !== null && $v !== []),
+        ];
+    }
+
+    // Keep lines that have a pattern # and a quantity
+    private function cleanProcessingItems(array $items): array
+    {
+        $items = array_values(array_filter($items, fn($i) => (float) ($i['quantity'] ?? 0) > 0 && trim($i['pattern_code'] ?? '') !== ''));
+        if (empty($items)) throw new \Exception('Enter at least one processing line with a pattern # and quantity.');
+        return $items;
+    }
+
+    private function writeProcessingItems(PurchaseOrder $order, array $items): void
+    {
+        $meter = \App\Models\MeasurementUnit::where('shortcode', 'm')->value('id');
+        $clean = fn($v) => ($v = trim((string) $v)) === '' ? null : $v;
 
         foreach ($items as $item) {
             $qty = (float) $item['quantity']; $rate = (float) $item['rate'];
+            $design = $clean($item['design'] ?? null); $colour = $clean($item['color_scheme'] ?? null);
             PurchaseOrderItem::create([
-                'purchase_order_id' => $order->id, 'job_item_id' => $item['job_item_id'] ?? null,
-                'product_id' => $item['product_id'] ?? null, 'collection' => $item['collection'] ?? null,
-                'pattern_code' => $item['pattern_code'] ?? null, 'description' => $item['description'] ?? null,
-                'measurement_unit' => $item['measurement_unit'] ?? null,
-                'quantity' => $qty, 'rate' => $rate, 'amount' => round($qty * $rate, 2),
+                'purchase_order_id' => $order->id,
+                'job_item_id'       => !empty($item['job_item_id']) ? $item['job_item_id'] : null,
+                'product_id'        => !empty($item['product_id']) ? $item['product_id'] : null,   // packaging (put-up SKU)
+                'collection'        => $clean($item['collection'] ?? null),
+                'pattern_code'      => $clean($item['pattern_code']),
+                'design'            => $design,
+                'color_scheme'      => $colour,
+                'description'       => $clean($item['description'] ?? null) ?? (implode(' - ', array_filter([$design, $colour])) ?: null),
+                'measurement_unit'  => !empty($item['measurement_unit']) ? $item['measurement_unit'] : $meter,
+                'quantity'          => $qty, 'rate' => $rate, 'amount' => round($qty * $rate, 2),
             ]);
         }
-
-        return $order->load('items', 'vendor', 'category', 'serviceType', 'job', 'tax');
     }
 
     public function update(PurchaseOrder $order, array $data, array $items, ?int $userId = null): PurchaseOrder
@@ -195,28 +242,17 @@ class PurchaseOrderService
                 ));
 
             } elseif ($order->type === 'processing') {
-                $items = array_values(array_filter($items, fn($i) => (float) ($i['quantity'] ?? 0) > 0));
-                if (empty($items)) throw new \Exception('Enter at least one processing line item.');
-                $subtotal = 0;
-                foreach ($items as $item) $subtotal += (float) $item['quantity'] * (float) $item['rate'];
+                $items = $this->cleanProcessingItems($items);
+                $subtotal = array_sum(array_map(fn($i) => round((float) $i['quantity'] * (float) $i['rate'], 2), $items));
                 [$taxRate, $gstAmount] = $this->calcTax($data, $subtotal);
 
                 $order->update(array_merge(
                     $this->updateHeaderPayload($data, $userId, ['subtotal' => $subtotal, 'gst_amount' => $gstAmount, 'gst_rate' => $taxRate, 'total_amount' => $subtotal + $gstAmount]),
-                    ['job_id' => $data['job_id'] ?? null, 'program' => $data['program'] ?? null, 'fabric_specs' => $data['fabric_specs'] ?? null]
+                    $this->processingFieldsPayload($data)
                 ));
 
                 $order->items()->delete();
-                foreach ($items as $item) {
-                    $qty = (float) $item['quantity']; $rate = (float) $item['rate'];
-                    PurchaseOrderItem::create([
-                        'purchase_order_id' => $order->id, 'job_item_id' => $item['job_item_id'] ?? null,
-                        'product_id' => $item['product_id'] ?? null, 'collection' => $item['collection'] ?? null,
-                        'pattern_code' => $item['pattern_code'] ?? null, 'description' => $item['description'] ?? null,
-                        'measurement_unit' => $item['measurement_unit'] ?? null,
-                        'quantity' => $qty, 'rate' => $rate, 'amount' => round($qty * $rate, 2),
-                    ]);
-                }
+                $this->writeProcessingItems($order, $items);
             }
 
             $this->syncTerms($order, $data);

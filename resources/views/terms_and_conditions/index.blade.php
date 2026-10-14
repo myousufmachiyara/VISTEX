@@ -18,7 +18,7 @@
           @foreach($terms as $term)
           <tr>
             <td>{{ $term->title }}</td>
-            <td><span class="badge bg-info text-dark">{{ ucfirst($term->applies_to) }}</span></td>
+            <td><span class="badge bg-info text-dark">{{ $term->applies_to === 'customer_order' ? 'Customer Orders' : ucfirst($term->applies_to) }}</span></td>
             <td>{{ $term->is_default_checked ? 'Yes' : '—' }}</td>
             <td><span class="badge bg-{{ $term->is_active ? 'success' : 'secondary' }}">{{ $term->is_active ? 'Active' : 'Inactive' }}</span></td>
             <td>
@@ -55,6 +55,7 @@
               <option value="purchase">Purchasing Only</option>
               <option value="weaving">Weaving Only</option>
               <option value="processing">Processing Only</option>
+              <option value="customer_order">Customer Orders</option>
             </select>
           </div>
           <div class="mb-2"><label>Sort Order</label><input type="number" name="sort_order" class="form-control" value="0"></div>
@@ -86,6 +87,7 @@
               <option value="purchase">Purchasing Only</option>
               <option value="weaving">Weaving Only</option>
               <option value="processing">Processing Only</option>
+              <option value="customer_order">Customer Orders</option>
             </select>
           </div>
           <div class="mb-2"><label>Sort Order</label><input type="number" name="sort_order" id="et_sort_order" class="form-control"></div>

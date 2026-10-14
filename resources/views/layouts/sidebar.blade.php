@@ -115,8 +115,9 @@
           <a class="nav-link" href="#"><i class="fa fa-industry"></i><span>Production</span></a>
           <ul class="nav nav-children">
             @can('issuances.index')<li class="{{ request()->routeIs('issuances.*')?'active':'' }}"><a class="nav-link" href="{{ route('issuances.index') }}">Issuance</a></li>@endcan
-            @can('stock_movements.index')<li class="{{ request()->routeIs('stock_movements.*')?'active':'' }}"><a class="nav-link" href="{{ route('stock_movements.index') }}">Stock Movement</a></li>@endcan
-            @can('processing_issues.index')<li class="{{ request()->routeIs('processing_issues.*')?'active':'' }}"><a class="nav-link" href="{{ route('processing_issues.index') }}">Processing Issue</a></li>@endcan
+            @can('stock_movements.index')<li class="{{ request()->routeIs('stock_movements.*') && !request()->routeIs('stock_movements.gate') ?'active':'' }}"><a class="nav-link" href="{{ route('stock_movements.index') }}">Stock Movement</a></li>@endcan
+            @can('stock_movements.gate')<li class="{{ request()->routeIs('stock_movements.gate')?'active':'' }}"><a class="nav-link" href="{{ route('stock_movements.gate') }}">Gate Out</a></li>@endcan
+            {{-- Processing Issue replaced by Issuance → Greige for Processing (issued at the mill by lot #) --}}
           </ul>
         </li>
         @endif
@@ -124,15 +125,15 @@
         {{-- ═══════════════════════════════════════════════════════ --}}
         {{-- SALES — Forecasting + Jobs                                 --}}
         {{-- ═══════════════════════════════════════════════════════ --}}
-        {{-- @if(auth()->user()->canAny(['forecasts.index','jobs.index']))
-        <li class="nav-parent {{ request()->routeIs('forecasts.*','jobs.*') ? 'nav-expanded active' : '' }}">
+        @can('jobs.index')
+        <li class="nav-parent {{ request()->routeIs('jobs.*') ? 'nav-expanded active' : '' }}">
           <a class="nav-link" href="#"><i class="fa fa-chart-line"></i><span>Sales</span></a>
           <ul class="nav nav-children">
-            @can('forecasts.index')<li class="{{ request()->routeIs('forecasts.*')?'active':'' }}"><a class="nav-link" href="{{ route('forecasts.index') }}">Forecasting</a></li>@endcan
-            @can('jobs.index')<li class="{{ request()->routeIs('jobs.*')?'active':'' }}"><a class="nav-link" href="{{ route('jobs.index') }}">Jobs / Customer Orders</a></li>@endcan
+            @can('jobs.index')<li class="{{ request()->routeIs('jobs.*')?'active':'' }}"><a class="nav-link" href="{{ route('jobs.index') }}">Customer Orders (Jobs)</a></li>@endcan
+            {{-- Forecasting hidden for now --}}
           </ul>
         </li>
-        @endif --}}
+        @endcan
 
         {{-- ═══════════════════════════════════════════════════════ --}}
         {{-- FINANCE — PDC + Vouchers                                   --}}
@@ -147,19 +148,6 @@
               <li class="{{ request()->is("vouchers/{$t}*")?'active':'' }}"><a class="nav-link" href="{{ route('vouchers.index',$t) }}">{{ $l }}</a></li>
               @endforeach
             @endcan
-          </ul>
-        </li>
-        @endif
-
-        {{-- ═══════════════════════════════════════════════════════ --}}
-        {{-- DESIGN PREVIEW — mockups for client review (superadmin)     --}}
-        {{-- ═══════════════════════════════════════════════════════ --}}
-        @if(auth()->user()->hasRole('superadmin'))
-        <li class="nav-parent {{ request()->routeIs('design_preview.*') ? 'nav-expanded active' : '' }}">
-          <a class="nav-link" href="#"><i class="fa fa-drafting-compass"></i><span>Design Preview</span></a>
-          <ul class="nav nav-children">
-            <li class="{{ request()->routeIs('design_preview.job_order')?'active':'' }}"><a class="nav-link" href="{{ route('design_preview.job_order') }}">Customer Order (Job Order)</a></li>
-            <li class="{{ request()->routeIs('design_preview.processing_po')?'active':'' }}"><a class="nav-link" href="{{ route('design_preview.processing_po') }}">Processing PO</a></li>
           </ul>
         </li>
         @endif

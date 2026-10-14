@@ -57,21 +57,23 @@
             @if($orders->isEmpty())<small class="text-muted">No approved {{ strtolower($types[$type]['against']) }}s are open.</small>@endif
           </div>
           <div class="col-md-3 mb-3">
-            <label>Issue From (Warehouse) <span class="text-danger">*</span></label>
-            <select name="source_location_id" id="source_select" class="form-control" required>
-              @foreach($warehouses as $w)
-                <option value="{{ $w->id }}" @selected(old('source_location_id', $issuance->source_location_id ?? null) == $w->id)>{{ $w->name }}</option>
-              @endforeach
-            </select>
+            @if($type === 'greige_processing')
+              <label>Issue From (Mill Location) <span class="text-danger">*</span></label>
+              <select name="source_location_id" id="source_select" class="form-control" required data-selected="{{ old('source_location_id', $issuance->source_location_id ?? '') }}">
+                <option value="">Select the PO first</option>
+              </select>
+            @else
+              <label>Issue From (Warehouse) <span class="text-danger">*</span></label>
+              <select name="source_location_id" id="source_select" class="form-control" required>
+                @foreach($warehouses as $w)
+                  <option value="{{ $w->id }}" @selected(old('source_location_id', $issuance->source_location_id ?? null) == $w->id)>{{ $w->name }}</option>
+                @endforeach
+              </select>
+            @endif
           </div>
           <div class="col-md-2 mb-3"><label>Issue Date</label><input type="date" name="issue_date" class="form-control" value="{{ old('issue_date', $issuance?->issue_date?->format('Y-m-d') ?? date('Y-m-d')) }}" required></div>
-          @if($type === 'greige_processing')
-          <div class="col-md-2 mb-3">
-            <label>Send To (Mill) <span class="text-danger">*</span></label>
-            <select name="destination_location_id" id="dest_select" class="form-control" required data-selected="{{ old('destination_location_id', $issuance->destination_location_id ?? '') }}"></select>
-          </div>
-          @endif
         </div>
+        @if($type === 'greige_processing')<div class="alert alert-info py-2 small" id="millInfo" style="display:none"></div>@endif
 
         <div id="linesWrap" style="display:none">
           <table class="table table-bordered align-middle" id="linesTable">
@@ -117,7 +119,7 @@ $(function () {
   }
 
   function load() {
-    const po = $('#po_select').val(), src = $('#source_select').val();
+    const po = $('#po_select').val(), src = $('#source_select').val() || $('#source_select').data('selected');
     if (!po) { $('#linesWrap').hide(); return; }
     const q = new URLSearchParams({ source_location_id: src || '' }); if (EXCLUDE) q.set('exclude', EXCLUDE);
     fetch(`{{ url('issuances/po-details') }}/${po}?` + q).then(r => r.json()).then(d => {
@@ -139,9 +141,15 @@ $(function () {
         if (!d.lines.length) body.append('<tr><td colspan="7" class="text-muted">This PO has no warp/weft yarn set.</td></tr>');
       } else {
         greige = d;
-        const dest = $('#dest_select'); const sel = dest.data('selected');
-        dest.html(d.destinations.length ? d.destinations.map(l => `<option value="${l.id}" ${+l.id === +sel ? 'selected' : ''}>${l.name}</option>`).join('') : '<option value="">No location set up for this mill</option>');
-        $('#linesHead').html('<tr><th>Greige</th><th class="text-end">In Warehouse</th><th width="20%">Lot</th><th width="22%">For PO Line</th><th width="15%">Qty</th><th></th></tr>');
+        const srcSel = $('#source_select');
+        srcSel.html(d.sources.length ? d.sources.map(l => `<option value="${l.id}" ${+l.id === +d.source_id ? 'selected' : ''}>${l.name}</option>`).join('') : '<option value="">No location set up for this mill</option>');
+        srcSel.data('selected', d.source_id);
+        const here = d.sources.find(l => +l.id === +d.source_id);
+        const left = Math.max(0, d.po_total - d.issued);
+        $('#millInfo').show().html(`<strong>${d.vendor}</strong> — PO lines ${d.po_total.toLocaleString()} m · greige issued so far ${d.issued.toLocaleString()} m · about ${left.toLocaleString()} m still to issue.`
+          + (here && !here.can_issue ? '<br><span class="text-danger">Only this location\'s in-charge (or a superadmin) can issue here.</span>' : '')
+          + (!d.stock.length ? '<br><span class="text-danger">No greige at this mill location yet — send it by Stock Movement first.</span>' : ''));
+        $('#linesHead').html('<tr><th>Greige</th><th class="text-end">At Mill</th><th width="20%">Mill Lot #</th><th width="22%">For PO Line</th><th width="15%">Qty</th><th></th></tr>');
         rowIdx = 0;
         (prefill.length ? prefill : [{}]).forEach(p => addGreigeRow(p));
       }

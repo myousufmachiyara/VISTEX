@@ -1,7 +1,7 @@
 <?php
 namespace App\Http\Controllers;
 
-use App\Models\{PurchaseOrder, Vendor, ProductCategory, Product, Location, TaxMaster, Broker, ServiceType, Forecast, MeasurementUnit, Job};
+use App\Models\{PurchaseOrder, PurchaseOrderItem, Vendor, ProductCategory, Product, Location, TaxMaster, Broker, ServiceType, Forecast, MeasurementUnit, Job};
 use App\Services\{PurchaseOrderService, CpoFormulaService};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -42,7 +42,10 @@ class PurchaseOrderController extends Controller
         $greigeCategory = ProductCategory::where('code', 'greige')->first();
         $greigeProducts = $greigeCategory ? Product::active()->where('category_id', $greigeCategory->id)->orderBy('name')->get() : collect();
 
-        return compact('categories', 'vendors', 'products', 'taxes', 'brokers', 'serviceTypes', 'units', 'dropOffLocations', 'approvedJobs', 'yarnProducts', 'greigeProducts', 'terms');
+        $skuCategory = ProductCategory::where('code', 'sku')->value('id');
+        $packagings = $skuCategory ? Product::active()->where('category_id', $skuCategory)->orderBy('name')->get(['id', 'name']) : collect();
+
+        return compact('categories', 'vendors', 'products', 'taxes', 'brokers', 'serviceTypes', 'units', 'dropOffLocations', 'approvedJobs', 'yarnProducts', 'greigeProducts', 'terms', 'packagings');
     }
 
     public function create() { return view('purchase_orders.create', $this->formData()); }
@@ -57,7 +60,21 @@ class PurchaseOrderController extends Controller
             ->where(fn($q) => $q->where('is_active', true)->orWhereIn('id', $selected))
             ->orderBy('sort_order')->orderBy('title')->get();
 
-        return view('purchase_orders.edit', array_merge($this->formData(), ['order' => $order, 'terms' => $terms]));
+        return view('purchase_orders.edit', array_merge($this->formData(), [
+            'order' => $order, 'terms' => $terms, 'procSeed' => $this->processingSeed($order),
+        ]));
+    }
+
+    // Saved processing lines in the shape the form's grid expects
+    private function processingSeed(PurchaseOrder $order): array
+    {
+        if ($order->type !== 'processing') return [];
+        return $order->items->map(fn($i) => [
+            'job_item_id' => $i->job_item_id, 'collection' => $i->collection, 'pattern_code' => $i->pattern_code,
+            'design' => $i->design, 'color_scheme' => $i->color_scheme, 'product_id' => $i->product_id,
+            'quantity' => (float) $i->quantity, 'rate' => (float) $i->rate,
+            'ordered' => $i->job_item_id ? (float) optional($i->jobItem)->quantity : null,
+        ])->values()->all();
     }
 
     public function vendorLocations($vendorId) { return response()->json($this->service->vendorLocations($vendorId)); }
@@ -72,15 +89,28 @@ class PurchaseOrderController extends Controller
         ]));
     }
 
-    public function jobItems($jobId)
+    // Lines of an approved customer order for a Processing PO, with what other processing POs already planned
+    public function jobItems(Request $request, $jobId)
     {
-        $job = Job::with('items.product')->findOrFail($jobId);
+        $job = Job::with('items.product', 'customer')->findOrFail($jobId);
+        $exclude = $request->integer('exclude_po') ?: 0;
+
+        $planned = PurchaseOrderItem::whereIn('job_item_id', $job->items->pluck('id'))
+            ->whereHas('purchaseOrder', fn($q) => $q->where('type', 'processing')->where('id', '!=', $exclude)
+                ->whereNotIn('status', [PurchaseOrder::STATUS_REJECTED]))
+            ->selectRaw('job_item_id, SUM(quantity) AS qty')->groupBy('job_item_id')->pluck('qty', 'job_item_id');
+
         return response()->json([
-            'collection' => $job->customer_reference,
+            'job_no' => $job->job_no, 'customer' => $job->customer->name ?? '',
+            'reference' => $job->customer_reference, 'customer_po' => $job->customer_po_number,
+            'delivery_date' => $job->expected_date?->format('Y-m-d'),
             'items' => $job->items->map(fn($i) => [
-                'id' => $i->id, 'pattern_code' => $i->product->sku ?? '', 'description' => $i->product->name ?? '',
-                'outstanding' => $i->outstanding_qty, 'unit' => $i->measurement_unit,
-            ]),
+                'id' => $i->id, 'collection' => $i->collection, 'pattern_code' => $i->pattern_code,
+                'design' => $i->design, 'color_scheme' => $i->color_scheme,
+                'product_id' => $i->product_id, 'packaging' => $i->product->name ?? null,
+                'ordered' => (float) $i->quantity, 'planned' => round((float) ($planned[$i->id] ?? 0), 3),
+                'unit' => $i->measurement_unit,
+            ])->values(),
         ]);
     }
 
@@ -153,10 +183,22 @@ class PurchaseOrderController extends Controller
         }
 
         return array_merge($base, [
-            'job_id' => 'required|exists:jobs,id', 'program' => 'nullable|string|max:255', 'fabric_specs' => 'nullable|array',
+            'job_id' => 'required|exists:job_orders,id', 'program' => 'nullable|string|max:255',
+            'service_type_id' => 'required|exists:service_types,id',
+            'greige_product_id' => 'required|exists:products,id',
+            'fabric_specs' => 'nullable|array',
+            'fabric_specs.po_kind' => 'nullable|string|max:60', 'fabric_specs.is_sample' => 'nullable|boolean',
+            'fabric_specs.greige_width' => 'nullable|string|max:30', 'fabric_specs.finished_width' => 'nullable|string|max:30',
+            'fabric_specs.finished_gsm' => 'nullable|string|max:30', 'fabric_specs.dyestuff' => 'nullable|string|max:60',
+            'fabric_specs.finish' => 'nullable|string|max:60',
+            'fabric_specs.lab_requirements' => 'nullable|array', 'fabric_specs.lab_requirements.*.label' => 'nullable|string|max:100',
+            'fabric_specs.lab_requirements.*.value' => 'nullable|string|max:191',
+            'fabric_specs.notes' => 'nullable|array', 'fabric_specs.notes.*' => 'nullable|string|max:500',
             'items' => 'required|array|min:1', 'items.*.collection' => 'nullable|string|max:255',
-            'items.*.pattern_code' => 'required|string|max:255', 'items.*.description' => 'nullable|string|max:255',
-            'items.*.job_item_id' => 'nullable|exists:job_items,id', 'items.*.quantity' => 'required|numeric|min:0.001',
+            'items.*.pattern_code' => 'nullable|string|max:255', 'items.*.design' => 'nullable|string|max:191',
+            'items.*.color_scheme' => 'nullable|string|max:191', 'items.*.description' => 'nullable|string|max:255',
+            'items.*.product_id' => 'nullable|exists:products,id',
+            'items.*.job_item_id' => 'nullable|exists:job_order_items,id', 'items.*.quantity' => 'required|numeric|min:0',
             'items.*.rate' => 'required|numeric|min:0', 'items.*.measurement_unit' => 'nullable|exists:measurement_units,id',
         ]);
     }
@@ -312,6 +354,11 @@ class PurchaseOrderController extends Controller
 
         if ($order->type === 'weaving') {
             return $this->printWeaving($order);
+        }
+
+        if ($order->type === 'processing') {
+            $order->load('job.customer', 'greigeProduct', 'approver', 'items.product');
+            return view('purchase_orders.print_processing', compact('order'));
         }
 
         if ($order->type === 'purchase' && ($order->category->code ?? null) === 'greige') {

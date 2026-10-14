@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\DB;
  *
  *  yarn_weaving       stock out of warehouse -> Yarn-in-Process at the weaving mill
  *                     Dr Yarn in Process / Cr Stock. Capped per yarn at the PO's warp/weft requirement.
- *  greige_processing  stock transfer: our warehouse -> processing mill's location (still our stock, no voucher)
+ *  greige_processing  at the processing mill: greige already there (Stock Movement, mill lot #) is issued to
+ *                     the Processing PO — fresh → in_process at the mill, lot kept. No voucher (still our stock).
  *
  * First issuance moves the PO Approved -> Issued, which is what makes a
  * weaving/processing PO receivable at the gate.
@@ -34,7 +35,7 @@ class IssuanceService
                 'purchase_order_id'       => $po->id,
                 'vendor_id'               => $po->vendor_id,
                 'source_location_id'      => $data['source_location_id'],
-                'destination_location_id' => $data['destination_location_id'] ?? null,
+                'destination_location_id' => null,
                 'issue_date'              => $data['issue_date'],
                 'remarks'                 => $data['remarks'] ?? null,
                 'attachments'             => $data['attachments'] ?? null,
@@ -56,6 +57,7 @@ class IssuanceService
     {
         return DB::transaction(function () use ($issuance, $data, $items, $userId) {
             $this->assertReversible($issuance);
+            if ($issuance->isWarehouseToMill()) throw new \Exception('This issuance sent greige straight from the warehouse (older method). Delete it and issue again at the mill.');
             $data['issue_type'] = $issuance->issue_type;
             $data['purchase_order_id'] = $issuance->purchase_order_id;
             [, $po] = $this->validateHeader($data);
@@ -63,7 +65,7 @@ class IssuanceService
             $this->reverse($issuance);
             $issuance->update([
                 'source_location_id'      => $data['source_location_id'],
-                'destination_location_id' => $data['destination_location_id'] ?? null,
+                'destination_location_id' => null,
                 'issue_date'              => $data['issue_date'],
                 'remarks'                 => $data['remarks'] ?? null,
                 'attachments'             => $data['attachments'] ?? $issuance->attachments,
@@ -128,13 +130,12 @@ class IssuanceService
         }
 
         $source = Location::find($data['source_location_id'] ?? 0);
-        if (!$source || !$source->isOwnWarehouse()) throw new \Exception('Select one of our warehouses to issue from.');
-
         if ($type === 'greige_processing') {
-            $dest = Location::find($data['destination_location_id'] ?? 0);
-            if (!$dest || (int) $dest->vendor_id !== (int) $po->vendor_id) {
-                throw new \Exception("Select the processing mill location of {$po->vendor->name} to send greige to.");
+            if (!$source || (int) $source->vendor_id !== (int) $po->vendor_id) {
+                throw new \Exception("Issue from {$po->vendor->name}'s own location — greige reaches the mill by Stock Movement first.");
             }
+        } elseif (!$source || !$source->isOwnWarehouse()) {
+            throw new \Exception('Select one of our warehouses to issue from.');
         }
         return [$type, $po];
     }
@@ -188,7 +189,7 @@ class IssuanceService
                 throw new \Exception("Insufficient stock of {$product->name}{$where} — available " . round($available, 3) . ", requested {$g['quantity']}.");
             }
 
-            $rate = $product->weightedAverageCost($sourceId);
+            $rate = LocationStockLedger::lotRate($sourceId, $product->id, $g['lot_no'], $product->weightedAverageCost($sourceId));
             $amount = round($g['quantity'] * $rate, 2);
             $totalQty += $g['quantity']; $totalAmount += $amount;
 
@@ -212,12 +213,12 @@ class IssuanceService
                 $acc = $product->category->stock_account_id ?? $this->mappingService->accountId('stock_in_hand');
                 $stockCredits[$acc] = ($stockCredits[$acc] ?? 0) + $amount;
             } else {
-                // Same goods, new place: at the mill the lot is the issuance number, which ties it to the Processing PO
+                // Same lot, same mill: no longer free stock — held in process for this Processing PO
                 LocationStockLedger::create([
-                    'doc_no' => $issuance->issue_no, 'location_id' => $issuance->destination_location_id, 'product_id' => $product->id,
-                    'status' => 'fresh', 'lot_no' => $issuance->issue_no, 'quantity' => $g['quantity'], 'amount' => $amount,
+                    'doc_no' => $issuance->issue_no, 'location_id' => $sourceId, 'product_id' => $product->id,
+                    'status' => 'in_process', 'lot_no' => $g['lot_no'], 'quantity' => $g['quantity'], 'amount' => $amount,
                     'reference_type' => 'Issuance', 'reference_id' => $issuance->id, 'entry_date' => $issuance->issue_date,
-                    'remarks' => "At mill for {$po->order_no}",
+                    'remarks' => "In process for {$po->order_no}",
                 ]);
             }
         }
@@ -291,7 +292,7 @@ class IssuanceService
             throw new \Exception('Cannot change this issuance — goods have already been received against ' . ($issuance->purchaseOrder->order_no ?? 'the PO') . '.');
         }
 
-        if ($issuance->issue_type === 'greige_processing') {
+        if ($issuance->isWarehouseToMill()) {
             $lot = $issuance->issue_no;
             foreach ($issuance->items->groupBy('product_id') as $productId => $lines) {
                 $left = LocationStockLedger::balance($issuance->destination_location_id, $productId, 'fresh', $lot);

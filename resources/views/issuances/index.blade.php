@@ -30,7 +30,7 @@
             <td>{{ $iss->type_label }}</td>
             <td>@if($iss->purchaseOrder)<a href="{{ route('purchase_orders.show', $iss->purchase_order_id) }}">{{ $iss->purchaseOrder->order_no }}</a>@endif</td>
             <td>{{ $iss->purchaseOrder->vendor->name ?? '' }}</td>
-            <td class="small">{{ $iss->sourceLocation->name ?? '—' }} → {{ $iss->destinationLocation->name ?? 'Mill' }}</td>
+            <td class="small">{{ $iss->sourceLocation->name ?? '—' }} → {{ $iss->destinationLocation->name ?? ($iss->issue_type === 'greige_processing' ? 'in process' : 'Mill') }}</td>
             <td class="small">@foreach($iss->items as $it){{ $it->product->name ?? '' }}@if(!$loop->last), @endif @endforeach</td>
             <td class="text-end">{{ number_format($iss->total_quantity, 3) }}</td>
             <td class="text-nowrap">

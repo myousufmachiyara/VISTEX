@@ -9,7 +9,8 @@ class JobItem extends Model
     protected $table = 'job_order_items';
 
     protected $fillable = [
-        'job_id', 'product_id', 'quantity', 'measurement_unit',
+        'job_id', 'collection', 'pattern_code', 'design', 'color_scheme',
+        'product_id', 'quantity', 'measurement_unit',
         'unit_price', 'discount_pct', 'tax_id', 'tax_amount', 'amount', 'quantity_fulfilled',
     ];
 
@@ -26,6 +27,13 @@ class JobItem extends Model
     public function product()         { return $this->belongsTo(Product::class, 'product_id'); }
     public function measurementUnit() { return $this->belongsTo(MeasurementUnit::class, 'measurement_unit'); }
     public function tax()             { return $this->belongsTo(TaxMaster::class, 'tax_id'); }
+
+    // Pieces of the chosen put-up this quantity makes (qty in meters / meters per piece)
+    public function getPiecesAttribute(): ?float
+    {
+        $perPiece = (float) ($this->product?->getAttribute('attributes')['meters_per_unit'] ?? 0);
+        return $perPiece > 0 ? floor((float) $this->quantity / $perPiece) : null;
+    }
 
     public function getOutstandingQtyAttribute(): float
     {

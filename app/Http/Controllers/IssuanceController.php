@@ -37,6 +37,9 @@ class IssuanceController extends Controller
     public function edit($id)
     {
         $issuance = Issuance::with('items.product', 'purchaseOrder')->findOrFail($id);
+        if ($issuance->isWarehouseToMill()) {
+            return redirect()->route('issuances.show', $id)->with('error', 'This issuance sent greige straight from the warehouse (older method). Delete it and issue again at the mill.');
+        }
         return view('issuances.create', array_merge($this->formData($issuance->issue_type), [
             'issuance' => $issuance, 'preselectPo' => $issuance->purchase_order_id,
         ]));
@@ -82,24 +85,35 @@ class IssuanceController extends Controller
             return response()->json(['type' => 'weaving', 'vendor' => $po->vendor->name ?? '', 'lines' => $lines]);
         }
 
-        // processing: greige in stock at the source warehouse + the mill's locations
+        // processing: greige already at this mill (by mill lot #), issued from the mill's own location
+        $mills = Location::where('vendor_id', $po->vendor_id)->active()->orderBy('name')->get(['id', 'name', 'in_charge_user_id']);
+        $millId = $request->integer('source_location_id');
+        if (!$mills->contains('id', $millId)) $millId = $mills->first()->id ?? null;
+
         $greigeCategoryIds = ProductCategory::where('code', 'greige')->pluck('id');
-        $stock = $sourceId ? LocationStockLedger::where('location_id', $sourceId)->where('status', 'fresh')
+        $stock = $millId ? LocationStockLedger::where('location_id', $millId)->where('status', 'fresh')
             ->whereHas('product', fn($q) => $q->whereIn('category_id', $greigeCategoryIds))
             ->groupBy('product_id')->selectRaw('product_id, SUM(quantity) as qty')->having('qty', '>', 0.001)
             ->with('product')->get() : collect();
 
+        $issued = \App\Models\IssuanceItem::whereHas('issuance', fn($q) => $q->where('purchase_order_id', $po->id)
+                ->when($excludeId, fn($q2) => $q2->where('id', '!=', $excludeId)))->sum('quantity');
+
         return response()->json([
             'type' => 'processing',
             'vendor' => $po->vendor->name ?? '',
-            'destinations' => Location::where('vendor_id', $po->vendor_id)->active()->orderBy('name')->get(['id', 'name']),
+            'sources' => $mills->map(fn($l) => ['id' => $l->id, 'name' => $l->name,
+                'can_issue' => Issuance::canIssueAt($l, auth()->user())])->values(),
+            'source_id' => $millId,
+            'po_total' => round((float) $po->items->sum('quantity'), 3),
+            'issued' => round((float) $issued, 3),
             'po_items' => $po->items->map(fn($i) => [
                 'id' => $i->id, 'label' => trim(($i->pattern_code ?? '') . ' ' . ($i->description ?? $i->product->name ?? '')),
                 'quantity' => (float) $i->quantity,
             ]),
             'stock' => $stock->map(fn($r) => [
                 'product_id' => $r->product_id, 'product_name' => $r->product->name ?? '', 'available' => round((float) $r->qty, 3),
-                'lots' => LocationStockLedger::availableLots($sourceId, $r->product_id),
+                'lots' => LocationStockLedger::availableLots($millId, $r->product_id),
             ])->values(),
         ]);
     }
@@ -121,6 +135,16 @@ class IssuanceController extends Controller
         ];
     }
 
+    // Greige for processing: only the mill location's in-charge (or a superadmin) issues
+    private function assertMillInCharge(Request $request, string $type): void
+    {
+        if ($type !== 'greige_processing') return;
+        $loc = Location::find($request->integer('source_location_id'));
+        if (!Issuance::canIssueAt($loc, auth()->user())) {
+            throw new \Exception('Only the in-charge of ' . ($loc->name ?? 'the mill location') . ' (or a superadmin) can issue greige there.');
+        }
+    }
+
     private function storeAttachments(Request $request, array $existing = []): ?array
     {
         foreach ($request->file('attachments', []) as $file) $existing[] = $file->store('issuance_attachments', 'public');
@@ -131,6 +155,7 @@ class IssuanceController extends Controller
     {
         $request->validate(array_merge($this->rules(), ['issue_type' => 'required|in:' . implode(',', array_keys(Issuance::TYPES))]));
         try {
+            $this->assertMillInCharge($request, $request->issue_type);
             $issuance = $this->service->create(
                 array_merge($request->except('attachments'), ['attachments' => $this->storeAttachments($request)]),
                 $request->items, auth()->id()
@@ -148,6 +173,7 @@ class IssuanceController extends Controller
         $issuance = Issuance::with('items', 'purchaseOrder')->findOrFail($id);
         $request->validate($this->rules());
         try {
+            $this->assertMillInCharge($request, $issuance->issue_type);
             $this->service->update($issuance,
                 array_merge($request->except('attachments'), ['attachments' => $this->storeAttachments($request, $issuance->attachments ?? [])]),
                 $request->items, auth()->id());
@@ -166,7 +192,11 @@ class IssuanceController extends Controller
     public function destroy($id)
     {
         try {
-            $issuance = Issuance::with('items', 'purchaseOrder')->findOrFail($id);
+            $issuance = Issuance::with('items', 'purchaseOrder', 'sourceLocation')->findOrFail($id);
+            if ($issuance->issue_type === 'greige_processing' && !$issuance->isWarehouseToMill()
+                && !Issuance::canIssueAt($issuance->sourceLocation, auth()->user())) {
+                throw new \Exception('Only the mill location in-charge (or a superadmin) can reverse this issuance.');
+            }
             $this->service->delete($issuance);
             return redirect()->route('issuances.index')->with('success', "{$issuance->issue_no} reversed and deleted.");
         } catch (\Exception $e) {

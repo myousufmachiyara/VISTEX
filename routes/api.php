@@ -29,6 +29,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/challans/direct', [ChallanApiController::class, 'storeDirect']);
     Route::post('/challans/{id}/update', [ChallanApiController::class, 'update']); // multipart, so POST
 
+    // Challan OUT: gate passes waiting at the gate
+    Route::get('/gate-passes', [\App\Http\Controllers\Api\GatePassApiController::class, 'index']);
+    Route::get('/gate-passes/{id}', [\App\Http\Controllers\Api\GatePassApiController::class, 'show']);
+    Route::post('/gate-passes/{id}/dispatch', [\App\Http\Controllers\Api\GatePassApiController::class, 'dispatch']);
+
     // Purchase Orders (read-only for mobile, for now)
     Route::get('/purchase-orders', [PurchaseOrderApiController::class, 'index']);
     Route::get('/purchase-orders/{id}', [PurchaseOrderApiController::class, 'show']);

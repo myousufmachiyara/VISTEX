@@ -245,9 +245,15 @@ class GreigeReports extends BaseReports
             ->whereIn('s.issue_no', $lines->pluck('lot_no')->filter()->all() ?: ['-'])
             ->get(['s.issue_no', 'po.id', 'po.order_no', 'po.type', 'po.gsm_kg', 'v.name as vendor'])->keyBy('issue_no');
 
+        // mill lot #s come from the stock movement that took the greige to the mill
+        $millLots = DB::table('stock_movements as m')->join('purchase_orders as po', 'po.id', '=', 'm.purchase_order_id')
+            ->leftJoin('vendors as v', 'v.id', '=', 'po.vendor_id')->whereNull('m.deleted_at')
+            ->whereIn('m.lot_no', $lines->pluck('lot_no')->filter()->all() ?: ['-'])
+            ->get(['m.lot_no', 'po.id', 'po.order_no', 'po.type', 'po.gsm_kg', 'v.name as vendor'])->keyBy('lot_no');
+
         $rows = [];
         foreach ($lines as $r) {
-            $po = $pos[$r->lot_no] ?? $issued[$r->lot_no] ?? null;
+            $po = $pos[$r->lot_no] ?? $issued[$r->lot_no] ?? $millLots[$r->lot_no] ?? null;
             if ($f['vendor_id'] && (!$po || !$this->vendorMatches($po, $f['vendor_id']))) continue;
             $qty = (float) $r->qty;
             $rate = $qty > 0 ? (float) $r->amount / $qty : 0;
