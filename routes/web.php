@@ -353,6 +353,9 @@ Route::middleware(['auth'])->group(function () {
     // ════════════════════════════════════════════════════════════════
     Route::get('jobs/{id}/dispatch',  [\App\Http\Controllers\JobDispatchController::class, 'create'])->name('jobs.dispatch')      ->middleware('check.permission:jobs.edit');
     Route::post('jobs/{id}/dispatch', [\App\Http\Controllers\JobDispatchController::class, 'store']) ->name('jobs.dispatch.store')->middleware('check.permission:jobs.edit');
+    Route::post('jobs/{id}/tolerance', [\App\Http\Controllers\JobDispatchController::class, 'tolerance'])->name('jobs.tolerance')->middleware('check.permission:jobs.edit');
+
+    Route::get('statements', [\App\Http\Controllers\StatementController::class, 'index'])->name('statements.index')->middleware('check.permission:reports.processing');
 
     Route::prefix('customer-invoices')->name('customer_invoices.')->group(function () {
         Route::get('/',                     [\App\Http\Controllers\CustomerInvoiceController::class, 'index'])      ->name('index')     ->middleware('check.permission:customer_invoices.index');
@@ -363,6 +366,15 @@ Route::middleware(['auth'])->group(function () {
         Route::get('{id}/print',            [\App\Http\Controllers\CustomerInvoiceController::class, 'print'])      ->name('print')     ->middleware('check.permission:customer_invoices.print');
         Route::post('{id}/cancel',          [\App\Http\Controllers\CustomerInvoiceController::class, 'cancel'])     ->name('cancel')    ->middleware('check.permission:customer_invoices.delete');
     });
+    Route::prefix('customer-returns')->name('customer_returns.')->group(function () {
+        Route::get('/',                         [\App\Http\Controllers\CustomerReturnController::class, 'index'])          ->name('index')     ->middleware('check.permission:customer_returns.index');
+        Route::get('create',                    [\App\Http\Controllers\CustomerReturnController::class, 'create'])         ->name('create')    ->middleware('check.permission:customer_returns.create');
+        Route::get('returnable/{customerId}',   [\App\Http\Controllers\CustomerReturnController::class, 'returnable'])     ->name('returnable')->middleware('check.permission:customer_returns.create');
+        Route::post('/',                        [\App\Http\Controllers\CustomerReturnController::class, 'store'])          ->name('store')     ->middleware('check.permission:customer_returns.create');
+        Route::get('{id}',                      [\App\Http\Controllers\CustomerReturnController::class, 'show'])           ->name('show')      ->middleware('check.permission:customer_returns.index')->whereNumber('id');
+        Route::get('credit-notes/{id}',         [\App\Http\Controllers\CustomerReturnController::class, 'creditNote'])     ->name('credit_note')->middleware('check.permission:customer_returns.index');
+        Route::post('credit-notes/{id}/apply',  [\App\Http\Controllers\CustomerReturnController::class, 'applyCreditNote'])->name('credit_note.apply')->middleware('check.permission:customer_returns.create');
+    });
     Route::prefix('customer-receipts')->name('customer_receipts.')->group(function () {
         Route::get('/',                     [\App\Http\Controllers\CustomerReceiptController::class, 'index'])       ->name('index')        ->middleware('check.permission:customer_receipts.index');
         Route::get('create',                [\App\Http\Controllers\CustomerReceiptController::class, 'create'])      ->name('create')       ->middleware('check.permission:customer_receipts.create');
@@ -370,6 +382,9 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/',                    [\App\Http\Controllers\CustomerReceiptController::class, 'store'])       ->name('store')        ->middleware('check.permission:customer_receipts.create');
         Route::get('{id}',                  [\App\Http\Controllers\CustomerReceiptController::class, 'show'])        ->name('show')         ->middleware('check.permission:customer_receipts.index')->whereNumber('id');
         Route::delete('{id}',               [\App\Http\Controllers\CustomerReceiptController::class, 'destroy'])     ->name('destroy')      ->middleware('check.permission:customer_receipts.delete');
+        Route::post('{id}/clear',            [\App\Http\Controllers\CustomerReceiptController::class, 'clear'])       ->name('clear')        ->middleware('check.permission:customer_receipts.edit');
+        Route::post('{id}/bounce',           [\App\Http\Controllers\CustomerReceiptController::class, 'bounce'])      ->name('bounce')       ->middleware('check.permission:customer_receipts.edit');
+        Route::post('{id}/apply',            [\App\Http\Controllers\CustomerReceiptController::class, 'apply'])       ->name('apply')        ->middleware('check.permission:customer_receipts.create');
     });
 
     Route::prefix('sale-orders')->name('sale_orders.')->group(function () {

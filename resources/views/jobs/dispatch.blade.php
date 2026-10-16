@@ -6,7 +6,13 @@
   $n = 0;
 @endphp
 <div class="row"><div class="col">
+  @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
   @if(session('error'))<div class="alert alert-danger">{{ session('error') }}</div>@endif
+  <form method="POST" action="{{ route('jobs.tolerance', $job->id) }}" class="d-flex flex-wrap gap-2 align-items-end mb-2 small">@csrf
+    <div><label>Dispatch tolerance %</label><input type="number" step="0.01" min="0" max="50" name="dispatch_tolerance_pct" class="form-control form-control-sm" style="width:110px" value="{{ (float) $job->dispatch_tolerance_pct }}"></div>
+    <button class="btn btn-sm btn-outline-secondary">Save</button>
+    <span class="text-muted">Pieces may go over the ordered quantity by this much.</span>
+  </form>
   @if($errors->any())<div class="alert alert-danger">{{ $errors->first() }}</div>@endif
   <form method="POST" action="{{ route('jobs.dispatch.store', $job->id) }}">
   @csrf

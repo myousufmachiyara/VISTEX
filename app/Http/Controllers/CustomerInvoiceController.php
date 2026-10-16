@@ -44,7 +44,7 @@ class CustomerInvoiceController extends Controller
 
     public function show($id)
     {
-        $invoice = CustomerInvoice::with('customer', 'items.product', 'allocations.receipt', 'creator')->findOrFail($id);
+        $invoice = CustomerInvoice::with('customer', 'items.product', 'allocations.receipt', 'creator', 'creditNotes', 'creditApplications.creditNote')->findOrFail($id);
         return view('customer_invoices.show', compact('invoice'));
     }
 

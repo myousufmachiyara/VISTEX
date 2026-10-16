@@ -79,7 +79,7 @@ class DatabaseSeeder extends Seeder
             'qc_inspections',
             'production_orders',
             'sale_orders',
-            'customer_invoices', 'customer_receipts',
+            'customer_invoices', 'customer_receipts', 'customer_returns',
             'issuances',
             'stock_movements',
             'processing_issues',

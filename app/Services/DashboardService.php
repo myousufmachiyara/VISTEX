@@ -48,7 +48,7 @@ class DashboardService
 
         return [
             'sales_month'   => round((float) DB::table('customer_invoices')->where('status', '!=', 'Cancelled')->where('invoice_date', '>=', $start)->sum('total_pkr'), 2),
-            'received_month'=> round((float) DB::table('customer_receipts')->where('receipt_date', '>=', $start)->sum('amount_pkr'), 2),
+            'received_month'=> round((float) DB::table('customer_receipts')->where('receipt_date', '>=', $start)->where('status', '!=', 'Bounced')->sum('amount_pkr'), 2),
             'receivable'    => round($open->sum($bal), 2),
             'overdue'       => round($overdue->sum($bal), 2),
             'overdue_count' => $overdue->count(),
@@ -84,6 +84,7 @@ class DashboardService
         $add($u->can('customer_invoices.create'), 'Deliveries not invoiced', fn() => DB::table('stock_movement_items as i')->join('stock_movements as m', 'm.id', '=', 'i.stock_movement_id')
             ->where('m.movement_type', 'warehouse_to_customer')->where('m.status', 'Received')->whereColumn('i.invoiced_qty', '<', 'i.quantity')
             ->distinct()->count('m.id'), route('customer_invoices.create'), 'primary');
+        $add($u->can('customer_receipts.edit'), 'Customer cheques to deposit (due)', fn() => DB::table('customer_receipts')->where('status', 'Pending')->where('cheque_date', '<=', now()->toDateString())->count(), route('customer_receipts.index'), 'warning');
         $add($u->can('customer_invoices.index'), 'Overdue invoices', fn() => DB::table('customer_invoices')->whereIn('status', ['Unpaid', 'PartiallyPaid'])->where('due_date', '<', now()->toDateString())->count(), route('customer_invoices.index'), 'danger');
         return $q;
     }

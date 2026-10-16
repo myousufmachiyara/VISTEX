@@ -30,6 +30,11 @@ class CustomerReceiptService
             if ($rate <= 0) throw new \Exception('Enter the exchange rate for the amount received.');
             $amount = round((float) ($data['amount'] ?? 0), 2);
             if ($amount <= 0) throw new \Exception('Enter the amount received.');
+            // Post-dated cheque: held in Cheques in Hand until it clears into the bank account chosen
+            $pdc = ($data['method'] ?? '') === 'pdc';
+            if ($pdc && empty($data['cheque_date'])) throw new \Exception('Enter the cheque date for a post-dated cheque.');
+            $debitAccount = $pdc ? $this->mapping->accountId('cheques_in_hand') : $account->id;
+            if (!$debitAccount) throw new \Exception('Cheques in Hand account mapping is missing.');
 
             $rows = []; $allocated = 0; $arCredit = 0;
             foreach ($allocations as $a) {
@@ -55,6 +60,8 @@ class CustomerReceiptService
                 'method' => $data['method'] ?? 'bank', 'reference' => trim((string) ($data['reference'] ?? '')) ?: null,
                 'currency' => $currency, 'exchange_rate' => $rate, 'amount' => $amount, 'amount_pkr' => $amountPkr,
                 'unallocated' => $unallocated, 'exchange_difference' => $diff, 'remarks' => $data['remarks'] ?? null, 'created_by' => $userId,
+                'status' => $pdc ? 'Pending' : 'Cleared', 'cheque_date' => $pdc ? $data['cheque_date'] : null,
+                'cleared_at' => $pdc ? null : $data['receipt_date'],
             ]);
             foreach ($rows as [$inv, $amt]) {
                 CustomerReceiptAllocation::create(['customer_receipt_id' => $receipt->id, 'customer_invoice_id' => $inv->id, 'amount' => $amt]);
@@ -65,7 +72,7 @@ class CustomerReceiptService
             $fx = $this->mapping->accountId('exchange_gain_loss');
             if (!$ar || (abs($diff) > 0.004 && !$fx)) throw new \Exception('Receivable / Exchange Gain-Loss account mapping is missing.');
             $lines = [
-                ['account_id' => $account->id, 'debit' => $amountPkr, 'credit' => 0],
+                ['account_id' => $debitAccount, 'debit' => $amountPkr, 'credit' => 0],
                 ['account_id' => $ar, 'debit' => 0, 'credit' => $arCredit, 'party_type' => 'customer', 'party_id' => $customer->id],
             ];
             if ($diff > 0.004) $lines[] = ['account_id' => $fx, 'debit' => 0, 'credit' => $diff];
@@ -80,11 +87,47 @@ class CustomerReceiptService
     public function delete(CustomerReceipt $receipt): void
     {
         DB::transaction(function () use ($receipt) {
-            $invoices = $receipt->allocations()->with('invoice')->get()->pluck('invoice');
-            $receipt->allocations()->delete();
-            foreach ($invoices as $inv) CustomerInvoiceService::refreshStatus($inv);
-            $this->vouchers->deleteByReference('CustomerReceipt', $receipt->id);
+            $this->unwind($receipt);
+            $this->vouchers->deleteByReference('CustomerReceiptClear', $receipt->id);
             $receipt->delete();
         });
+    }
+
+    /** Post-dated cheque cleared: Cheques in Hand → bank. */
+    public function clear(CustomerReceipt $receipt, string $date, int $userId): CustomerReceipt
+    {
+        return DB::transaction(function () use ($receipt, $date, $userId) {
+            $receipt = CustomerReceipt::lockForUpdate()->findOrFail($receipt->id);
+            if ($receipt->status !== 'Pending') throw new \Exception('Only a post-dated cheque waiting to clear can be cleared.');
+            $cih = $this->mapping->accountId('cheques_in_hand');
+            $this->vouchers->post('contra', $date, [
+                ['account_id' => $receipt->account_id, 'debit' => (float) $receipt->amount_pkr, 'credit' => 0],
+                ['account_id' => $cih, 'debit' => 0, 'credit' => (float) $receipt->amount_pkr],
+            ], "Cheque cleared — {$receipt->receipt_no}" . ($receipt->reference ? " ({$receipt->reference})" : ''), 'CustomerReceiptClear', $receipt->id, $userId);
+            $receipt->update(['status' => 'Cleared', 'cleared_at' => $date]);
+            return $receipt->fresh();
+        });
+    }
+
+    /** Post-dated cheque bounced: the receipt is undone and its invoices are open again. */
+    public function bounce(CustomerReceipt $receipt, string $reason): CustomerReceipt
+    {
+        return DB::transaction(function () use ($receipt, $reason) {
+            $receipt = CustomerReceipt::lockForUpdate()->findOrFail($receipt->id);
+            if ($receipt->status !== 'Pending') throw new \Exception('Only a post-dated cheque waiting to clear can bounce.');
+            $this->unwind($receipt);
+            $receipt->update(['status' => 'Bounced', 'bounce_reason' => $reason, 'unallocated' => 0, 'exchange_difference' => 0]);
+            return $receipt->fresh();
+        });
+    }
+
+    // Remove the receipt's posting and allocations (incl. ones applied later) and reopen its invoices
+    private function unwind(CustomerReceipt $receipt): void
+    {
+        $allocs = $receipt->allocations()->with('invoice')->get();
+        foreach ($allocs as $a) $this->vouchers->deleteByReference('CustomerReceiptAllocation', $a->id);
+        $receipt->allocations()->delete();
+        foreach ($allocs->pluck('invoice')->unique('id') as $inv) CustomerInvoiceService::refreshStatus($inv);
+        $this->vouchers->deleteByReference('CustomerReceipt', $receipt->id);
     }
 }

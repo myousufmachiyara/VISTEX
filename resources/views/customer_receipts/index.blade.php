@@ -11,7 +11,7 @@
     <div class="card-body">
       <div class="table-responsive">
       <table class="table table-bordered table-striped" id="rcvTable">
-        <thead><tr><th>Date</th><th>Receipt #</th><th>Customer</th><th>Into</th><th>Method</th><th class="text-end">Amount</th><th class="text-end">PKR</th><th class="text-end">On account</th></tr></thead>
+        <thead><tr><th>Date</th><th>Receipt #</th><th>Customer</th><th>Into</th><th>Method</th><th class="text-end">Amount</th><th class="text-end">PKR</th><th class="text-end">On account</th><th>Status</th></tr></thead>
         <tbody>
         @foreach($receipts as $r)
           <tr>
@@ -22,6 +22,7 @@
             <td class="text-end">{{ $r->currency }} {{ number_format($r->amount, 2) }}</td>
             <td class="text-end">{{ number_format($r->amount_pkr, 2) }}</td>
             <td class="text-end">{{ $r->unallocated > 0 ? number_format($r->unallocated, 2) : '' }}</td>
+            <td><span class="badge bg-{{ $r->status_badge }}">{{ $r->status === 'Pending' ? 'PDC due ' . $r->cheque_date?->format('d-M') : $r->status }}</span></td>
           </tr>
         @endforeach
         </tbody>

@@ -18,6 +18,14 @@ class JobDispatchController extends Controller
         return view('jobs.dispatch', compact('job', 'lines', 'warehouses'));
     }
 
+    // Over-shipment allowed on this order (can be changed after approval)
+    public function tolerance(Request $request, $id)
+    {
+        $request->validate(['dispatch_tolerance_pct' => 'required|numeric|min:0|max:50']);
+        Job::findOrFail($id)->update(['dispatch_tolerance_pct' => round((float) $request->dispatch_tolerance_pct, 2)]);
+        return back()->with('success', 'Dispatch tolerance saved.');
+    }
+
     public function store(Request $request, $id)
     {
         $request->validate(['location_id' => 'required|exists:locations,id', 'dispatch_date' => 'required|date', 'remarks' => 'nullable|string|max:500',

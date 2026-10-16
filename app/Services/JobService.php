@@ -68,6 +68,7 @@ class JobService
             'order_date'         => $data['order_date'],
             'expected_date'      => $data['expected_date'] ?? null,
             'currency'           => $currency,
+            'dispatch_tolerance_pct' => max(0, min(50, round((float) ($data['dispatch_tolerance_pct'] ?? 0), 2))),
             'exchange_rate'      => $currency === 'PKR' ? 1 : max(0.0001, (float) ($data['exchange_rate'] ?? 1)),
             'payment_term_type'  => $term,
             'payment_term_days'  => in_array($term, ['credit', 'pdc']) ? ($data['payment_term_days'] ?? null) : null,

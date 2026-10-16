@@ -4,7 +4,7 @@ namespace App\Support;
 
 use Illuminate\Support\Facades\DB;
 
-/** Accounts used by customer invoicing: Sales Tax Payable and Exchange Gain / Loss. Safe to run any number of times. */
+/** Accounts used by customer invoicing: Sales Tax Payable, Exchange Gain / Loss, Cheques in Hand, Sales Returns, Brokerage. Safe to run any number of times. */
 class SalesAccounts
 {
     public static function ensure(): void
@@ -23,5 +23,8 @@ class SalesAccounts
         };
         $map('sales_tax_payable', $account('202001', $shoa(2, 'Taxes Payable'), 'Sales Tax Payable (Output Tax)', 'tax_payable'));
         $map('exchange_gain_loss', $account('402001', $shoa(4, 'Other Income'), 'Exchange Gain / Loss', 'other_income'));
+        $map('cheques_in_hand', $account('107001', $shoa(1, 'Cash & Cash Equivalents'), 'Cheques in Hand (Customer PDC)', 'cheques_in_hand'));
+        $map('sales_returns', $account('401002', $shoa(4, 'Sales'), 'Sales Returns', 'revenue_contra'));
+        $map('brokerage_expense', $account('503001', $shoa(5, 'Selling Expenses'), 'Brokerage / Commission', 'expenses'));
     }
 }

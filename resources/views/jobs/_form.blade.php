@@ -82,6 +82,10 @@
           <input type="date" name="expected_date" class="form-control" value="{{ old('expected_date', $j?->expected_date?->format('Y-m-d')) }}">
         </div>
         <div class="col-md-3 mb-3">
+          <label>Dispatch tolerance % <small class="text-muted">(over-shipment allowed)</small></label>
+          <input type="number" name="dispatch_tolerance_pct" class="form-control" step="0.01" min="0" max="50" value="{{ $v('dispatch_tolerance_pct', 0) }}">
+        </div>
+        <div class="col-md-3 mb-3">
           <label>Currency</label>
           <select name="currency" id="currency" class="form-control">
             @foreach(\App\Models\Job::CURRENCIES as $cur)<option @selected($v('currency', 'PKR') === $cur)>{{ $cur }}</option>@endforeach

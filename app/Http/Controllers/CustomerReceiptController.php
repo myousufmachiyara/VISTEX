@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\{ChartOfAccounts, Customer, CustomerInvoice, CustomerReceipt};
-use App\Services\CustomerReceiptService;
+use App\Services\{CustomerCreditService, CustomerReceiptService};
 use Illuminate\Http\Request;
 
 class CustomerReceiptController extends Controller
@@ -38,7 +38,7 @@ class CustomerReceiptController extends Controller
     public function store(Request $request)
     {
         $request->validate(['customer_id' => 'required|exists:customers,id', 'receipt_date' => 'required|date', 'account_id' => 'required|exists:chart_of_accounts,id',
-            'method' => 'required|in:cash,bank,cheque', 'reference' => 'nullable|string|max:100', 'currency' => 'required|string|size:3',
+            'method' => 'required|in:cash,bank,cheque,pdc', 'cheque_date' => 'nullable|required_if:method,pdc|date', 'reference' => 'nullable|string|max:100', 'currency' => 'required|string|size:3',
             'exchange_rate' => 'nullable|numeric|min:0', 'amount' => 'required|numeric|min:0.01', 'remarks' => 'nullable|string',
             'allocations' => 'nullable|array', 'allocations.*.customer_invoice_id' => 'required|integer', 'allocations.*.amount' => 'nullable|numeric|min:0']);
         try {
@@ -52,7 +52,34 @@ class CustomerReceiptController extends Controller
     public function show($id)
     {
         $receipt = CustomerReceipt::with('customer', 'account', 'allocations.invoice', 'creator')->findOrFail($id);
-        return view('customer_receipts.show', compact('receipt'));
+        $open = $receipt->unallocated > 0.004 && $receipt->status !== 'Bounced'
+            ? CustomerInvoice::where('customer_id', $receipt->customer_id)->where('currency', $receipt->currency)->whereIn('status', ['Unpaid', 'PartiallyPaid'])->orderBy('invoice_date')->get()
+            : collect();
+        return view('customer_receipts.show', compact('receipt', 'open'));
+    }
+
+    public function clear(Request $request, $id)
+    {
+        $request->validate(['cleared_at' => 'required|date']);
+        return $this->act(fn() => $this->service->clear(CustomerReceipt::findOrFail($id), $request->cleared_at, auth()->id()), 'Cheque cleared into the bank.');
+    }
+
+    public function bounce(Request $request, $id)
+    {
+        $request->validate(['reason' => 'required|string|max:255']);
+        return $this->act(fn() => $this->service->bounce(CustomerReceipt::findOrFail($id), $request->reason), 'Cheque marked bounced; its invoices are open again.');
+    }
+
+    public function apply(Request $request, CustomerCreditService $credits, $id)
+    {
+        $request->validate(['rows' => 'required|array', 'rows.*.customer_invoice_id' => 'required|integer', 'rows.*.amount' => 'nullable|numeric|min:0']);
+        return $this->act(fn() => $credits->applyReceipt(CustomerReceipt::findOrFail($id), $request->input('rows'), auth()->id()), 'Applied to the invoices.');
+    }
+
+    private function act(callable $fn, string $msg)
+    {
+        try { $fn(); return back()->with('success', $msg); }
+        catch (\Exception $e) { return back()->with('error', $e->getMessage()); }
     }
 
     public function destroy($id)

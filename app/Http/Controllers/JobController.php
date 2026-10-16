@@ -73,6 +73,7 @@ class JobController extends Controller
             'order_date'           => 'required|date',
             'expected_date'        => 'nullable|date|after_or_equal:order_date',
             'currency'             => 'required|in:' . implode(',', Job::CURRENCIES),
+            'dispatch_tolerance_pct' => 'nullable|numeric|min:0|max:50',
             'exchange_rate'        => 'required_unless:currency,PKR|nullable|numeric|min:0.0001',
             'payment_term_type'    => 'required|in:cash,credit,pdc,other',
             'payment_term_days'    => 'required_if:payment_term_type,credit,pdc|nullable|integer|min:1',

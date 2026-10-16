@@ -222,8 +222,12 @@ class ProcessingReports extends BaseReports
         $inv = DB::table('customer_invoices as i')->join('customers as c', 'c.id', '=', 'i.customer_id')
             ->whereIn('i.status', ['Unpaid', 'PartiallyPaid'])->where('i.invoice_date', '<=', $asof)
             ->get(['i.customer_id', 'c.name', 'i.due_date', 'i.total', 'i.paid_amount', 'i.exchange_rate']);
-        $onAccount = DB::table('customer_receipts')->where('unallocated', '>', 0)->where('receipt_date', '<=', $asof)
+        $onAccount = DB::table('customer_receipts')->where('unallocated', '>', 0)->where('receipt_date', '<=', $asof)->where('status', '!=', 'Bounced')
             ->groupBy('customer_id')->selectRaw('customer_id, SUM(unallocated * exchange_rate) AS a')->pluck('a', 'customer_id');
+        foreach (DB::table('customer_credit_notes')->where('unapplied', '>', 0)->where('credit_date', '<=', $asof)
+            ->groupBy('customer_id')->selectRaw('customer_id, SUM(unapplied * exchange_rate) AS a')->pluck('a', 'customer_id') as $cid => $amt) {
+            $onAccount[$cid] = ($onAccount[$cid] ?? 0) + $amt;
+        }
 
         $rows = $inv->groupBy('customer_id')->map(function ($list) use ($asof, $onAccount) {
             $b = ['current' => 0, 'd30' => 0, 'd60' => 0, 'd90' => 0, 'over' => 0];
@@ -243,6 +247,6 @@ class ProcessingReports extends BaseReports
             self::col('d30', '1–30 days', 'money', true), self::col('d60', '31–60', 'money', true), self::col('d90', '61–90', 'money', true),
             self::col('over', '90+', 'money', true), self::col('total', 'Outstanding', 'money', true), self::col('on_account', 'On account', 'money', true),
             self::col('net', 'Net due', 'money', true),
-        ], 'rows' => $rows, 'notes' => ['Days past the invoice due date. Foreign-currency balances at the invoice rate. Balances use payments recorded to date.']];
+        ], 'rows' => $rows, 'notes' => ['Days past the invoice due date. Foreign-currency balances at the invoice rate. Balances use payments and credit notes recorded to date; on account = unapplied receipts + credit notes.']];
     }
 }

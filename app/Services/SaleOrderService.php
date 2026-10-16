@@ -138,7 +138,8 @@ class SaleOrderService
     public function refreshStatus(SaleOrder $order): void
     {
         $order->load('items');
-        if (!$order->canDeliver()) return;
+        // Delivered orders reopen when goods come back; closed / rejected orders stay as they are
+        if (!$order->canDeliver() && $order->status !== 'Delivered') return;
         $ordered = $order->items->sum('quantity'); $done = $order->items->sum('delivered_qty');
         $status = $done <= 0.0005 ? 'Approved' : ($done + 0.001 >= $ordered ? 'Delivered' : 'PartiallyDelivered');
         if ($status !== $order->status) $order->update(['status' => $status]);

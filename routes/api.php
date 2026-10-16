@@ -34,6 +34,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/gate-passes/{id}', [\App\Http\Controllers\Api\GatePassApiController::class, 'show']);
     Route::post('/gate-passes/{id}/dispatch', [\App\Http\Controllers\Api\GatePassApiController::class, 'dispatch']);
 
+    // QC of processed fabric (kanta)
+    Route::get('/qc', [\App\Http\Controllers\Api\QcApiController::class, 'index']);
+    Route::post('/qc/start/{receivingId}', [\App\Http\Controllers\Api\QcApiController::class, 'start']);
+    Route::get('/qc/{id}', [\App\Http\Controllers\Api\QcApiController::class, 'show']);
+    Route::post('/qc/{id}', [\App\Http\Controllers\Api\QcApiController::class, 'update']);
+
     // Purchase Orders (read-only for mobile, for now)
     Route::get('/purchase-orders', [PurchaseOrderApiController::class, 'index']);
     Route::get('/purchase-orders/{id}', [PurchaseOrderApiController::class, 'show']);

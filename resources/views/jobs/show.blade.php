@@ -6,7 +6,7 @@
   $cur = $job->currency ?? 'PKR';
   $pcsTotal = $job->items->sum(fn($i) => $i->pieces ?? 0);
   $dispatches = \App\Models\StockMovement::where('job_id', $job->id)->with('items', 'fromLocation')->orderBy('id')->get();
-  $dispatchedFor = fn($id) => (float) \App\Models\StockMovementItem::where('job_item_id', $id)->whereHas('stockMovement', fn($q) => $q->where('status', 'Received'))->sum('quantity');
+  $dispatchedFor = fn($id) => (float) \App\Models\StockMovementItem::where('job_item_id', $id)->whereHas('stockMovement', fn($q) => $q->where('status', 'Received'))->sum(\Illuminate\Support\Facades\DB::raw('quantity - returned_qty'));
 @endphp
 <div class="row"><div class="col">
   <section class="card">

@@ -44,7 +44,7 @@
           <tr><td colspan="6" class="text-end">Subtotal</td><td class="text-end">{{ number_format($invoice->subtotal, 2) }}</td><td></td></tr>
           @if($invoice->tax_amount > 0)<tr><td colspan="6" class="text-end">Sales Tax</td><td class="text-end">{{ number_format($invoice->tax_amount, 2) }}</td><td></td></tr>@endif
           <tr class="fw-bold"><td colspan="6" class="text-end">Total {{ $cur }}</td><td class="text-end">{{ number_format($invoice->total, 2) }}</td><td></td></tr>
-          <tr><td colspan="6" class="text-end">Received</td><td class="text-end">{{ number_format($invoice->paid_amount, 2) }}</td><td></td></tr>
+          <tr><td colspan="6" class="text-end">Received / credited</td><td class="text-end">{{ number_format($invoice->paid_amount, 2) }}</td><td></td></tr>
           <tr class="fw-bold"><td colspan="6" class="text-end">Balance</td><td class="text-end">{{ number_format($invoice->status === 'Cancelled' ? 0 : $invoice->balance, 2) }}</td><td></td></tr>
         </tfoot>
       </table>
@@ -53,6 +53,23 @@
         <ul class="small">
         @foreach($invoice->allocations as $a)<li><a href="{{ route('customer_receipts.show', $a->customer_receipt_id) }}">{{ $a->receipt->receipt_no ?? '' }}</a> — {{ $a->receipt?->receipt_date?->format('d-M-Y') }} — {{ $cur }} {{ number_format($a->amount, 2) }}</li>@endforeach
         </ul>
+      @endif
+      @if($invoice->creditNotes->isNotEmpty() || $invoice->creditApplications->isNotEmpty())
+        <h6>Credit notes</h6>
+        <ul class="small">
+        @foreach($invoice->creditApplications as $c)<li><a href="{{ route('customer_returns.credit_note', $c->customer_credit_note_id) }}">{{ $c->creditNote->credit_no ?? '' }}</a> — {{ $cur }} {{ number_format($c->amount, 2) }} applied</li>@endforeach
+        </ul>
+      @endif
+      @php
+        $credits = in_array($invoice->status, ['Unpaid', 'PartiallyPaid']) ? collect(app(\App\Services\CustomerCreditService::class)->available($invoice->customer_id))->where('currency', $cur) : collect();
+      @endphp
+      @if($credits->isNotEmpty())
+        <div class="alert alert-info small">This customer has credit on account that can settle this invoice:
+          @foreach($credits as $c)
+            <a href="{{ $c['type'] === 'receipt' ? route('customer_receipts.show', $c['id']) : route('customer_returns.credit_note', $c['id']) }}">{{ $c['no'] }}</a> ({{ $cur }} {{ number_format($c['amount'], 2) }}){{ $loop->last ? '' : ',' }}
+          @endforeach
+          — open it and use "Apply".
+        </div>
       @endif
       @if($invoice->remarks)<p class="small"><strong>Remarks:</strong> {{ $invoice->remarks }}</p>@endif
     </div>

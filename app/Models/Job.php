@@ -15,7 +15,7 @@ class Job extends Model
         'job_no', 'customer_id', 'buyer_name', 'consignee_name', 'shipping_address',
         'customer_po_number', 'customer_reference',
         'order_date', 'expected_date', 'currency', 'exchange_rate',
-        'payment_term_type', 'payment_term_days', 'payment_term_note',
+        'payment_term_type', 'payment_term_days', 'payment_term_note', 'dispatch_tolerance_pct',
         'subtotal', 'discount_amount', 'tax_amount', 'total_amount',
         'status', 'approved_by', 'approved_at', 'rejection_reason',
         'remarks', 'attachments', 'created_by', 'updated_by',

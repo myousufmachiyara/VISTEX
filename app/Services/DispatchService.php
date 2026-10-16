@@ -54,9 +54,14 @@ class DispatchService
                 throw new \Exception("{$fg->name} is not what order line {$item->pattern_code} asks for.");
             }
             if ($item->pieces !== null) {
-                $left = $item->pieces - $this->qty($item->id, [StockMovement::RECEIVED, StockMovement::PENDING, StockMovement::APPROVED])
+                // Ordered pieces + the order's dispatch tolerance %, less what is already sent (net of returns) or on a gate pass
+                $allowed = floor($item->pieces * (1 + (float) $job->dispatch_tolerance_pct / 100) + 0.0001);
+                $left = $allowed - $this->qty($item->id, [StockMovement::RECEIVED, StockMovement::PENDING, StockMovement::APPROVED])
                     - collect($items)->where('job_item_id', $item->id)->sum('quantity');
-                if ($pcs > $left + 0.001) throw new \Exception("{$item->pattern_code}: only " . max(0, $left) . " pcs left to dispatch on the order, you entered {$pcs}.");
+                if ($pcs > $left + 0.001) {
+                    $tol = (float) $job->dispatch_tolerance_pct ? " (incl. {$job->dispatch_tolerance_pct}% tolerance)" : '';
+                    throw new \Exception("{$item->pattern_code}: only " . max(0, $left) . " pcs left to dispatch on the order{$tol}, you entered {$pcs}.");
+                }
             }
             $items[] = ['product_id' => $fg->id, 'quantity' => $pcs, 'source_lot_no' => ($l['lot_no'] ?? '') ?: null,
                         'source_grade' => ($l['grade'] ?? '') ?: null, 'job_item_id' => $item->id];
@@ -72,8 +77,9 @@ class DispatchService
 
     private function qty(int $jobItemId, array $statuses): float
     {
+        // Delivered quantities count net of anything the customer sent back
         return (float) StockMovementItem::where('job_item_id', $jobItemId)
-            ->whereHas('stockMovement', fn($q) => $q->whereIn('status', $statuses))->sum('quantity');
+            ->whereHas('stockMovement', fn($q) => $q->whereIn('status', $statuses))->sum(\Illuminate\Support\Facades\DB::raw('quantity - returned_qty'));
     }
 
     private function held(int $locationId, int $productId, ?string $lot, ?string $grade): float

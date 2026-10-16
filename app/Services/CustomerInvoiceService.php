@@ -23,7 +23,7 @@ class CustomerInvoiceService
     /** Delivered lines of a customer not yet fully invoiced, priced from their order. */
     public function uninvoiced(int $customerId): array
     {
-        return StockMovementItem::whereColumn('invoiced_qty', '<', 'quantity')
+        return StockMovementItem::whereRaw('invoiced_qty + returned_qty < quantity - 0.0005')
             ->whereHas('stockMovement', fn($q) => $q->where('movement_type', StockMovement::SALE)->where('status', StockMovement::RECEIVED)->where('customer_id', $customerId))
             ->with('product.measurementUnit', 'saleOrderItem.saleOrder', 'jobItem.job', 'jobItem.tax', 'stockMovement')->get()
             ->map(fn($mi) => $this->price($mi))->filter()->values()->all();
@@ -32,7 +32,7 @@ class CustomerInvoiceService
     /** How one delivered line is billed. */
     private function price(StockMovementItem $mi): ?array
     {
-        $left = round((float) $mi->quantity - (float) $mi->invoiced_qty, 3);
+        $left = round((float) $mi->quantity - (float) $mi->invoiced_qty - (float) $mi->returned_qty, 3);
         $base = ['stock_movement_item_id' => $mi->id, 'delivery_no' => $mi->stockMovement->movement_no,
                  'delivery_date' => $mi->stockMovement->movement_date->format('Y-m-d'), 'product_id' => $mi->product_id,
                  'product' => $mi->product->name ?? '', 'left' => $left];
@@ -117,8 +117,30 @@ class CustomerInvoiceService
                 $taxPkr > 0 ? ['account_id' => $stp, 'debit' => 0, 'credit' => $taxPkr] : null,
             ]), "Invoice {$invoice->invoice_no} — {$customer->name}" . ($currency !== 'PKR' ? " ({$currency} {$total} @ {$rate})" : ''), 'CustomerInvoice', $invoice->id, $userId);
 
+            $this->postBrokerage($invoice->fresh('items.stockMovementItem.saleOrderItem.saleOrder'), $userId);
             return $invoice->fresh('items');
         });
+    }
+
+    /** Sale orders with a broker: commission accrued in proportion to what is invoiced. Dr Brokerage / Cr Payable (broker). */
+    private function postBrokerage(CustomerInvoice $invoice, int $userId): void
+    {
+        $byBroker = [];
+        foreach ($invoice->items as $it) {
+            $so = $it->stockMovementItem?->saleOrderItem?->saleOrder;
+            if (!$so || !$so->broker_id || (float) $so->broker_commission_amount <= 0 || (float) $so->subtotal <= 0) continue;
+            $byBroker[$so->broker_id] = ($byBroker[$so->broker_id] ?? 0) + (float) $so->broker_commission_amount * $it->amount / (float) $so->subtotal;
+        }
+        $total = round(array_sum($byBroker), 2);
+        if ($total <= 0) return;
+        $exp = $this->mapping->accountId('brokerage_expense'); $ap = $this->mapping->accountId('accounts_payable');
+        if (!$exp || !$ap) throw new \Exception('Brokerage / Accounts Payable account mapping is missing.');
+        $lines = [['account_id' => $exp, 'debit' => $total, 'credit' => 0]];
+        foreach ($byBroker as $brokerId => $amt) $lines[] = ['account_id' => $ap, 'debit' => 0, 'credit' => round($amt, 2), 'party_type' => 'broker', 'party_id' => $brokerId];
+        $diff = round($total - array_sum(array_column(array_slice($lines, 1), 'credit')), 2);
+        if (abs($diff) > 0) $lines[count($lines) - 1]['credit'] = round($lines[count($lines) - 1]['credit'] + $diff, 2);
+        $this->vouchers->post('system', $invoice->invoice_date->format('Y-m-d'), $lines, "Brokerage on {$invoice->invoice_no}", 'CustomerInvoiceBrokerage', $invoice->id, $userId);
+        $invoice->update(['brokerage_amount' => $total]);
     }
 
     public function cancel(CustomerInvoice $invoice, int $userId): CustomerInvoice
@@ -127,8 +149,10 @@ class CustomerInvoiceService
             $invoice = CustomerInvoice::with('items')->lockForUpdate()->findOrFail($invoice->id);
             if ($invoice->status === 'Cancelled') throw new \Exception('Already cancelled.');
             if ($invoice->paid_amount > 0.004) throw new \Exception('Payments are allocated to this invoice — remove them first.');
+            if ($invoice->creditNotes()->exists()) throw new \Exception('A credit note was issued against this invoice; it cannot be cancelled.');
             foreach ($invoice->items as $it) StockMovementItem::whereKey($it->stock_movement_item_id)->decrement('invoiced_qty', $it->delivered_qty);
             $this->vouchers->deleteByReference('CustomerInvoice', $invoice->id);
+            $this->vouchers->deleteByReference('CustomerInvoiceBrokerage', $invoice->id);
             $invoice->update(['status' => 'Cancelled']);
             return $invoice;
         });
@@ -137,8 +161,11 @@ class CustomerInvoiceService
     public static function refreshStatus(CustomerInvoice $invoice): void
     {
         if ($invoice->status === 'Cancelled') return;
-        $paid = (float) $invoice->allocations()->sum('amount');
+        // Settled = receipts (not bounced) + credit notes applied
+        $received = (float) $invoice->allocations()->whereHas('receipt', fn($q) => $q->where('status', '!=', 'Bounced'))->sum('amount');
+        $credited = (float) $invoice->creditApplications()->sum('amount');
+        $paid = $received + $credited;
         $status = $paid <= 0.004 ? 'Unpaid' : ($paid + 0.004 >= $invoice->total ? 'Paid' : 'PartiallyPaid');
-        $invoice->update(['paid_amount' => round($paid, 2), 'status' => $status]);
+        $invoice->update(['paid_amount' => round($paid, 2), 'credited_amount' => round($credited, 2), 'status' => $status]);
     }
 }

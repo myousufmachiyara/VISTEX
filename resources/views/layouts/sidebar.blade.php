@@ -132,14 +132,15 @@
         {{-- ═══════════════════════════════════════════════════════ --}}
         {{-- SALES — Forecasting + Jobs                                 --}}
         {{-- ═══════════════════════════════════════════════════════ --}}
-        @if(auth()->user()->canAny(['jobs.index','sale_orders.index','customer_invoices.index','customer_receipts.index']))
-        <li class="nav-parent {{ request()->routeIs('jobs.*','sale_orders.*','customer_invoices.*','customer_receipts.*') ? 'nav-expanded active' : '' }}">
+        @if(auth()->user()->canAny(['jobs.index','sale_orders.index','customer_invoices.index','customer_receipts.index','customer_returns.index']))
+        <li class="nav-parent {{ request()->routeIs('jobs.*','sale_orders.*','customer_invoices.*','customer_receipts.*','customer_returns.*') ? 'nav-expanded active' : '' }}">
           <a class="nav-link" href="#"><i class="fa fa-chart-line"></i><span>Sales</span></a>
           <ul class="nav nav-children">
             @can('jobs.index')<li class="{{ request()->routeIs('jobs.*')?'active':'' }}"><a class="nav-link" href="{{ route('jobs.index') }}">Customer Orders (Jobs)</a></li>@endcan
             @can('sale_orders.index')<li class="{{ request()->routeIs('sale_orders.*')?'active':'' }}"><a class="nav-link" href="{{ route('sale_orders.index') }}">Sale Orders (Yarn / Greige)</a></li>@endcan
             @can('customer_invoices.index')<li class="{{ request()->routeIs('customer_invoices.*')?'active':'' }}"><a class="nav-link" href="{{ route('customer_invoices.index') }}">Customer Invoices</a></li>@endcan
             @can('customer_receipts.index')<li class="{{ request()->routeIs('customer_receipts.*')?'active':'' }}"><a class="nav-link" href="{{ route('customer_receipts.index') }}">Customer Receipts</a></li>@endcan
+            @can('customer_returns.index')<li class="{{ request()->routeIs('customer_returns.*')?'active':'' }}"><a class="nav-link" href="{{ route('customer_returns.index') }}">Returns &amp; Credit Notes</a></li>@endcan
             {{-- Forecasting hidden for now --}}
           </ul>
         </li>
@@ -148,11 +149,12 @@
         {{-- ═══════════════════════════════════════════════════════ --}}
         {{-- FINANCE — PDC + Vouchers                                   --}}
         {{-- ═══════════════════════════════════════════════════════ --}}
-        @if(auth()->user()->canAny(['vouchers.index','pdcs.index']))
-        <li class="nav-parent {{ request()->routeIs('vouchers.*','pdcs.*') ? 'nav-expanded active' : '' }}">
+        @if(auth()->user()->canAny(['vouchers.index','pdcs.index','reports.processing']))
+        <li class="nav-parent {{ request()->routeIs('vouchers.*','pdcs.*','statements.*') ? 'nav-expanded active' : '' }}">
           <a class="nav-link" href="#"><i class="fa fa-money-check-alt"></i><span>Finance</span></a>
           <ul class="nav nav-children">
             @can('pdcs.index')<li class="{{ request()->routeIs('pdcs.*')?'active':'' }}"><a class="nav-link" href="{{ route('pdcs.index') }}">PDC Cheques</a></li>@endcan
+            @can('reports.processing')<li class="{{ request()->routeIs('statements.*')?'active':'' }}"><a class="nav-link" href="{{ route('statements.index') }}">Party Statements</a></li>@endcan
             @can('vouchers.index')
               @foreach(['receipt'=>'Receipt Vouchers','payment'=>'Payment Vouchers','journal'=>'Journal Vouchers','contra'=>'Contra Vouchers','system'=>'System Vouchers'] as $t=>$l)
               <li class="{{ request()->is("vouchers/{$t}*")?'active':'' }}"><a class="nav-link" href="{{ route('vouchers.index',$t) }}">{{ $l }}</a></li>

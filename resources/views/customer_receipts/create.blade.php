@@ -13,11 +13,12 @@
         <div class="col-md-4"><label>Customer</label><select name="customer_id" id="cust" class="form-control" required><option value="">Select…</option>
           @foreach($customers as $c)<option value="{{ $c->id }}" @selected(old('customer_id', $preset['customer_id'] ?? null) == $c->id)>{{ $c->name }}</option>@endforeach</select></div>
         <div class="col-md-2"><label>Date</label><input type="date" name="receipt_date" class="form-control" value="{{ old('receipt_date', date('Y-m-d')) }}" required></div>
-        <div class="col-md-3"><label>Received into</label><select name="account_id" class="form-control" required>
+        <div class="col-md-3"><label>Received into <small class="text-muted" id="intoHint"></small></label><select name="account_id" class="form-control" required>
           @foreach($accounts as $a)<option value="{{ $a->id }}" @selected(old('account_id') == $a->id)>{{ $a->name }}</option>@endforeach</select></div>
         <div class="col-md-3"><label>Method</label><div class="d-flex gap-2"><select name="method" class="form-control">
           @foreach(\App\Models\CustomerReceipt::METHODS as $k => $label)<option value="{{ $k }}" @selected(old('method', 'bank') === $k)>{{ $label }}</option>@endforeach</select>
           <input name="reference" class="form-control" placeholder="Cheque # / ref" value="{{ old('reference') }}"></div></div>
+        <div class="col-md-2" id="chqF"><label>Cheque date</label><input type="date" name="cheque_date" id="chq" class="form-control" value="{{ old('cheque_date') }}"></div>
         <div class="col-md-2"><label>Currency</label><select name="currency" id="cur" class="form-control">
           @foreach(\App\Models\Job::CURRENCIES as $c)<option value="{{ $c }}" @selected(old('currency', 'PKR') === $c)>{{ $c }}</option>@endforeach</select></div>
         <div class="col-md-2" id="rateF"><label>Rate to PKR</label><input type="number" step="0.0001" min="0" name="exchange_rate" id="rate" class="form-control" value="{{ old('exchange_rate') }}"></div>
@@ -71,6 +72,10 @@
       render();
     });
   }
+  const method = document.querySelector('[name=method]');
+  const pdcUi = () => { const p = method.value === 'pdc'; document.getElementById('chqF').style.display = p ? '' : 'none'; document.getElementById('chq').required = p;
+    document.getElementById('intoHint').textContent = p ? '(when it clears)' : ''; };
+  method.addEventListener('change', pdcUi); pdcUi();
   document.getElementById('cust').addEventListener('change', load);
   document.getElementById('cur').addEventListener('change', render);
   document.getElementById('amount').addEventListener('input', sum);
