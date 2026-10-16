@@ -50,9 +50,9 @@
               </td>
               <td class="text-end">
                 @if($order->type === 'weaving')
-                  {{ number_format($order->total_meters_required, 3) }} m
+                  {{ number_format($order->total_meters_required, 2) }} mtr
                 @else
-                  {{ number_format($order->items->sum('quantity'), 3) }}
+                  {{ number_format($order->items->sum('quantity'), 2) }}
                   {{ $order->items->first()?->product?->measurementUnit?->shortcode }}
                 @endif
               </td>
