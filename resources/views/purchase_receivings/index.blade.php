@@ -28,7 +28,8 @@
             <td>{{ $r->challan->challan_no ?? '' }}</td>
             <td class="text-end">{{ number_format($r->amount, 2) }}</td>
             <td><span class="badge bg-{{ match($r->status){'Approved'=>'success','Rejected'=>'danger',default=>'warning text-dark'} }}">{{ $r->status === 'PendingApproval' ? 'Pending Approval' : $r->status }}</span></td>
-            <td><a href="{{ route('purchase_receivings.show', $r->id) }}" class="btn btn-sm btn-outline-primary">View</a></td>
+            <td><a href="{{ route('purchase_receivings.show', $r->id) }}" class="btn btn-sm btn-outline-primary">View</a>
+              @if($r->challan_id)<a href="{{ route('purchase_receivings.print', $r->id) }}" target="_blank" class="btn btn-sm btn-outline-danger" title="Print GRN"><i class="fas fa-file-pdf"></i></a>@endif</td>
           </tr>
           @endforeach
         </tbody>

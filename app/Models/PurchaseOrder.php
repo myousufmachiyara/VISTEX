@@ -155,6 +155,22 @@ class PurchaseOrder extends Model
     {
         return $v === null ? null : strtolower(trim($v));
     }
+    /** "Y-20/2 Ring 2,800 kg · Y-30/1 500 kg · +2 more" — what is still to come on the PO, for pickers. */
+    public function getItemsSummaryAttribute(): string
+    {
+        if ($this->type === 'weaving') {
+            return trim(($this->greigeProduct->name ?? 'Greige') . ' ' . number_format((float) $this->total_meters_required) . ' m');
+        }
+        $open = $this->items->filter(fn($i) => $i->outstanding_qty > 0.001)->values();
+        $parts = $open->take(3)->map(function ($i) {
+            $name = $i->product->name ?? trim(($i->pattern_code ?? '') . ' ' . ($i->design ?? '')) ?: ($i->description ?? 'Item');
+            $unit = $i->product->measurementUnit->shortcode ?? ($this->type === 'processing' ? 'm' : '');
+            $qty = rtrim(rtrim(number_format($i->outstanding_qty, 3), '0'), '.');
+            return trim("{$name} {$qty} {$unit}");
+        });
+        return $parts->implode(' · ') . ($open->count() > 3 ? ' · +' . ($open->count() - 3) . ' more' : '');
+    }
+
     public function getStatusAttribute($v) { return self::canonicalStatus($v); }
     public function setStatusAttribute($v) { $this->attributes['status'] = self::canonicalStatus($v); }
     public function getTypeAttribute($v) { return self::canonicalType($v); }

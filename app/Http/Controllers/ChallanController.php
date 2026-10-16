@@ -50,7 +50,7 @@ class ChallanController extends Controller
         $user = auth()->user();
         $orders = PurchaseOrder::openForReceiving()
             ->where(fn($q) => $q->where('type', 'purchase')->orWhereIn('status', ['Issued', 'PartiallyReceived']))
-            ->with('vendor', 'category')
+            ->with('vendor', 'category', 'items.product.measurementUnit', 'greigeProduct')
             ->orderByDesc('order_date')->get();
 
         $categories = ProductCategory::orderBy('name')->get(['id', 'name']);
@@ -79,6 +79,9 @@ class ChallanController extends Controller
                                       : ($i->product->name ?? trim(($i->pattern_code ?? '') . ' ' . ($i->description ?? ''))),
             'quantity' => $i->outstanding_qty,
             'graded' => $graded,
+            'unit' => $i->product->measurementUnit->shortcode ?? ($graded ? 'm' : ''),
+            'qty_per_pack' => (float) $i->qty_per_pack > 1 ? (float) $i->qty_per_pack : null,
+            'packs_outstanding' => (float) $i->qty_per_pack > 1 ? round($i->outstanding_qty / (float) $i->qty_per_pack, 2) : null,
         ])->filter(fn($r) => $r['quantity'] > 0.001)->values());
     }
 
@@ -100,7 +103,7 @@ class ChallanController extends Controller
             'items.*.purchase_order_item_id' => 'nullable|exists:purchase_order_items,id',
             'items.*.product_id'             => 'nullable|exists:products,id',
             'items.*.expected_qty'           => 'required|numeric|min:0',
-            'items.*.received_qty'           => 'required|numeric|min:0', 'items.*.qty_a' => 'nullable|numeric|min:0', 'items.*.qty_b' => 'nullable|numeric|min:0', 'items.*.qty_c' => 'nullable|numeric|min:0',
+            'items.*.received_qty'           => 'required|numeric|min:0', 'items.*.qty_a' => 'nullable|numeric|min:0', 'items.*.qty_b' => 'nullable|numeric|min:0', 'items.*.qty_c' => 'nullable|numeric|min:0', 'items.*.packs' => 'nullable|numeric|min:0',
         ]);
 
         try {
@@ -220,7 +223,7 @@ class ChallanController extends Controller
             'remove_voice'         => 'nullable|boolean',
             'items'                => 'nullable|array',
             'items.*.id'           => 'required|integer',
-            'items.*.received_qty' => 'required|numeric|min:0', 'items.*.qty_a' => 'nullable|numeric|min:0', 'items.*.qty_b' => 'nullable|numeric|min:0', 'items.*.qty_c' => 'nullable|numeric|min:0',
+            'items.*.received_qty' => 'required|numeric|min:0', 'items.*.qty_a' => 'nullable|numeric|min:0', 'items.*.qty_b' => 'nullable|numeric|min:0', 'items.*.qty_c' => 'nullable|numeric|min:0', 'items.*.packs' => 'nullable|numeric|min:0',
         ];
         $request->validate($rules);
 
@@ -385,5 +388,17 @@ class ChallanController extends Controller
     private function authorizeReview(Challan $challan): void
     {
         abort_unless($challan->canBeReviewedBy(auth()->user()), 403, 'Only the category incharge can review this challan.');
+    }
+
+    // Inspection / GRN PDF for a challan (no rates). Uses the latest GRN once posted.
+    public function print($id)
+    {
+        $challan = Challan::with('receiving')->findOrFail($id);
+        $pdf = app(\App\Services\GrnPdf::class)->render($challan, $challan->receiving);
+        $name = ($challan->receiving->receiving_no ?? $challan->challan_no) . '.pdf';
+        return response($pdf, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $name . '"',
+        ]);
     }
 }

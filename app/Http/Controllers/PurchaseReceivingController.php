@@ -138,6 +138,18 @@ class PurchaseReceivingController extends Controller
         }
     }
     
+    // GRN PDF (no rates) — built from the gate challan + inspection + this GRN
+    public function print($id)
+    {
+        $receiving = PurchaseReceiving::with('challan')->findOrFail($id);
+        abort_unless($receiving->challan, 404, 'This GRN has no gate challan to print from.');
+        $pdf = app(\App\Services\GrnPdf::class)->render($receiving->challan, $receiving);
+        return response($pdf, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $receiving->receiving_no . '.pdf"',
+        ]);
+    }
+
     public function show($id)
     {
         $receiving = PurchaseReceiving::with([

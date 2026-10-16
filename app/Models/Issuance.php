@@ -27,7 +27,7 @@ class Issuance extends Model
         ],
         'greige_sale' => [
             'label' => 'Greige against Sale Order', 'against' => 'Sale Order', 'po_type' => null, 'active' => false,
-            'help'  => 'Locked — pending client discussion.',
+            'help'  => 'Done from Sales → Sale Orders: each delivery goes out on a gate pass.',
         ],
         'fabric_reprocess' => [
             'label' => 'Finish Fabric for Reprocess', 'against' => 'Reprocess PO', 'po_type' => null, 'active' => false,
@@ -39,6 +39,7 @@ class Issuance extends Model
         'issue_no', 'issue_type', 'purchase_order_id', 'job_id', 'vendor_id',
         'source_location_id', 'destination_location_id',
         'issue_date', 'total_quantity', 'total_amount', 'remarks', 'attachments', 'created_by', 'updated_by',
+        'vehicle_no', 'driver_name', 'driver_contact', 'no_of_bags', 'prepared_by_name', 'received_by_name',
     ];
 
     protected $casts = [

@@ -85,6 +85,15 @@
           @endif
         </div>
 
+        @include('challans._transport', ['challan' => $issuance ?? null])
+        <div class="row">
+          <div class="col-md-4 mb-3"><label>No. of Bags <small class="text-muted">(record only)</small></label>
+            <input type="number" step="0.01" min="0" name="no_of_bags" class="form-control" value="{{ old('no_of_bags', isset($issuance) && $issuance->no_of_bags !== null ? (float) $issuance->no_of_bags : '') }}"></div>
+          <div class="col-md-4 mb-3"><label>Prepared By</label>
+            <input type="text" name="prepared_by_name" class="form-control" maxlength="100" value="{{ old('prepared_by_name', $issuance->prepared_by_name ?? auth()->user()->name) }}"></div>
+          <div class="col-md-4 mb-3"><label>Received By <small class="text-muted">(mill representative)</small></label>
+            <input type="text" name="received_by_name" class="form-control" maxlength="100" value="{{ old('received_by_name', $issuance->received_by_name ?? '') }}"></div>
+        </div>
         <div class="row">
           <div class="col-md-8 mb-3"><label>Remarks</label><textarea name="remarks" class="form-control" rows="1">{{ old('remarks', $issuance->remarks ?? '') }}</textarea></div>
           <div class="col-md-4 mb-3"><label>Attachments</label><input type="file" name="attachments[]" class="form-control" multiple></div>
@@ -126,7 +135,7 @@ $(function () {
       const body = $('#linesTable tbody').empty();
       const prefill = OLD.length ? OLD : EXISTING;
       if (d.type === 'weaving') {
-        $('#linesHead').html('<tr><th>Yarn</th><th class="text-end">Required</th><th class="text-end">Issued</th><th class="text-end">Remaining</th><th class="text-end">In Warehouse</th><th width="18%">PO #</th><th width="16%">Issue Qty</th></tr>');
+        $('#linesHead').html('<tr><th>Yarn</th><th class="text-end">Required</th><th class="text-end">Issued</th><th class="text-end">Remaining</th><th class="text-end">In Warehouse</th><th width="18%">Lot</th><th width="16%">Issue Qty</th></tr>');
         d.lines.forEach((l, i) => {
           const pre = prefill.find(p => +p.product_id === +l.product_id) || {};
           body.append(`<tr>

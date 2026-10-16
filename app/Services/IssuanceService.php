@@ -39,6 +39,7 @@ class IssuanceService
                 'issue_date'              => $data['issue_date'],
                 'remarks'                 => $data['remarks'] ?? null,
                 'attachments'             => $data['attachments'] ?? null,
+                ...self::extraFields($data),
                 'created_by'              => $userId,
                 'updated_by'              => $userId,
             ]);
@@ -69,6 +70,7 @@ class IssuanceService
                 'issue_date'              => $data['issue_date'],
                 'remarks'                 => $data['remarks'] ?? null,
                 'attachments'             => $data['attachments'] ?? $issuance->attachments,
+                ...self::extraFields($data),
                 'updated_by'              => $userId,
             ]);
             $this->apply($issuance->fresh(), $po, $items, $userId);
@@ -302,5 +304,19 @@ class IssuanceService
                 }
             }
         }
+    }
+
+    // Transport, bags (record only — no stock effect) and the two signatory names
+    private static function extraFields(array $data): array
+    {
+        $str = fn($k) => isset($data[$k]) && trim((string) $data[$k]) !== '' ? trim((string) $data[$k]) : null;
+        return [
+            'vehicle_no'       => $str('vehicle_no') ? strtoupper($str('vehicle_no')) : null,
+            'driver_name'      => $str('driver_name'),
+            'driver_contact'   => $str('driver_contact'),
+            'no_of_bags'       => $str('no_of_bags') !== null ? round(max(0, (float) $data['no_of_bags']), 2) : null,
+            'prepared_by_name' => $str('prepared_by_name'),
+            'received_by_name' => $str('received_by_name'),
+        ];
     }
 }

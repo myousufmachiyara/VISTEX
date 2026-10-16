@@ -33,6 +33,13 @@
         </tbody>
         <tfoot><tr class="fw-bold"><td colspan="2" class="text-end">Total</td><td class="text-end">{{ number_format($issuance->total_quantity, 3) }}</td><td></td><td></td><td class="text-end">{{ number_format($issuance->total_amount, 2) }}</td></tr></tfoot>
       </table>
+      <div class="row mb-2 small">
+        <div class="col-md-3"><strong>Vehicle:</strong> {{ $issuance->vehicle_no ?: '—' }}</div>
+        <div class="col-md-3"><strong>Driver:</strong> {{ $issuance->driver_name ?: '—' }} {{ $issuance->driver_contact ? '(' . $issuance->driver_contact . ')' : '' }}</div>
+        <div class="col-md-2"><strong>Bags:</strong> {{ $issuance->no_of_bags !== null ? rtrim(rtrim(number_format((float) $issuance->no_of_bags, 2), '0'), '.') : '—' }}</div>
+        <div class="col-md-2"><strong>Prepared By:</strong> {{ $issuance->prepared_by_name ?: '—' }}</div>
+        <div class="col-md-2"><strong>Received By:</strong> {{ $issuance->received_by_name ?: '—' }}</div>
+      </div>
       @if($issuance->remarks)<p><strong>Remarks:</strong> {{ $issuance->remarks }}</p>@endif
       @if($issuance->attachments)
         <p><strong>Attachments:</strong> @foreach($issuance->attachments as $a)<a href="{{ Storage::url($a) }}" target="_blank" class="me-2">File {{ $loop->iteration }}</a>@endforeach</p>

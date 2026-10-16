@@ -11,7 +11,10 @@
     <section class="card">
       <header class="card-header d-flex justify-content-between align-items-center">
         <h2 class="card-title">Inspect {{ $c['challan_no'] }} </h2>
-        <a href="{{ route('challans.show', $challan->id) }}" class="btn btn-sm btn-outline-secondary">View Challan</a>
+        <div>
+          <a href="{{ route('challans.print', $challan->id) }}" target="_blank" class="btn btn-sm btn-outline-danger"><i class="fas fa-file-pdf"></i> Print PDF</a>
+          <a href="{{ route('challans.show', $challan->id) }}" class="btn btn-sm btn-outline-secondary">View Challan</a>
+        </div>
       </header>
       <div class="card-body">
         @if(session('error'))<div class="alert alert-danger">{{ session('error') }}</div>@endif
@@ -67,13 +70,13 @@
             <tr>
               <td>{{ $l['description'] }} <small class="text-muted">{{ $l['unit'] }}</small>
                 <input type="hidden" name="lines[{{ $i }}][purchase_order_item_id]" value="{{ $l['purchase_order_item_id'] }}">
-                <div class="small text-muted">Rate: {{ number_format($l['rate'], 2) }}</div>
                 <input type="text" name="lines[{{ $i }}][note]" class="form-control form-control-sm mt-1 line-note" placeholder="Note (e.g. 5 bags wet)" value="{{ old("lines.$i.note") }}">
               </td>
               <td class="text-end">{{ number_format($l['ordered_qty'], 3) }}</td>
               <td class="text-end">{{ number_format($l['already_received'], 3) }}</td>
               <td class="text-end outstanding" data-v="{{ $l['outstanding'] }}"><strong>{{ number_format($l['outstanding'], 3) }}</strong></td>
               <td class="text-end">{{ number_format($l['gate_qty'], 3) }}
+                @if($l['gate_packs'] !== null)<div class="small text-muted">{{ $l['gate_packs'] + 0 }} bags / packs</div>@endif
                 @if($isProcessing && ($l['gate_a'] + $l['gate_b'] + $l['gate_c']) > 0)<div class="small text-muted">A {{ $l['gate_a'] + 0 }} · B {{ $l['gate_b'] + 0 }} · C {{ $l['gate_c'] + 0 }}</div>@endif
               </td>
               @if($isProcessing)
@@ -98,7 +101,7 @@
                 @endif
               </td>
               @unless($isWeaving)
-              <td class="amend-col"><input type="number" step="any" min="0" name="lines[{{ $i }}][new_rate]" class="form-control" placeholder="{{ $l['rate'] }}" value="{{ old("lines.$i.new_rate") }}"></td>
+              <td class="amend-col"><input type="number" step="any" min="0" name="lines[{{ $i }}][new_rate]" class="form-control" placeholder="unchanged" value="{{ old("lines.$i.new_rate") }}"></td>
               @endunless
             </tr>
             @endforeach
@@ -109,7 +112,7 @@
         <div class="row amend-col">
           <div class="col-md-3 mb-3"><label>New Expected Date</label><input type="date" name="amend[expected_date]" class="form-control" value="{{ old('amend.expected_date') }}"></div>
           @if($isWeaving)
-          <div class="col-md-3 mb-3"><label>New Rate per Pick</label><input type="number" step="any" name="amend[rate_per_pick]" class="form-control" placeholder="{{ $data['weaving']['rate_per_pick'] }}" value="{{ old('amend.rate_per_pick') }}"></div>
+          <div class="col-md-3 mb-3"><label>New Rate per Pick</label><input type="number" step="any" name="amend[rate_per_pick]" class="form-control" placeholder="unchanged" value="{{ old('amend.rate_per_pick') }}"></div>
           @endif
           <div class="col-md-3 mb-3"><label>New Payment Term</label>
             <select name="amend[payment_term_type]" class="form-control">

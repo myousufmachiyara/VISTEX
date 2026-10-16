@@ -91,6 +91,7 @@ class ChallanReviewService
                 'already_received' => (float) $poItem->quantity_received,
                 'outstanding' => $poItem->outstanding_qty,
                 'gate_qty' => $gate,
+                'gate_packs' => $ci && $ci->packs !== null ? (float) $ci->packs : null,
                 'accepted_qty' => $accepted,
                 'rejected_qty' => (float) ($ci->rejected_qty ?? 0),
                 'rate' => (float) $poItem->rate,

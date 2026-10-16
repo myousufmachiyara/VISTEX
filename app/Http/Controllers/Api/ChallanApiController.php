@@ -37,7 +37,7 @@ class ChallanApiController extends Controller
         $category = ProductCategory::with('inchargeUsers')->findOrFail($request->category_id);
         $incharges = $category->inchargeUsers->pluck('name')->values();
 
-        $orders = PurchaseOrder::with('vendor')
+        $orders = PurchaseOrder::with('vendor', 'items.product.measurementUnit', 'greigeProduct')
             ->where('product_category_id', $category->id)
             ->whereIn('status', self::OPEN_STATUSES)
             ->orderByDesc('order_date')->get();
@@ -50,6 +50,7 @@ class ChallanApiController extends Controller
                 return [
                     'id' => $o->id, 'order_no' => $o->order_no, 'type' => $o->type, 'status' => $o->status,
                     'order_date' => $o->order_date->format('d-M-Y'),
+                    'items_summary' => $o->items_summary,
                     'selectable' => $selectable, 'note' => $note,
                     'incharge_names' => $o->status === 'Pending' ? $incharges : [],
                 ];
@@ -69,7 +70,7 @@ class ChallanApiController extends Controller
 
     public function poExpectedItems($poId)
     {
-        $po = PurchaseOrder::with('items.product')->findOrFail($poId);
+        $po = PurchaseOrder::with('items.product.measurementUnit')->findOrFail($poId);
 
         if ($po->type === 'weaving') {
             return response()->json([[
@@ -86,6 +87,8 @@ class ChallanApiController extends Controller
                                      : ($i->product->name ?? $i->description ?? ''),
             'expected' => round((float) $i->quantity - (float) $i->quantity_received, 3),
             'graded' => $graded,
+            'unit' => $i->product->measurementUnit->shortcode ?? ($graded ? 'm' : ''),
+            'qty_per_pack' => (float) $i->qty_per_pack > 1 ? (float) $i->qty_per_pack : null,
         ])->filter(fn($r) => $r['expected'] > 0.001)->values());
     }
 
@@ -138,6 +141,7 @@ class ChallanApiController extends Controller
                 'accepted_qty' => (float) $i->accepted_qty, 'rejected_qty' => (float) $i->rejected_qty, 'decision' => $i->decision,
                 'qty_a' => $i->qty_a !== null ? (float) $i->qty_a : null, 'qty_b' => $i->qty_b !== null ? (float) $i->qty_b : null,
                 'qty_c' => $i->qty_c !== null ? (float) $i->qty_c : null,
+                'packs' => $i->packs !== null ? (float) $i->packs : null,
             ]),
             'direct_items' => $c->directItems->map(fn($i) => [
                 'id' => $i->id, 'description' => $i->description, 'unit' => $i->unit,
@@ -163,7 +167,7 @@ class ChallanApiController extends Controller
             'items.*.purchase_order_item_id' => 'nullable|exists:purchase_order_items,id',
             'items.*.product_id' => 'nullable|exists:products,id',
             'items.*.expected_qty' => 'required|numeric|min:0',
-            'items.*.received_qty' => 'required|numeric|min:0', 'items.*.qty_a' => 'nullable|numeric|min:0', 'items.*.qty_b' => 'nullable|numeric|min:0', 'items.*.qty_c' => 'nullable|numeric|min:0',
+            'items.*.received_qty' => 'required|numeric|min:0', 'items.*.qty_a' => 'nullable|numeric|min:0', 'items.*.qty_b' => 'nullable|numeric|min:0', 'items.*.qty_c' => 'nullable|numeric|min:0', 'items.*.packs' => 'nullable|numeric|min:0',
         ]);
 
         if ($request->boolean('has_objection') && !$request->filled('objection_remarks') && !$request->hasFile('objection_voice')) {
@@ -271,7 +275,7 @@ class ChallanApiController extends Controller
             'remove_voice'         => 'nullable|boolean',
             'items'                => 'nullable|array',
             'items.*.id'           => 'required|integer',
-            'items.*.received_qty' => 'required|numeric|min:0', 'items.*.qty_a' => 'nullable|numeric|min:0', 'items.*.qty_b' => 'nullable|numeric|min:0', 'items.*.qty_c' => 'nullable|numeric|min:0',
+            'items.*.received_qty' => 'required|numeric|min:0', 'items.*.qty_a' => 'nullable|numeric|min:0', 'items.*.qty_b' => 'nullable|numeric|min:0', 'items.*.qty_c' => 'nullable|numeric|min:0', 'items.*.packs' => 'nullable|numeric|min:0',
         ];
         $request->validate($rules);
 

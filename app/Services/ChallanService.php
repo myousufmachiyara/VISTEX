@@ -216,6 +216,13 @@ class ChallanService
     // Gate count for a line. Processed fabric is counted as A / B / C quality; their total is the received quantity.
     private function gateCount(array $item): array
     {
+        // Bags / packs counted at the gate (record only)
+        $packs = (isset($item['packs']) && $item['packs'] !== '' && $item['packs'] !== null) ? round(max(0, (float) $item['packs']), 2) : null;
+        return $this->gateQty($item) + (array_key_exists('packs', $item) ? ['packs' => $packs] : []);
+    }
+
+    private function gateQty(array $item): array
+    {
         $grades = [];
         foreach (['qty_a', 'qty_b', 'qty_c'] as $k) {
             if (isset($item[$k]) && $item[$k] !== '') $grades[$k] = round((float) $item[$k], 3);

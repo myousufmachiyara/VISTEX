@@ -293,6 +293,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('create',              [ChallanController::class, 'create'])           ->name('create') ->middleware('check.permission:challans.create');
         Route::get('po-items/{poId}',     [ChallanController::class, 'poItems'])          ->name('po_items')->middleware('check.permission:challans.index');
         Route::post('/',                  [ChallanController::class, 'store'])            ->name('store')  ->middleware('check.permission:challans.create');
+        Route::get('{id}/print',          [ChallanController::class, 'print'])            ->name('print')  ->middleware('check.permission:challans.index');
         Route::get('{id}',                [ChallanController::class, 'show'])             ->name('show')   ->middleware('check.permission:challans.index');
         Route::get('{id}/edit',           [ChallanController::class, 'edit'])             ->name('edit')   ->middleware('check.permission:challans.edit');
         Route::put('{id}',                [ChallanController::class, 'update'])           ->name('update') ->middleware('check.permission:challans.edit');
@@ -312,6 +313,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('create/{challanId}', [PurchaseReceivingController::class, 'create'])       ->name('create') ->middleware('check.permission:purchase_receivings.create');
         Route::post('/',                 [PurchaseReceivingController::class, 'store'])        ->name('store')  ->middleware('check.permission:purchase_receivings.create');
         Route::post('store-weaving',     [PurchaseReceivingController::class, 'storeWeaving'])  ->name('store_weaving')->middleware('check.permission:purchase_receivings.create');
+        Route::get('{id}/print',         [PurchaseReceivingController::class, 'print'])        ->name('print')  ->middleware('check.permission:purchase_receivings.index');
         Route::get('{id}',               [PurchaseReceivingController::class, 'show'])         ->name('show')   ->middleware('check.permission:purchase_receivings.index');
         Route::post('{id}/approve',      [PurchaseReceivingController::class, 'approve'])      ->name('approve')->middleware('check.permission:purchase_receivings.edit');
         Route::post('{id}/reject',       [PurchaseReceivingController::class, 'reject'])       ->name('reject') ->middleware('check.permission:purchase_receivings.edit');

@@ -6,7 +6,9 @@
     @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
     @if(session('error'))<div class="alert alert-danger">{{ session('error') }}</div>@endif
     <header class="card-header d-flex justify-content-between align-items-center">
-      <h2 class="card-title">{{ $receiving->receiving_no }}</h2>
+      <h2 class="card-title">{{ $receiving->receiving_no }}
+        @if($receiving->challan_id)<a href="{{ route('purchase_receivings.print', $receiving->id) }}" target="_blank" class="btn btn-sm btn-outline-danger ms-2"><i class="fas fa-file-pdf"></i> Print GRN</a>@endif
+      </h2>
       <span class="badge bg-{{ match($receiving->status){'Approved'=>'success','Rejected'=>'danger',default=>'warning text-dark'} }}">{{ $receiving->status === 'PendingApproval' ? 'Pending Approval' : $receiving->status }}</span>
     </header>
     <div class="card-body">

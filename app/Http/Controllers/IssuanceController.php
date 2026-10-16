@@ -132,7 +132,10 @@ class IssuanceController extends Controller
             'items.*.lot_no'          => 'nullable|string|max:100',
             'items.*.purchase_order_item_id' => 'nullable|exists:purchase_order_items,id',
             'attachments.*'           => 'nullable|file|max:5120',
-        ];
+            'no_of_bags'              => 'nullable|numeric|min:0',
+            'prepared_by_name'        => 'nullable|string|max:100',
+            'received_by_name'        => 'nullable|string|max:100',
+        ] + ChallanController::TRANSPORT_RULES;
     }
 
     // Greige for processing: only the mill location's in-charge (or a superadmin) issues
@@ -233,6 +236,10 @@ class IssuanceController extends Controller
                 <td width="20%"><b>Against</b></td><td width="30%">' . e($issuance->purchaseOrder->order_no ?? '-') . '</td></tr>
             <tr><td><b>From</b></td><td>' . e($issuance->sourceLocation->name ?? '-') . '</td>
                 <td><b>To</b></td><td>' . e($issuance->destinationLocation->name ?? ($issuance->purchaseOrder->vendor->name ?? '-')) . '</td></tr>
+            <tr><td><b>Vehicle No.</b></td><td>' . e($issuance->vehicle_no ?: '-') . '</td>
+                <td><b>No. of Bags</b></td><td>' . ($issuance->no_of_bags !== null ? rtrim(rtrim(number_format((float) $issuance->no_of_bags, 2), '0'), '.') : '-') . '</td></tr>
+            <tr><td><b>Driver</b></td><td>' . e($issuance->driver_name ?: '-') . '</td>
+                <td><b>Driver Contact</b></td><td>' . e($issuance->driver_contact ?: '-') . '</td></tr>
         </table>';
         $pdf->SetFont('helvetica', '', 10);
         $pdf->writeHTML($info, true, false, false, false, '');
@@ -251,9 +258,12 @@ class IssuanceController extends Controller
 
         $pdf->Ln(20);
         $y = $pdf->GetY();
+        $pdf->SetFont('helvetica', '', 10);
+        $pdf->SetXY(20, $y - 6); $pdf->Cell(60, 6, (string) ($issuance->prepared_by_name ?? ''), 0, 0, 'C');
+        $pdf->SetXY(130, $y - 6); $pdf->Cell(60, 6, (string) ($issuance->received_by_name ?? ''), 0, 0, 'C');
         $pdf->Line(20, $y, 80, $y); $pdf->Line(130, $y, 190, $y);
         $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->SetXY(20, $y + 1); $pdf->Cell(60, 6, 'Issued By', 0, 0, 'C');
+        $pdf->SetXY(20, $y + 1); $pdf->Cell(60, 6, 'Prepared By', 0, 0, 'C');
         $pdf->SetXY(130, $y + 1); $pdf->Cell(60, 6, 'Received By (Mill)', 0, 0, 'C');
 
         return $pdf->Output($issuance->issue_no . '.pdf', 'I');

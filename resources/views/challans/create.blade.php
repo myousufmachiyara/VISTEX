@@ -26,7 +26,7 @@
               <select name="purchase_order_id" id="po_select" class="form-control select2-js">
                 <option value="">Select PO</option>
                 @foreach($orders as $o)
-                  <option value="{{ $o->id }}" @selected(old('purchase_order_id', $preselect) == $o->id)>{{ $o->order_no }} — {{ $o->vendor->name ?? '' }} ({{ $o->category->name ?? '' }}, {{ ucfirst($o->type) }})</option>
+                  <option value="{{ $o->id }}" @selected(old('purchase_order_id', $preselect) == $o->id)>{{ $o->order_no }} — {{ $o->vendor->name ?? '' }} ({{ $o->category->name ?? '' }}, {{ ucfirst($o->type) }}) — {{ $o->items_summary }}</option>
                 @endforeach
               </select>
               <small class="text-muted">Only approved POs appear here. Weaving/processing POs appear once material has been issued.</small>
@@ -36,7 +36,8 @@
           </div>
 
           <table class="table table-bordered" id="gateItems" style="display:none">
-            <thead><tr><th>Item</th><th class="text-end" width="18%">Outstanding</th><th width="22%">Counted at Gate</th></tr></thead>
+            <thead><tr><th>Item</th><th class="text-end" width="16%">Outstanding</th><th width="14%">Bags / Packs</th><th width="22%">Counted at Gate</th></tr></thead>
+            <tfoot><tr class="fw-bold"><td colspan="2" class="text-end">Total bags / packs</td><td id="packsTotal">0</td><td></td></tr></tfoot>
             <tbody></tbody>
           </table>
 
@@ -111,7 +112,7 @@
       const body = $('#gateItems tbody').empty();
       if (!id) { $('#gateItems').hide(); return; }
       fetch(`{{ url('challans/po-items') }}/${id}`).then(r => r.json()).then(rows => {
-        if (!rows.length) body.append('<tr><td colspan="3" class="text-muted">Nothing outstanding on this PO.</td></tr>');
+        if (!rows.length) body.append('<tr><td colspan="4" class="text-muted">Nothing outstanding on this PO.</td></tr>');
         rows.forEach((r, i) => body.append(`
           <tr>
             <td>${r.product_name}
@@ -119,7 +120,8 @@
               <input type="hidden" name="items[${i}][product_id]" value="${r.product_id ?? ''}">
               <input type="hidden" name="items[${i}][expected_qty]" value="${r.quantity}">
             </td>
-            <td class="text-end">${r.quantity}</td>
+            <td class="text-end">${r.quantity} ${r.unit || ''}${r.packs_outstanding ? `<div class="small text-muted">${r.packs_outstanding} × ${r.qty_per_pack}</div>` : ''}</td>
+            <td><input type="number" name="items[${i}][packs]" class="form-control packs" step="any" min="0" data-per="${r.qty_per_pack || ''}" placeholder="${r.qty_per_pack ? r.qty_per_pack + ' per pack' : ''}"></td>
             <td>${r.graded
               ? `<div class="input-group input-group-sm grade-row">
                    <span class="input-group-text">A</span><input type="number" name="items[${i}][qty_a]" class="form-control g" step="any" min="0" value="${r.quantity}">
@@ -128,13 +130,21 @@
                  </div>
                  <input type="hidden" name="items[${i}][received_qty]" class="g-total" value="${r.quantity}">
                  <small class="text-muted g-sum">Total ${r.quantity} m</small>`
-              : `<input type="number" name="items[${i}][received_qty]" class="form-control" step="any" min="0" value="${r.quantity}">`}</td>
+              : `<input type="number" name="items[${i}][received_qty]" class="form-control rq" step="any" min="0" value="${r.quantity}">`}</td>
           </tr>`));
         $('#gateItems thead th:last').text(rows.some(r => r.graded) ? 'Counted at Gate (A / B / C quality, m)' : 'Counted at Gate');
         $('#gateItems').show();
       });
     });
     if ($('#po_select').val()) $('#po_select').trigger('change');
+
+    // Bags / packs: running total; with a known pack size, fill the quantity counted
+    $(document).on('input', '#gateItems .packs', function () {
+      const per = parseFloat($(this).data('per')), n = parseFloat(this.value);
+      if (per && n >= 0) $(this).closest('tr').find('.rq').val(Math.round(n * per * 1000) / 1000);
+      let t = 0; $('#gateItems .packs').each(function () { t += parseFloat(this.value) || 0; });
+      $('#packsTotal').text(Math.round(t * 100) / 100);
+    });
 
     // A + B + C = meters received
     $(document).on('input', '.grade-row .g', function () {

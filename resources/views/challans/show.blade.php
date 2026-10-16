@@ -8,7 +8,10 @@
     @if(session('error'))<div class="alert alert-danger">{{ session('error') }}</div>@endif
     <header class="card-header d-flex justify-content-between align-items-center">
       <h2 class="card-title">{{ $challan->challan_no }}</h2>
-      <span class="badge bg-{{ $challan->status_badge }}">{{ $challan->status_label }}</span>
+      <div>
+        <a href="{{ route('challans.print', $challan->id) }}" target="_blank" class="btn btn-sm btn-outline-danger me-2"><i class="fas fa-file-pdf"></i> {{ $challan->receiving ? 'GRN PDF' : 'Print PDF' }}</a>
+        <span class="badge bg-{{ $challan->status_badge }}">{{ $challan->status_label }}</span>
+      </div>
     </header>
     <div class="card-body">
 
@@ -80,19 +83,20 @@
       @else
         <h6>Items</h6>
         <table class="table table-sm table-bordered">
-          <thead><tr><th>Item</th><th class="text-end">Expected</th><th class="text-end">Gate Count</th><th class="text-end">Accepted</th><th class="text-end">Rejected</th><th>Line Status</th></tr></thead>
+          <thead><tr><th>Item</th><th class="text-end">Expected</th><th class="text-end">Bags / Packs</th><th class="text-end">Gate Count</th><th class="text-end">Accepted</th><th class="text-end">Rejected</th><th>Line Status</th></tr></thead>
           <tbody>
             @forelse($challan->items as $item)
             <tr>
               <td>{{ $item->display_name }}@if($item->rejection_note)<br><small class="text-muted">{{ $item->rejection_note }}</small>@endif</td>
               <td class="text-end">{{ number_format($item->expected_qty, 3) }}</td>
+              <td class="text-end">{{ $item->packs !== null ? $item->packs + 0 : '—' }}</td>
               <td class="text-end">{{ number_format($item->received_qty, 3) }}@if($item->qty_a !== null || $item->qty_b !== null || $item->qty_c !== null)<div class="small text-muted">A {{ (float) $item->qty_a }} · B {{ (float) $item->qty_b }} · C {{ (float) $item->qty_c }}</div>@endif</td>
               <td class="text-end">{{ $challan->decision && $challan->decision !== 'amend' ? number_format($item->accepted_qty, 3) : '—' }}</td>
               <td class="text-end">{{ $challan->decision && $challan->decision !== 'amend' ? number_format($item->rejected_qty, 3) : '—' }}</td>
               <td>{{ ucfirst($item->decision) }}</td>
             </tr>
             @empty
-            <tr><td colspan="6" class="text-muted">No gate count recorded — the incharge enters quantities during inspection.</td></tr>
+            <tr><td colspan="7" class="text-muted">No gate count recorded — the incharge enters quantities during inspection.</td></tr>
             @endforelse
           </tbody>
         </table>
