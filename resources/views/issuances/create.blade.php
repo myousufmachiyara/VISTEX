@@ -126,7 +126,7 @@ $(function () {
       const body = $('#linesTable tbody').empty();
       const prefill = OLD.length ? OLD : EXISTING;
       if (d.type === 'weaving') {
-        $('#linesHead').html('<tr><th>Yarn</th><th class="text-end">Required</th><th class="text-end">Issued</th><th class="text-end">Remaining</th><th class="text-end">In Warehouse</th><th width="18%">Lot</th><th width="16%">Issue Qty</th></tr>');
+        $('#linesHead').html('<tr><th>Yarn</th><th class="text-end">Required</th><th class="text-end">Issued</th><th class="text-end">Remaining</th><th class="text-end">In Warehouse</th><th width="18%">PO #</th><th width="16%">Issue Qty</th></tr>');
         d.lines.forEach((l, i) => {
           const pre = prefill.find(p => +p.product_id === +l.product_id) || {};
           body.append(`<tr>
