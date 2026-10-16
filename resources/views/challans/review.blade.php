@@ -76,8 +76,8 @@
               <td class="text-end">{{ number_format($l['already_received'], 3) }}</td>
               <td class="text-end outstanding" data-v="{{ $l['outstanding'] }}"><strong>{{ number_format($l['outstanding'], 3) }}</strong></td>
               <td class="text-end">{{ number_format($l['gate_qty'], 3) }}
-                @if($l['gate_packs'] !== null)<div class="small text-muted">{{ $l['gate_packs'] + 0 }} bags / packs</div>@endif
-                @if($isProcessing && ($l['gate_a'] + $l['gate_b'] + $l['gate_c']) > 0)<div class="small text-muted">A {{ $l['gate_a'] + 0 }} · B {{ $l['gate_b'] + 0 }} · C {{ $l['gate_c'] + 0 }}</div>@endif
+                @if(($l['gate_packs'] ?? null) !== null)<div class="small text-muted">{{ $l['gate_packs'] + 0 }} bags / packs</div>@endif
+                @if($isProcessing && (($l['gate_a'] ?? 0) + ($l['gate_b'] ?? 0) + ($l['gate_c'] ?? 0)) > 0)<div class="small text-muted">A {{ $l['gate_a'] + 0 }} · B {{ $l['gate_b'] + 0 }} · C {{ $l['gate_c'] + 0 }}</div>@endif
               </td>
               @if($isProcessing)
                 @php($ga = ($l['gate_a'] + $l['gate_b'] + $l['gate_c']) > 0 ? $l['gate_a'] : $l['gate_qty'])

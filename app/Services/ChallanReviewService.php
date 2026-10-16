@@ -69,6 +69,7 @@ class ChallanReviewService
                 'already_received' => round($received, 3),
                 'outstanding' => round((float) $po->total_meters_required - $received, 3),
                 'gate_qty' => $gateQty,
+                'gate_packs' => ($p = $challan->items->first()?->packs) !== null ? (float) $p : null, // weaving: only if the gate typed bags
                 'accepted_qty' => (float) ($challan->items->first()->accepted_qty ?? 0) ?: $gateQty,
                 'rejected_qty' => (float) ($challan->items->first()->rejected_qty ?? 0),
                 'rate' => (float) $po->weaving_per_meter,
