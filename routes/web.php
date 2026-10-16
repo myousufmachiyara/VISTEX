@@ -329,7 +329,7 @@ Route::middleware(['auth'])->group(function () {
     // REPORTS — Yarn, Greige, Packaging Material (each family has its own reports.* permission)
     Route::get('reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports.index');
     Route::get('reports/{group}/{key}', [\App\Http\Controllers\ReportController::class, 'show'])
-        ->where(['group' => 'yarn|greige|packaging', 'key' => '[a-z_]+'])->name('reports.show');
+        ->where(['group' => 'yarn|greige|packaging|processing', 'key' => '[a-z_]+'])->name('reports.show');
 
     // OPERATIONAL 6 — ISSUANCE (Yarn for Weaving, Greige for Processing, …)
     // ════════════════════════════════════════════════════════════════
@@ -351,6 +351,68 @@ Route::middleware(['auth'])->group(function () {
     // ════════════════════════════════════════════════════════════════
     // OPERATIONAL 7 — STOCK MOVEMENT + GATE PASS / CHALLAN OUT
     // ════════════════════════════════════════════════════════════════
+    Route::get('jobs/{id}/dispatch',  [\App\Http\Controllers\JobDispatchController::class, 'create'])->name('jobs.dispatch')      ->middleware('check.permission:jobs.edit');
+    Route::post('jobs/{id}/dispatch', [\App\Http\Controllers\JobDispatchController::class, 'store']) ->name('jobs.dispatch.store')->middleware('check.permission:jobs.edit');
+
+    Route::prefix('customer-invoices')->name('customer_invoices.')->group(function () {
+        Route::get('/',                     [\App\Http\Controllers\CustomerInvoiceController::class, 'index'])      ->name('index')     ->middleware('check.permission:customer_invoices.index');
+        Route::get('create',                [\App\Http\Controllers\CustomerInvoiceController::class, 'create'])     ->name('create')    ->middleware('check.permission:customer_invoices.create');
+        Route::get('uninvoiced/{customerId}', [\App\Http\Controllers\CustomerInvoiceController::class, 'uninvoiced'])->name('uninvoiced')->middleware('check.permission:customer_invoices.create');
+        Route::post('/',                    [\App\Http\Controllers\CustomerInvoiceController::class, 'store'])      ->name('store')     ->middleware('check.permission:customer_invoices.create');
+        Route::get('{id}',                  [\App\Http\Controllers\CustomerInvoiceController::class, 'show'])       ->name('show')      ->middleware('check.permission:customer_invoices.index')->whereNumber('id');
+        Route::get('{id}/print',            [\App\Http\Controllers\CustomerInvoiceController::class, 'print'])      ->name('print')     ->middleware('check.permission:customer_invoices.print');
+        Route::post('{id}/cancel',          [\App\Http\Controllers\CustomerInvoiceController::class, 'cancel'])     ->name('cancel')    ->middleware('check.permission:customer_invoices.delete');
+    });
+    Route::prefix('customer-receipts')->name('customer_receipts.')->group(function () {
+        Route::get('/',                     [\App\Http\Controllers\CustomerReceiptController::class, 'index'])       ->name('index')        ->middleware('check.permission:customer_receipts.index');
+        Route::get('create',                [\App\Http\Controllers\CustomerReceiptController::class, 'create'])      ->name('create')       ->middleware('check.permission:customer_receipts.create');
+        Route::get('open-invoices/{customerId}', [\App\Http\Controllers\CustomerReceiptController::class, 'openInvoices'])->name('open_invoices')->middleware('check.permission:customer_receipts.create');
+        Route::post('/',                    [\App\Http\Controllers\CustomerReceiptController::class, 'store'])       ->name('store')        ->middleware('check.permission:customer_receipts.create');
+        Route::get('{id}',                  [\App\Http\Controllers\CustomerReceiptController::class, 'show'])        ->name('show')         ->middleware('check.permission:customer_receipts.index')->whereNumber('id');
+        Route::delete('{id}',               [\App\Http\Controllers\CustomerReceiptController::class, 'destroy'])     ->name('destroy')      ->middleware('check.permission:customer_receipts.delete');
+    });
+
+    Route::prefix('sale-orders')->name('sale_orders.')->group(function () {
+        Route::get('/',              [\App\Http\Controllers\SaleOrderController::class, 'index'])   ->name('index')   ->middleware('check.permission:sale_orders.index');
+        Route::get('create',         [\App\Http\Controllers\SaleOrderController::class, 'create'])  ->name('create')  ->middleware('check.permission:sale_orders.create');
+        Route::get('sellable',       [\App\Http\Controllers\SaleOrderController::class, 'sellable'])->name('sellable')->middleware('check.permission:sale_orders.index');
+        Route::post('/',             [\App\Http\Controllers\SaleOrderController::class, 'store'])   ->name('store')   ->middleware('check.permission:sale_orders.create');
+        Route::get('{id}',           [\App\Http\Controllers\SaleOrderController::class, 'show'])    ->name('show')    ->middleware('check.permission:sale_orders.index')->whereNumber('id');
+        Route::get('{id}/edit',      [\App\Http\Controllers\SaleOrderController::class, 'edit'])    ->name('edit')    ->middleware('check.permission:sale_orders.edit');
+        Route::put('{id}',           [\App\Http\Controllers\SaleOrderController::class, 'update'])  ->name('update')  ->middleware('check.permission:sale_orders.edit');
+        Route::get('{id}/print',     [\App\Http\Controllers\SaleOrderController::class, 'print'])   ->name('print')   ->middleware('check.permission:sale_orders.print');
+        Route::post('{id}/approve',  [\App\Http\Controllers\SaleOrderController::class, 'approve']) ->name('approve') ->middleware('check.permission:sale_orders.edit');
+        Route::post('{id}/reject',   [\App\Http\Controllers\SaleOrderController::class, 'reject'])  ->name('reject')  ->middleware('check.permission:sale_orders.edit');
+        Route::post('{id}/close',    [\App\Http\Controllers\SaleOrderController::class, 'close'])   ->name('close')   ->middleware('check.permission:sale_orders.edit');
+        Route::post('{id}/deliver',  [\App\Http\Controllers\SaleOrderController::class, 'deliver']) ->name('deliver') ->middleware('check.permission:sale_orders.create');
+    });
+
+    Route::prefix('production')->name('production.')->group(function () {
+        Route::get('/',                    [\App\Http\Controllers\ProductionController::class, 'index'])   ->name('index')   ->middleware('check.permission:production_orders.index');
+        Route::get('packaging-list',       [\App\Http\Controllers\ProductionController::class, 'bom'])     ->name('bom')     ->middleware('check.permission:production_orders.index');
+        Route::post('packaging-list',      [\App\Http\Controllers\ProductionController::class, 'saveBom']) ->name('bom.save')->middleware('check.permission:production_orders.edit');
+        Route::get('job-items/{jobId}',    [\App\Http\Controllers\ProductionController::class, 'jobItems'])->name('job_items')->middleware('check.permission:production_orders.create');
+        Route::get('{type}/create',        [\App\Http\Controllers\ProductionController::class, 'create'])  ->name('create')  ->middleware('check.permission:production_orders.create')->whereIn('type', ['cutting', 'packing']);
+        Route::get('{type}/stock',         [\App\Http\Controllers\ProductionController::class, 'stock'])   ->name('stock')   ->middleware('check.permission:production_orders.create')->whereIn('type', ['cutting', 'packing']);
+        Route::post('{type}',              [\App\Http\Controllers\ProductionController::class, 'store'])   ->name('store')   ->middleware('check.permission:production_orders.create')->whereIn('type', ['cutting', 'packing']);
+        Route::get('{id}',                 [\App\Http\Controllers\ProductionController::class, 'show'])    ->name('show')    ->middleware('check.permission:production_orders.index')->whereNumber('id');
+    });
+
+    Route::prefix('reprocess')->name('reprocess.')->group(function () {
+        Route::get('/',          [\App\Http\Controllers\ReprocessController::class, 'index'])    ->name('index')    ->middleware('check.permission:purchase_orders.index');
+        Route::get('create',     [\App\Http\Controllers\ReprocessController::class, 'create'])   ->name('create')   ->middleware('check.permission:purchase_orders.create');
+        Route::get('available',  [\App\Http\Controllers\ReprocessController::class, 'available'])->name('available')->middleware('check.permission:purchase_orders.create');
+        Route::post('/',         [\App\Http\Controllers\ReprocessController::class, 'store'])    ->name('store')    ->middleware('check.permission:purchase_orders.create');
+    });
+
+    Route::prefix('qc-inspections')->name('qc_inspections.')->group(function () {
+        Route::get('/',                    [\App\Http\Controllers\QcInspectionController::class, 'index'])  ->name('index') ->middleware('check.permission:qc_inspections.index');
+        Route::post('start/{receivingId}', [\App\Http\Controllers\QcInspectionController::class, 'start'])  ->name('start') ->middleware('check.permission:qc_inspections.create');
+        Route::get('{id}',                 [\App\Http\Controllers\QcInspectionController::class, 'show'])   ->name('show')  ->middleware('check.permission:qc_inspections.index');
+        Route::put('{id}',                 [\App\Http\Controllers\QcInspectionController::class, 'update']) ->name('update')->middleware('check.permission:qc_inspections.create');
+        Route::get('{id}/print',           [\App\Http\Controllers\QcInspectionController::class, 'print'])  ->name('print') ->middleware('check.permission:qc_inspections.print');
+    });
+
     Route::prefix('stock-movements')->name('stock_movements.')->group(function () {
         Route::get('/',              [StockMovementController::class, 'index'])         ->name('index')   ->middleware('check.permission:stock_movements.index');
         Route::get('gate',           [StockMovementController::class, 'gate'])          ->name('gate')    ->middleware('check.permission:stock_movements.gate');

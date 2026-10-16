@@ -76,6 +76,10 @@ class DatabaseSeeder extends Seeder
             'purchase_orders', 'purchase_order_amendments',
             'challans',
             'purchase_receivings', 'purchase_returns',
+            'qc_inspections',
+            'production_orders',
+            'sale_orders',
+            'customer_invoices', 'customer_receipts',
             'issuances',
             'stock_movements',
             'processing_issues',
@@ -89,7 +93,7 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        foreach (['reports.yarn', 'reports.greige', 'reports.packaging', 'stock_movements.gate'] as $name) {
+        foreach (['reports.yarn', 'reports.greige', 'reports.packaging', 'reports.processing', 'stock_movements.gate'] as $name) {
             Permission::firstOrCreate(['name' => $name]);
         }
 
@@ -179,6 +183,7 @@ class DatabaseSeeder extends Seeder
         foreach ($mappings as $key => $accountId) {
             AccountMapping::updateOrCreate(['role_key' => $key], ['account_id' => $accountId]);
         }
+        \App\Support\SalesAccounts::ensure();
     }
 
     // ─────────────────────────────────────────────────────────────────

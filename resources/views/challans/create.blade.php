@@ -120,12 +120,29 @@
               <input type="hidden" name="items[${i}][expected_qty]" value="${r.quantity}">
             </td>
             <td class="text-end">${r.quantity}</td>
-            <td><input type="number" name="items[${i}][received_qty]" class="form-control" step="any" min="0" value="${r.quantity}"></td>
+            <td>${r.graded
+              ? `<div class="input-group input-group-sm grade-row">
+                   <span class="input-group-text">A</span><input type="number" name="items[${i}][qty_a]" class="form-control g" step="any" min="0" value="${r.quantity}">
+                   <span class="input-group-text">B</span><input type="number" name="items[${i}][qty_b]" class="form-control g" step="any" min="0" value="0">
+                   <span class="input-group-text">C</span><input type="number" name="items[${i}][qty_c]" class="form-control g" step="any" min="0" value="0">
+                 </div>
+                 <input type="hidden" name="items[${i}][received_qty]" class="g-total" value="${r.quantity}">
+                 <small class="text-muted g-sum">Total ${r.quantity} m</small>`
+              : `<input type="number" name="items[${i}][received_qty]" class="form-control" step="any" min="0" value="${r.quantity}">`}</td>
           </tr>`));
+        $('#gateItems thead th:last').text(rows.some(r => r.graded) ? 'Counted at Gate (A / B / C quality, m)' : 'Counted at Gate');
         $('#gateItems').show();
       });
     });
     if ($('#po_select').val()) $('#po_select').trigger('change');
+
+    // A + B + C = meters received
+    $(document).on('input', '.grade-row .g', function () {
+      const td = $(this).closest('td');
+      const total = td.find('.g').toArray().reduce((s, el) => s + (parseFloat(el.value) || 0), 0);
+      td.find('.g-total').val(Math.round(total * 1000) / 1000);
+      td.find('.g-sum').text('Total ' + (Math.round(total * 1000) / 1000) + ' m');
+    });
 
     let idx = 0;
     function addDirectRow() {

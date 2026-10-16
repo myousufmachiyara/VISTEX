@@ -72,10 +72,13 @@ class ChallanController extends Controller
             ]]);
         }
 
+        $graded = $po->type === 'processing';
         return response()->json($po->items->map(fn($i) => [
-            'purchase_order_item_id' => $i->id, 'product_id' => $i->product_id,
-            'product_name' => $i->product->name ?? trim(($i->pattern_code ?? '') . ' ' . ($i->description ?? '')),
+            'purchase_order_item_id' => $i->id, 'product_id' => $graded ? null : $i->product_id,
+            'product_name' => $graded ? trim($i->pattern_code . ' ' . collect([$i->design, $i->color_scheme])->filter()->implode(' - '))
+                                      : ($i->product->name ?? trim(($i->pattern_code ?? '') . ' ' . ($i->description ?? ''))),
             'quantity' => $i->outstanding_qty,
+            'graded' => $graded,
         ])->filter(fn($r) => $r['quantity'] > 0.001)->values());
     }
 
@@ -97,7 +100,7 @@ class ChallanController extends Controller
             'items.*.purchase_order_item_id' => 'nullable|exists:purchase_order_items,id',
             'items.*.product_id'             => 'nullable|exists:products,id',
             'items.*.expected_qty'           => 'required|numeric|min:0',
-            'items.*.received_qty'           => 'required|numeric|min:0',
+            'items.*.received_qty'           => 'required|numeric|min:0', 'items.*.qty_a' => 'nullable|numeric|min:0', 'items.*.qty_b' => 'nullable|numeric|min:0', 'items.*.qty_c' => 'nullable|numeric|min:0',
         ]);
 
         try {
@@ -217,7 +220,7 @@ class ChallanController extends Controller
             'remove_voice'         => 'nullable|boolean',
             'items'                => 'nullable|array',
             'items.*.id'           => 'required|integer',
-            'items.*.received_qty' => 'required|numeric|min:0',
+            'items.*.received_qty' => 'required|numeric|min:0', 'items.*.qty_a' => 'nullable|numeric|min:0', 'items.*.qty_b' => 'nullable|numeric|min:0', 'items.*.qty_c' => 'nullable|numeric|min:0',
         ];
         $request->validate($rules);
 
@@ -282,7 +285,7 @@ class ChallanController extends Controller
             'lines'                          => 'required|array|min:1',
             'lines.*.purchase_order_item_id' => 'nullable|integer',
             'lines.*.accepted_qty'           => 'nullable|numeric|min:0',
-            'lines.*.rejected_qty'           => 'nullable|numeric|min:0',
+            'lines.*.rejected_qty'           => 'nullable|numeric|min:0', 'lines.*.qty_a' => 'nullable|numeric|min:0', 'lines.*.qty_b' => 'nullable|numeric|min:0', 'lines.*.qty_c' => 'nullable|numeric|min:0',
             'lines.*.new_quantity'           => 'nullable|numeric|min:0',
             'lines.*.new_rate'               => 'nullable|numeric|min:0',
             'lines.*.note'                   => 'nullable|string|max:255',

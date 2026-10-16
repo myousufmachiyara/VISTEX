@@ -86,7 +86,7 @@
             <tr>
               <td>{{ $item->display_name }}@if($item->rejection_note)<br><small class="text-muted">{{ $item->rejection_note }}</small>@endif</td>
               <td class="text-end">{{ number_format($item->expected_qty, 3) }}</td>
-              <td class="text-end">{{ number_format($item->received_qty, 3) }}</td>
+              <td class="text-end">{{ number_format($item->received_qty, 3) }}@if($item->qty_a !== null || $item->qty_b !== null || $item->qty_c !== null)<div class="small text-muted">A {{ (float) $item->qty_a }} · B {{ (float) $item->qty_b }} · C {{ (float) $item->qty_c }}</div>@endif</td>
               <td class="text-end">{{ $challan->decision && $challan->decision !== 'amend' ? number_format($item->accepted_qty, 3) : '—' }}</td>
               <td class="text-end">{{ $challan->decision && $challan->decision !== 'amend' ? number_format($item->rejected_qty, 3) : '—' }}</td>
               <td>{{ ucfirst($item->decision) }}</td>

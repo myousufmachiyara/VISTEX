@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Services\DashboardService;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(DashboardService $dashboard)
     {
-        return view('home');
-    } 
+        return view('home', ['d' => $dashboard->build(auth()->user())]);
+    }
 }

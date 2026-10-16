@@ -27,22 +27,30 @@ class StockMovementService
 
             $type = $data['movement_type'];
             $from = Location::findOrFail($data['from_location_id']);
-            $to = Location::findOrFail($data['to_location_id']);
-            $this->assertLocations($type, $from, $to);
+            if ($type === StockMovement::SALE) {
+                // Sale delivery: from our warehouse to a customer (no destination location)
+                if ($from->vendor_id) throw new \Exception('Sale deliveries leave from one of our warehouses.');
+                if (empty($data['customer_id'])) throw new \Exception('A sale delivery needs a customer.');
+                $to = null;
+            } else {
+                $to = Location::findOrFail($data['to_location_id']);
+                $this->assertLocations($type, $from, $to);
+            }
 
             // Stock check: what's at the source minus what other open movements already hold
             $want = [];
             foreach ($items as $i) {
-                $k = $i['product_id'] . '|' . ($i['source_lot_no'] ?? '');
+                $k = implode('|', [$i['product_id'], $i['source_lot_no'] ?? '', $this->sourceStatus($i), $this->sourceGrade($i) ?? '']);
                 $want[$k] = ($want[$k] ?? 0) + (float) $i['quantity'];
             }
             foreach ($want as $k => $qty) {
-                [$productId, $lot] = explode('|', $k);
-                $lot = $lot === '' ? null : $lot;
-                $free = LocationStockLedger::balance($from->id, (int) $productId, 'fresh', $lot) - $this->held($from->id, (int) $productId, $lot);
+                [$productId, $lot, $status, $grade] = explode('|', $k);
+                $lot = $lot === '' ? null : $lot; $grade = $grade === '' ? null : $grade;
+                $free = LocationStockLedger::balance($from->id, (int) $productId, $status, $lot, $grade) - $this->held($from->id, (int) $productId, $lot, null, $status, $grade);
                 if ($qty > $free + 0.001) {
                     $name = Product::find($productId)->name ?? 'item';
-                    throw new \Exception("Not enough {$name} at {$from->name}" . ($lot ? " (lot {$lot})" : '') . ' — free stock ' . round(max(0, $free), 3) . ", requested {$qty}.");
+                    $what = $status === 'reprocess' ? ' on reprocess hold' : ($grade ? " grade {$grade}" : '');
+                    throw new \Exception("Not enough {$name}{$what} at {$from->name}" . ($lot ? " (lot {$lot})" : '') . ' — free stock ' . round(max(0, $free), 3) . ", requested {$qty}.");
                 }
             }
 
@@ -50,8 +58,11 @@ class StockMovementService
                 'movement_no'       => $this->numberService->next('stock_movement', 'stock_movements', 'movement_no', 'SM'),
                 'movement_type'     => $type,
                 'from_location_id'  => $from->id,
-                'to_location_id'    => $to->id,
+                'to_location_id'    => $to?->id,
                 'purchase_order_id' => $data['purchase_order_id'] ?? null,
+                'sale_order_id'     => $data['sale_order_id'] ?? null,
+                'job_id'            => $data['job_id'] ?? null,
+                'customer_id'       => $data['customer_id'] ?? null,
                 'movement_date'     => $data['movement_date'],
                 'status'            => StockMovement::PENDING,
                 'remarks'           => $data['remarks'] ?? null,
@@ -65,15 +76,19 @@ class StockMovementService
                     'stock_movement_id' => $movement->id,
                     'product_id'        => $item['product_id'],
                     'source_lot_no'     => ($item['source_lot_no'] ?? '') !== '' ? $item['source_lot_no'] : null,
+                    'source_status'     => $this->sourceStatus($item),
+                    'source_grade'      => $this->sourceGrade($item),
+                    'sale_order_item_id' => $item['sale_order_item_id'] ?? null,
+                    'job_item_id'        => $item['job_item_id'] ?? null,
                     'quantity'          => round((float) $item['quantity'], 3),
                     'amount'            => 0, // valued at dispatch
                 ]);
             }
 
-            $this->notifyLocation($from, 'stock_movement_pending', 'Stock Movement to Approve',
-                "{$movement->movement_no}: {$from->name} → {$to->name} needs your approval.", $movement->id);
+            $this->notifyLocation($from, 'stock_movement_pending', $type === StockMovement::SALE ? 'Sale Delivery to Approve' : 'Stock Movement to Approve',
+                "{$movement->movement_no}: {$from->name} → {$movement->destination_name} needs your approval.", $movement->id);
 
-            return $movement->load('items.product', 'fromLocation', 'toLocation');
+            return $movement->load('items.product', 'fromLocation', 'toLocation', 'customer');
         });
     }
 
@@ -91,9 +106,17 @@ class StockMovementService
     }
 
     // Quantity already promised to open (not yet dispatched) movements from this location
-    private function held(int $locationId, int $productId, ?string $lot, ?int $exceptId = null): float
+    private function sourceStatus(array $i): string { return ($i['source_status'] ?? 'fresh') === 'reprocess' ? 'reprocess' : 'fresh'; }
+    private function sourceGrade(array $i): ?string
     {
-        return (float) StockMovementItem::where('product_id', $productId)
+        $g = strtoupper(trim((string) ($i['source_grade'] ?? '')));
+        return ($this->sourceStatus($i) === 'fresh' && in_array($g, ['A', 'B', 'C'], true)) ? $g : null;
+    }
+
+    private function held(int $locationId, int $productId, ?string $lot, ?int $exceptId = null, string $status = 'fresh', ?string $grade = null): float
+    {
+        return (float) StockMovementItem::where('product_id', $productId)->where('source_status', $status)
+            ->when($grade, fn($q) => $q->where('source_grade', $grade))
             ->when($lot !== null, fn($q) => $q->where('source_lot_no', $lot))
             ->whereHas('stockMovement', fn($q) => $q->where('from_location_id', $locationId)
                 ->whereIn('status', [StockMovement::PENDING, StockMovement::APPROVED])
@@ -113,7 +136,7 @@ class StockMovementService
             if (!$movement->needsGateExit()) return $this->dispatch($movement, [], $userId);
 
             $this->notifications->notifyRole('gatekeeper', 'gate_pass_issued', 'Gate Pass Issued',
-                "{$movement->movement_no}: {$movement->fromLocation->name} → {$movement->toLocation->name} may leave after gate check.", 'stock_movement', $movement->id);
+                "{$movement->movement_no}: {$movement->fromLocation->name} → {$movement->destination_name} may leave after gate check.", 'stock_movement', $movement->id);
             return $movement->fresh();
         });
     }
@@ -130,13 +153,14 @@ class StockMovementService
             foreach ($movement->items as $item) {
                 $avg = $item->product->weightedAverageCost($movement->from_location_id);
                 $total = 0;
-                foreach (LocationStockLedger::allocate($movement->from_location_id, $item->product_id, (float) $item->quantity, $item->source_lot_no) as $part) {
+                $status = $item->source_status ?: 'fresh'; $grade = $item->source_grade;
+                foreach (LocationStockLedger::allocate($movement->from_location_id, $item->product_id, (float) $item->quantity, $item->source_lot_no, $status, $grade) as $part) {
                     // Each lot carries its own cost (a lot is one PO's price); unlotted stock uses the location average
-                    $rate = LocationStockLedger::lotRate($movement->from_location_id, $item->product_id, $part['lot_no'], $avg);
+                    $rate = LocationStockLedger::lotRate($movement->from_location_id, $item->product_id, $part['lot_no'], $avg, $status, $grade);
                     $amount = round($part['quantity'] * $rate, 2);
                     $total += $amount;
-                    $this->post($movement, $movement->from_location_id, $item->product_id, 'fresh', $part['lot_no'], -$part['quantity'], -$amount);
-                    $this->post($movement, $movement->to_location_id, $item->product_id, 'in_transit', $part['lot_no'], $part['quantity'], $amount);
+                    $this->post($movement, $movement->from_location_id, $item->product_id, $status, $part['lot_no'], -$part['quantity'], -$amount, $grade);
+                    if (!$movement->isSale()) $this->post($movement, $movement->to_location_id, $item->product_id, 'in_transit', $part['lot_no'], $part['quantity'], $amount);
                 }
                 $item->update(['amount' => round($total, 2)]);
             }
@@ -154,6 +178,13 @@ class StockMovementService
                 'dispatched_at'  => now(),
                 'updated_by'     => $userId,
             ]);
+
+            // Sale delivery: handed over at our gate — delivered, cost of goods sold, sale order updated
+            if ($movement->isSale()) {
+                $movement->update(['status' => StockMovement::RECEIVED, 'received_by' => $userId, 'received_at' => now()]);
+                app(SaleOrderService::class)->delivered($movement->fresh('items.product.category', 'saleOrder', 'job'), $userId);
+                return $movement->fresh('items.product');
+            }
 
             $this->notifyLocation($movement->toLocation, 'stock_movement_dispatched', 'Stock On The Way',
                 "{$movement->movement_no} left {$movement->fromLocation->name}. Receive it when it arrives.", $movement->id);
@@ -177,15 +208,18 @@ class StockMovementService
             $transit = LocationStockLedger::where('reference_type', 'StockMovement')->where('reference_id', $movement->id)
                 ->where('location_id', $movement->to_location_id)->where('status', 'in_transit')->get();
 
+            // Fabric sent for reprocessing goes straight into process at the mill, under its own lot
+            $reprocess = $movement->isReprocess();
             foreach ($transit as $row) {
-                $lot = $millLot !== '' ? $millLot : $row->lot_no;
+                $lot = (!$reprocess && $millLot !== '') ? $millLot : $row->lot_no;
                 $this->post($movement, $movement->to_location_id, $row->product_id, 'in_transit', $row->lot_no, -(float) $row->quantity, -(float) $row->amount);
-                $this->post($movement, $movement->to_location_id, $row->product_id, 'fresh', $lot, (float) $row->quantity, (float) $row->amount);
+                $this->post($movement, $movement->to_location_id, $row->product_id, $reprocess ? 'in_process' : 'fresh', $lot, (float) $row->quantity, (float) $row->amount);
             }
+            if ($reprocess && $movement->purchaseOrder->status === 'Approved') $movement->purchaseOrder->update(['status' => 'Issued']);
 
             $movement->update([
                 'status'          => StockMovement::RECEIVED,
-                'lot_no'          => $millLot !== '' ? $millLot : $movement->lot_no,
+                'lot_no'          => (!$reprocess && $millLot !== '') ? $millLot : ($reprocess ? $movement->purchaseOrder->stock_lot_no : $movement->lot_no),
                 'received_by'     => $userId,
                 'received_at'     => now(),
                 'receive_remarks' => trim((string) ($data['remarks'] ?? '')) ?: null,
@@ -204,11 +238,11 @@ class StockMovementService
         return $movement->fresh();
     }
 
-    private function post(StockMovement $m, int $locationId, int $productId, string $status, ?string $lot, float $qty, float $amount): void
+    private function post(StockMovement $m, int $locationId, int $productId, string $status, ?string $lot, float $qty, float $amount, ?string $grade = null): void
     {
         LocationStockLedger::create([
             'doc_no' => $m->movement_no, 'location_id' => $locationId, 'product_id' => $productId,
-            'status' => $status, 'lot_no' => $lot, 'quantity' => round($qty, 3), 'amount' => round($amount, 2),
+            'status' => $status, 'lot_no' => $lot, 'grade' => $grade, 'quantity' => round($qty, 3), 'amount' => round($amount, 2),
             'reference_type' => 'StockMovement', 'reference_id' => $m->id, 'entry_date' => $m->movement_date,
         ]);
     }

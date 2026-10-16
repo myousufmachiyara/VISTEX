@@ -60,7 +60,18 @@
                 <tr>
                   <td>{{ $item->display_name }}<input type="hidden" name="items[{{ $i }}][id]" value="{{ $item->id }}"></td>
                   <td class="text-end">{{ number_format($item->expected_qty, 3) }}</td>
-                  <td><input type="number" name="items[{{ $i }}][received_qty]" class="form-control" step="any" min="0" required value="{{ old("items.$i.received_qty", (float) $item->received_qty) }}"></td>
+                  <td>
+                    @if($item->qty_a !== null || $item->qty_b !== null || $item->qty_c !== null || ($po->type ?? null) === 'processing')
+                      <div class="input-group input-group-sm">
+                        <span class="input-group-text">A</span><input type="number" name="items[{{ $i }}][qty_a]" class="form-control" step="any" min="0" value="{{ old("items.$i.qty_a", (float) ($item->qty_a ?? $item->received_qty)) }}">
+                        <span class="input-group-text">B</span><input type="number" name="items[{{ $i }}][qty_b]" class="form-control" step="any" min="0" value="{{ old("items.$i.qty_b", (float) $item->qty_b) }}">
+                        <span class="input-group-text">C</span><input type="number" name="items[{{ $i }}][qty_c]" class="form-control" step="any" min="0" value="{{ old("items.$i.qty_c", (float) $item->qty_c) }}">
+                      </div>
+                      <input type="hidden" name="items[{{ $i }}][received_qty]" value="{{ (float) $item->received_qty }}">
+                    @else
+                      <input type="number" name="items[{{ $i }}][received_qty]" class="form-control" step="any" min="0" required value="{{ old("items.$i.received_qty", (float) $item->received_qty) }}">
+                    @endif
+                  </td>
                 </tr>
               @empty
                 <tr><td colspan="3" class="text-muted">No gate count on this challan.</td></tr>

@@ -5,6 +5,8 @@
   $badge = match($job->status) { 'Approved' => 'success', 'Rejected' => 'danger', default => 'warning text-dark' };
   $cur = $job->currency ?? 'PKR';
   $pcsTotal = $job->items->sum(fn($i) => $i->pieces ?? 0);
+  $dispatches = \App\Models\StockMovement::where('job_id', $job->id)->with('items', 'fromLocation')->orderBy('id')->get();
+  $dispatchedFor = fn($id) => (float) \App\Models\StockMovementItem::where('job_item_id', $id)->whereHas('stockMovement', fn($q) => $q->where('status', 'Received'))->sum('quantity');
 @endphp
 <div class="row"><div class="col">
   <section class="card">
@@ -49,7 +51,7 @@
         <table class="table table-bordered table-sm">
           <thead class="table-light">
             <tr><th>#</th><th>Collection</th><th>Pattern #</th><th>Design</th><th>Colour Scheme</th><th>Packaging</th>
-              <th class="text-end">Qty (m)</th><th class="text-end">Pcs</th><th class="text-end">Rate</th><th class="text-end">Disc %</th><th class="text-end">Tax</th><th class="text-end">Amount</th></tr>
+              <th class="text-end">Qty (m)</th><th class="text-end">Pcs</th><th class="text-end">Packed</th><th class="text-end">Dispatched</th><th class="text-end">Rate</th><th class="text-end">Disc %</th><th class="text-end">Tax</th><th class="text-end">Amount</th></tr>
           </thead>
           <tbody>
             @foreach($job->items as $n => $item)
@@ -62,6 +64,8 @@
               <td>{{ $item->product->name ?? '—' }}</td>
               <td class="text-end">{{ number_format($item->quantity, 2) }}</td>
               <td class="text-end">{{ $item->pieces !== null ? number_format($item->pieces) : '' }}</td>
+              <td class="text-end">{{ ($packed = \App\Services\ProductionService::packedFor($item->id)) ? number_format($packed) : '' }}</td>
+              <td class="text-end">{{ ($sent = $dispatchedFor($item->id)) ? number_format($sent) : '' }}</td>
               <td class="text-end">{{ rtrim(rtrim(number_format($item->unit_price, 4), '0'), '.') }}</td>
               <td class="text-end">{{ (float) $item->discount_pct ? number_format($item->discount_pct, 2) : '' }}</td>
               <td class="text-end">{{ (float) $item->tax_amount ? number_format($item->tax_amount, 2) : '' }}</td>
@@ -70,7 +74,7 @@
             @endforeach
           </tbody>
           <tfoot class="fw-bold">
-            <tr><td colspan="6" class="text-end">Total</td><td class="text-end">{{ number_format($job->total_meters, 2) }}</td><td class="text-end">{{ $pcsTotal ? number_format($pcsTotal) : '' }}</td><td colspan="3"></td><td class="text-end">{{ $cur }} {{ number_format($job->total_amount, 2) }}</td></tr>
+            <tr><td colspan="6" class="text-end">Total</td><td class="text-end">{{ number_format($job->total_meters, 2) }}</td><td class="text-end">{{ $pcsTotal ? number_format($pcsTotal) : '' }}</td><td></td><td></td><td colspan="3"></td><td class="text-end">{{ $cur }} {{ number_format($job->total_amount, 2) }}</td></tr>
           </tfoot>
         </table>
       </div>
@@ -110,10 +114,28 @@
         @endif
       </div>
       <div>
+        @if($job->status === 'Approved')@can('jobs.edit')<a href="{{ route('jobs.dispatch', $job->id) }}" class="btn btn-primary"><i class="fa fa-truck"></i> Dispatch</a>@endcan @endif
         @can('jobs.print')<a href="{{ route('jobs.print', $job->id) }}" target="_blank" class="btn btn-outline-secondary"><i class="fa fa-print"></i> Print</a>@endcan
         <a href="{{ route('jobs.index') }}" class="btn btn-outline-secondary">Back</a>
       </div>
     </footer>
   </section>
+  @if($dispatches->isNotEmpty())
+  <section class="card mt-3">
+    <header class="card-header"><h2 class="card-title">Dispatches</h2></header>
+    <div class="card-body">
+      <table class="table table-sm table-bordered mb-0">
+        <thead><tr><th>Gate pass</th><th>Date</th><th>From</th><th class="text-end">Pcs</th><th>Vehicle</th><th>Status</th></tr></thead>
+        <tbody>
+        @foreach($dispatches as $d)
+          <tr><td><a href="{{ route('stock_movements.show', $d->id) }}">{{ $d->movement_no }}</a></td><td>{{ $d->movement_date->format('d-M-Y') }}</td>
+            <td>{{ $d->fromLocation->name ?? '' }}</td><td class="text-end">{{ number_format($d->items->sum('quantity')) }}</td><td>{{ $d->vehicle_no ?? '—' }}</td>
+            <td><span class="badge bg-{{ $d->status_badge }}">{{ $d->status_label }}</span></td></tr>
+        @endforeach
+        </tbody>
+      </table>
+    </div>
+  </section>
+  @endif
 </div></div>
 @endsection

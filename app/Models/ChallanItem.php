@@ -13,6 +13,7 @@ class ChallanItem extends Model
     protected $fillable = [
         'challan_id', 'purchase_order_item_id', 'product_id', 'description',
         'expected_qty', 'received_qty', 'accepted_qty', 'rejected_qty', 'decision', 'rejection_note',
+        'qty_a', 'qty_b', 'qty_c',
     ];
 
     protected $casts = [

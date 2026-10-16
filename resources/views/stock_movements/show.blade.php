@@ -24,9 +24,9 @@
       @if($m->status === 'Rejected')<div class="alert alert-danger"><strong>Rejected:</strong> {{ $m->rejection_reason }}</div>@endif
 
       <div class="row mb-2">
-        <div class="col-md-4 mb-2"><strong>Type:</strong> {{ \App\Models\StockMovement::TYPES[$m->movement_type] ?? $m->movement_type }}</div>
+        <div class="col-md-4 mb-2"><strong>Type:</strong> {{ $m->type_label }}</div>
         <div class="col-md-4 mb-2"><strong>From:</strong> {{ $m->fromLocation->name ?? '' }}@if($m->fromLocation?->vendor) <small class="text-muted">({{ $m->fromLocation->vendor->name }})</small>@endif</div>
-        <div class="col-md-4 mb-2"><strong>To:</strong> {{ $m->toLocation->name ?? '' }}@if($m->toLocation?->vendor) <small class="text-muted">({{ $m->toLocation->vendor->name }})</small>@endif</div>
+        <div class="col-md-4 mb-2"><strong>To:</strong> {{ $m->destination_name }}@if($m->isSale() && $m->saleOrder) <small class="text-muted">(Sale <a href="{{ route('sale_orders.show', $m->sale_order_id) }}">{{ $m->saleOrder->so_no }}</a>)</small>@endif @if($m->job) <small class="text-muted">(Order <a href="{{ route('jobs.show', $m->job_id) }}">{{ $m->job->job_no }}</a>)</small>@endif @if($m->toLocation?->vendor) <small class="text-muted">({{ $m->toLocation->vendor->name }})</small>@endif</div>
         <div class="col-md-4 mb-2"><strong>Date:</strong> {{ $m->movement_date->format('d-M-Y') }}</div>
         @if($m->purchaseOrder)<div class="col-md-4 mb-2"><strong>Processing PO:</strong> <a href="{{ route('purchase_orders.show', $m->purchase_order_id) }}">{{ $m->purchaseOrder->order_no }}</a></div>@endif
         @if($m->lot_no)<div class="col-md-4 mb-2"><strong>Mill Lot #:</strong> <span class="badge bg-dark">{{ $m->lot_no }}</span></div>@endif
@@ -45,7 +45,9 @@
             @php $taken = $lots[$item->product_id] ?? collect(); @endphp
             <tr>
               <td>{{ $n + 1 }}</td>
-              <td>{{ $item->product->name ?? '' }}</td>
+              <td>{{ $item->product->name ?? '' }}
+                @if($item->source_status === 'reprocess' || $item->source_grade)<div class="small text-muted">{{ $item->source_label }}</div>@endif
+              </td>
               <td class="small">
                 @if($taken->isNotEmpty())
                   {{ $taken->map(fn($r) => ($r->lot_no ?? 'no lot') . ': ' . rtrim(rtrim(number_format(-$r->quantity, 3), '0'), '.'))->implode(' · ') }}
@@ -101,8 +103,13 @@
           <h6 class="mb-2">Receive at {{ $m->toLocation->name ?? '' }}</h6>
           <div class="row">
             <div class="col-md-4 mb-3">
+              @if($m->isReprocess())
+              <label>Lot #</label>
+              <div class="form-control-plaintext"><span class="badge bg-dark">{{ $m->purchaseOrder->stock_lot_no }}</span> <small class="text-muted">kept for reprocessing; goes straight into process</small></div>
+              @else
               <label>Mill Lot # @if($m->needsMillLot())<span class="text-danger">*</span>@else<small class="text-muted">(optional)</small>@endif</label>
               <input type="text" name="lot_no" class="form-control" maxlength="100" value="{{ old('lot_no') }}" @if($m->needsMillLot()) required placeholder="Lot # given by the mill" @endif>
+              @endif
             </div>
             <div class="col-md-8 mb-3"><label>Remarks</label><input type="text" name="remarks" class="form-control" maxlength="1000" value="{{ old('remarks') }}"></div>
           </div>

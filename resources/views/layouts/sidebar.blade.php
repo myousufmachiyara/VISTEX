@@ -89,8 +89,8 @@
         {{-- ═══════════════════════════════════════════════════════ --}}
         {{-- PURCHASE — PO, Objections, Challans, Receiving, Return     --}}
         {{-- ═══════════════════════════════════════════════════════ --}}
-        @if(auth()->user()->canAny(['purchase_orders.index','challans.index','purchase_receivings.index','purchase_returns.index']))
-        <li class="nav-parent {{ request()->routeIs('purchase_orders.*','purchase_order_objections.*','challans.*','purchase_receivings.*','purchase_returns.*') ? 'nav-expanded active' : '' }}">
+        @if(auth()->user()->canAny(['purchase_orders.index','challans.index','purchase_receivings.index','purchase_returns.index','qc_inspections.index']))
+        <li class="nav-parent {{ request()->routeIs('purchase_orders.*','purchase_order_objections.*','challans.*','purchase_receivings.*','purchase_returns.*','qc_inspections.*','reprocess.*') ? 'nav-expanded active' : '' }}">
           <a class="nav-link" href="#"><i class="fa fa-shopping-cart"></i><span>Purchase</span></a>
           <ul class="nav nav-children">
             @can('purchase_orders.index')<li class="{{ request()->routeIs('purchase_orders.*')?'active':'' }}"><a class="nav-link" href="{{ route('purchase_orders.index') }}">Purchase Orders</a></li>@endcan
@@ -101,6 +101,11 @@
               <li class="{{ request()->routeIs('challans.pending','challans.review*')?'active':'' }}"><a class="nav-link" href="{{ route('challans.pending') }}">Inspection Queue @if($__inspect)<span class="badge bg-danger ms-1">{{ $__inspect }}</span>@endif</a></li>
             @endcan
             @can('purchase_receivings.index')<li class="{{ request()->routeIs('purchase_receivings.*')?'active':'' }}"><a class="nav-link" href="{{ route('purchase_receivings.index') }}">Receivings (GRN)</a></li>@endcan
+            @can('qc_inspections.index')
+              @php($__qc = \App\Models\PurchaseReceiving::where('status', 'Approved')->whereIn('qc_status', ['Pending', 'InProgress'])->count())
+              <li class="{{ request()->routeIs('qc_inspections.*')?'active':'' }}"><a class="nav-link" href="{{ route('qc_inspections.index') }}">QC (Processed Fabric) @if($__qc)<span class="badge bg-warning text-dark ms-1">{{ $__qc }}</span>@endif</a></li>
+            @endcan
+            @can('purchase_orders.index')<li class="{{ request()->routeIs('reprocess.*')?'active':'' }}"><a class="nav-link" href="{{ route('reprocess.index') }}">Reprocess</a></li>@endcan
             @can('purchase_returns.index')<li class="{{ request()->routeIs('purchase_returns.*')?'active':'' }}"><a class="nav-link" href="{{ route('purchase_returns.index') }}">Returns</a></li>@endcan
           </ul>
         </li>
@@ -110,13 +115,15 @@
         {{-- ═══════════════════════════════════════════════════════ --}}
         {{-- PRODUCTION — Yarn Issue, Stock Movement, Processing        --}}
         {{-- ═══════════════════════════════════════════════════════ --}}
-        @if(auth()->user()->canAny(['issuances.index','stock_movements.index','processing_issues.index']))
-        <li class="nav-parent {{ request()->routeIs('issuances.*','stock_movements.*','processing_issues.*') ? 'nav-expanded active' : '' }}">
+        @if(auth()->user()->canAny(['issuances.index','stock_movements.index','processing_issues.index','production_orders.index']))
+        <li class="nav-parent {{ request()->routeIs('issuances.*','stock_movements.*','processing_issues.*','production.*') ? 'nav-expanded active' : '' }}">
           <a class="nav-link" href="#"><i class="fa fa-industry"></i><span>Production</span></a>
           <ul class="nav nav-children">
             @can('issuances.index')<li class="{{ request()->routeIs('issuances.*')?'active':'' }}"><a class="nav-link" href="{{ route('issuances.index') }}">Issuance</a></li>@endcan
             @can('stock_movements.index')<li class="{{ request()->routeIs('stock_movements.*') && !request()->routeIs('stock_movements.gate') ?'active':'' }}"><a class="nav-link" href="{{ route('stock_movements.index') }}">Stock Movement</a></li>@endcan
             @can('stock_movements.gate')<li class="{{ request()->routeIs('stock_movements.gate')?'active':'' }}"><a class="nav-link" href="{{ route('stock_movements.gate') }}">Gate Out</a></li>@endcan
+            @can('production_orders.index')<li class="{{ request()->routeIs('production.*') && !request()->routeIs('production.bom*') ?'active':'' }}"><a class="nav-link" href="{{ route('production.index') }}">Cutting &amp; Packing</a></li>@endcan
+            @can('production_orders.index')<li class="{{ request()->routeIs('production.bom*')?'active':'' }}"><a class="nav-link" href="{{ route('production.bom') }}">Packaging List (BOM)</a></li>@endcan
             {{-- Processing Issue replaced by Issuance → Greige for Processing (issued at the mill by lot #) --}}
           </ul>
         </li>
@@ -125,15 +132,18 @@
         {{-- ═══════════════════════════════════════════════════════ --}}
         {{-- SALES — Forecasting + Jobs                                 --}}
         {{-- ═══════════════════════════════════════════════════════ --}}
-        @can('jobs.index')
-        <li class="nav-parent {{ request()->routeIs('jobs.*') ? 'nav-expanded active' : '' }}">
+        @if(auth()->user()->canAny(['jobs.index','sale_orders.index','customer_invoices.index','customer_receipts.index']))
+        <li class="nav-parent {{ request()->routeIs('jobs.*','sale_orders.*','customer_invoices.*','customer_receipts.*') ? 'nav-expanded active' : '' }}">
           <a class="nav-link" href="#"><i class="fa fa-chart-line"></i><span>Sales</span></a>
           <ul class="nav nav-children">
             @can('jobs.index')<li class="{{ request()->routeIs('jobs.*')?'active':'' }}"><a class="nav-link" href="{{ route('jobs.index') }}">Customer Orders (Jobs)</a></li>@endcan
+            @can('sale_orders.index')<li class="{{ request()->routeIs('sale_orders.*')?'active':'' }}"><a class="nav-link" href="{{ route('sale_orders.index') }}">Sale Orders (Yarn / Greige)</a></li>@endcan
+            @can('customer_invoices.index')<li class="{{ request()->routeIs('customer_invoices.*')?'active':'' }}"><a class="nav-link" href="{{ route('customer_invoices.index') }}">Customer Invoices</a></li>@endcan
+            @can('customer_receipts.index')<li class="{{ request()->routeIs('customer_receipts.*')?'active':'' }}"><a class="nav-link" href="{{ route('customer_receipts.index') }}">Customer Receipts</a></li>@endcan
             {{-- Forecasting hidden for now --}}
           </ul>
         </li>
-        @endcan
+        @endif
 
         {{-- ═══════════════════════════════════════════════════════ --}}
         {{-- FINANCE — PDC + Vouchers                                   --}}
@@ -155,7 +165,7 @@
         {{-- ═══════════════════════════════════════════════════════ --}}
         {{-- REPORTS — Yarn, Greige, Packaging Material                  --}}
         {{-- ═══════════════════════════════════════════════════════ --}}
-        @if(auth()->user()->canAny(['reports.yarn','reports.greige','reports.packaging']))
+        @if(auth()->user()->canAny(['reports.yarn','reports.greige','reports.packaging','reports.processing']))
         <li class="nav-parent {{ request()->routeIs('reports.*') ? 'nav-expanded active' : '' }}">
           <a class="nav-link" href="#"><i class="fa fa-chart-bar"></i><span>Reports</span></a>
           <ul class="nav nav-children">
@@ -163,6 +173,7 @@
             @can('reports.yarn')<li class="{{ request()->is('reports/yarn/*')?'active':'' }}"><a class="nav-link" href="{{ route('reports.index') }}#yarn">Yarn</a></li>@endcan
             @can('reports.greige')<li class="{{ request()->is('reports/greige/*')?'active':'' }}"><a class="nav-link" href="{{ route('reports.index') }}#greige">Greige Fabric</a></li>@endcan
             @can('reports.packaging')<li class="{{ request()->is('reports/packaging/*')?'active':'' }}"><a class="nav-link" href="{{ route('reports.index') }}#packaging">Packaging Material</a></li>@endcan
+            @can('reports.processing')<li class="{{ request()->is('reports/processing/*')?'active':'' }}"><a class="nav-link" href="{{ route('reports.index') }}#processing">Processing &amp; Costing</a></li>@endcan
           </ul>
         </li>
         @endif

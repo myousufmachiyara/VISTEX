@@ -16,6 +16,7 @@ class PurchaseReceiving extends Model
         'status', 'approved_by', 'approved_at', 'rejection_reason',
         'amount', 'remarks', 'created_by', 'updated_by',
         'is_final_receiving', 'yarn_consumed_meta', 'yarn_cost_amount', 'weaving_charge_amount',
+        'greige_consumed_meta', 'greige_cost_amount', 'processing_charge_amount', 'qc_status',
     ];
 
     protected $casts = [
@@ -26,11 +27,15 @@ class PurchaseReceiving extends Model
         'yarn_consumed_meta'     => 'array',
         'yarn_cost_amount'       => 'decimal:2',
         'weaving_charge_amount'  => 'decimal:2',
+        'greige_consumed_meta'   => 'array',
+        'greige_cost_amount'     => 'decimal:2',
+        'processing_charge_amount' => 'decimal:2',
     ];
 
     public function purchaseOrder() { return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id'); }
     public function challan()       { return $this->belongsTo(Challan::class, 'challan_id'); }
     public function items()         { return $this->hasMany(PurchaseReceivingItem::class, 'purchase_receiving_id'); }
+    public function qcInspection()  { return $this->hasOne(QcInspection::class, 'purchase_receiving_id'); }
     public function approver()      { return $this->belongsTo(User::class, 'approved_by'); }
 
     public function objections()    { return $this->hasMany(PurchaseOrderObjection::class, 'purchase_receiving_id'); }

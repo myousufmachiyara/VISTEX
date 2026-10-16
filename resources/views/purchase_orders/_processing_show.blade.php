@@ -1,5 +1,19 @@
 {{-- Processing PO details on the PO page --}}
-@php $spec = $order->fabric_specs ?? []; @endphp
+@php
+  $spec = $order->fabric_specs ?? [];
+  $rpMove = $order->isReprocess() ? \App\Models\StockMovement::where('purchase_order_id', $order->id)->where('status', '!=', 'Rejected')->first() : null;
+@endphp
+@if($order->isReprocess())
+<div class="alert alert-info py-2">
+  <strong>Reprocess order</strong> {!! $order->is_foc ? '<span class="badge bg-info">FOC</span>' : '' !!}
+  · lot <strong>{{ $order->reprocess_lot_no }}</strong> (kept)
+  · original PO <a href="{{ route('purchase_orders.show', $order->reprocess_of_po_id) }}">{{ $order->reprocessOf->order_no ?? '' }}</a>
+  · gate pass:
+  @if($rpMove)<a href="{{ route('stock_movements.show', $rpMove->id) }}">{{ $rpMove->movement_no }}</a> ({{ $rpMove->status_label }})
+  @else created when the order is approved @endif
+  @if(!empty($spec['notes']))<div class="small mt-1">Reason: {{ implode('; ', $spec['notes']) }}</div>@endif
+</div>
+@endif
 <div class="row mb-2">
   <div class="col-md-3 mb-2"><strong>Customer Order:</strong>
     @if($order->job)<a href="{{ route('jobs.show', $order->job_id) }}">{{ $order->job->job_no }}</a> <small class="text-muted">{{ $order->job->customer->name ?? '' }}</small>@else — @endif

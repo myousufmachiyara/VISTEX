@@ -161,6 +161,7 @@ class PurchaseReceivingService
             $po = $receiving->purchaseOrder()->with('vendor', 'category')->first();
 
             if ($po->type === 'weaving') return $this->approveWeaving($receiving, $po, $approverId);
+            if ($po->type === 'processing') return app(ProcessingReceivingService::class)->approve($receiving, $approverId);
 
             $defaultLocationId = $this->receivingLocationId($po);
             $stockTotalsByAccount = [];

@@ -125,6 +125,7 @@ class IssuanceService
 
         $po = PurchaseOrder::with('vendor')->findOrFail($data['purchase_order_id'] ?? 0);
         if ($po->type !== $def['po_type']) throw new \Exception("{$def['label']} must be issued against a {$def['against']}.");
+        if ($po->isReprocess()) throw new \Exception("{$po->order_no} is a reprocess order — its fabric goes into process when the mill receives the gate pass.");
         if (!in_array($po->status, [PurchaseOrder::STATUS_APPROVED, PurchaseOrder::STATUS_ISSUED, PurchaseOrder::STATUS_PARTIAL])) {
             throw new \Exception("{$po->order_no} is {$po->status_label} — material can only be issued against an approved, open PO.");
         }

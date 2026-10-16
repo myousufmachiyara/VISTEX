@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\{Location, Product, ProductCategory, Vendor};
-use App\Services\Reports\{GreigeReports, PackagingReports, YarnReports};
+use App\Services\Reports\{GreigeReports, PackagingReports, ProcessingReports, YarnReports};
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -13,6 +13,7 @@ class ReportController extends Controller
         'yarn'      => YarnReports::class,
         'greige'    => GreigeReports::class,
         'packaging' => PackagingReports::class,
+        'processing' => ProcessingReports::class,
     ];
 
     public function index()
@@ -65,7 +66,7 @@ class ReportController extends Controller
 
     private function filterOptions(string $group, array $f): array
     {
-        $catCode = match ($group) { 'yarn' => 'yarn', 'greige' => 'greige', default => null };
+        $catCode = match ($group) { 'yarn' => 'yarn', 'greige' => 'greige', 'processing' => 'processed', default => null };
         $catIds = $catCode
             ? ProductCategory::where('code', $catCode)->pluck('id')
             : collect([$f['category_id'] ?: ProductCategory::where('code', 'packaging')->value('id')]);

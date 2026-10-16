@@ -430,7 +430,11 @@ class PurchaseOrderService
     public function approve(PurchaseOrder $order, int $approverId): PurchaseOrder
     {
         if ($order->status !== PurchaseOrder::STATUS_PENDING) throw new \Exception('Only a Pending PO can be approved.');
-        $order->update(['status' => PurchaseOrder::STATUS_APPROVED, 'approved_by' => $approverId, 'approved_at' => now(), 'updated_by' => $approverId]);
+        DB::transaction(function () use ($order, $approverId) {
+            $order->update(['status' => PurchaseOrder::STATUS_APPROVED, 'approved_by' => $approverId, 'approved_at' => now(), 'updated_by' => $approverId]);
+            // A charged reprocess order: its fabric can now leave for the mill on a gate pass
+            if ($order->isReprocess()) app(ReprocessService::class)->createMovement($order->fresh(), $approverId);
+        });
 
         $this->notifyCreator($order, 'po_approved', 'PO Approved', "{$order->order_no} has been approved.");
         return $order->fresh();

@@ -94,9 +94,13 @@ class ChallanReviewService
                 'accepted_qty' => $accepted,
                 'rejected_qty' => (float) ($ci->rejected_qty ?? 0),
                 'rate' => (float) $poItem->rate,
+                'gate_a' => (float) ($ci->qty_a ?? 0), 'gate_b' => (float) ($ci->qty_b ?? 0), 'gate_c' => (float) ($ci->qty_c ?? 0),
             ];
         })->filter(fn($l) => $l['challan_item_id'] || $l['outstanding'] > 0.001)->values()->all();
 
+        if ($po->type === 'processing') {
+            $base['processing'] = ['greige_in_process' => round(array_sum(array_column(app(ProcessingReceivingService::class)->inProcessGreige($po), 'qty')), 3)];
+        }
         return $base;
     }
 
@@ -149,6 +153,14 @@ class ChallanReviewService
                 'quantity_received' => $totalAccepted, 'is_final_receiving' => (bool) ($opts['is_final_receiving'] ?? false),
                 'remarks' => $remarks ?: null,
             ], $userId);
+        } elseif ($po->type === 'processing') {
+            $items = collect($lines)->filter(fn($l) => $l['accepted_qty'] + $l['rejected_qty'] > 0.0001)
+                ->map(fn($l) => ['purchase_order_item_id' => $l['purchase_order_item_id'], 'quantity_rejected' => $l['rejected_qty']] + $l['grades'])
+                ->values()->all();
+            $receiving = app(ProcessingReceivingService::class)->create([
+                'challan_id' => $challan->id, 'receiving_date' => $date, 'remarks' => $remarks ?: null,
+                'is_final_receiving' => (bool) ($opts['is_final_receiving'] ?? false),
+            ], $items, $userId);
         } else {
             $items = collect($lines)->filter(fn($l) => $l['accepted_qty'] + $l['rejected_qty'] > 0.0001)->map(fn($l) => [
                 'purchase_order_item_id' => $l['purchase_order_item_id'],
@@ -233,7 +245,14 @@ class ChallanReviewService
             if ($po->type !== 'weaving' && !$po->items->firstWhere('id', $poItemId)) {
                 throw new \Exception('A line does not belong to this Purchase Order.');
             }
+            $grades = null;
+            if ($po->type === 'processing') {
+                $grades = ['qty_a' => max(0, round((float) ($l['qty_a'] ?? 0), 3)), 'qty_b' => max(0, round((float) ($l['qty_b'] ?? 0), 3)), 'qty_c' => max(0, round((float) ($l['qty_c'] ?? 0), 3))];
+                if (array_sum($grades) <= 0.0001 && $accepted > 0) $grades['qty_a'] = round($accepted, 3); // no grades given: all A
+                $accepted = array_sum($grades);
+            }
             $out[] = [
+                'grades' => $grades,
                 'purchase_order_item_id' => $poItemId ?: null,
                 'accepted_qty' => round($accepted, 3), 'rejected_qty' => round($rejected, 3),
                 'new_quantity' => $num($l['new_quantity'] ?? null), 'new_rate' => $num($l['new_rate'] ?? null),

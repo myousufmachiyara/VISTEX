@@ -13,6 +13,7 @@ class PurchaseOrder extends Model
     protected $fillable = [
         'order_no', 'type', 'revision_no', 'vendor_id', 'product_category_id', 'service_type_id',
         'job_id', 'program', 'fabric_specs',
+        'reprocess_of_po_id', 'reprocess_lot_no', 'is_foc',
         'from_location_id', 'drop_off_location_id',
         'order_date', 'expected_date',
         'broker_id', 'broker_commission_amount',
@@ -44,7 +45,7 @@ class PurchaseOrder extends Model
 
     protected $casts = [
         'order_date' => 'date', 'expected_date' => 'date', 'approved_at' => 'datetime', 'submitted_at' => 'datetime',
-        'gst_applicable' => 'boolean', 'is_final_receiving_done' => 'boolean',
+        'gst_applicable' => 'boolean', 'is_final_receiving_done' => 'boolean', 'is_foc' => 'boolean',
         'attachments' => 'array', 'fabric_specs' => 'array',
 
         'broker_commission_amount' => 'decimal:2',
@@ -103,6 +104,12 @@ class PurchaseOrder extends Model
     public function approver()        { return $this->belongsTo(User::class, 'approved_by'); }
     public function submitter()       { return $this->belongsTo(User::class, 'submitted_by'); }
     public function creator()         { return $this->belongsTo(User::class, 'locked_by'); }
+    public function reprocessOf()     { return $this->belongsTo(PurchaseOrder::class, 'reprocess_of_po_id'); }
+    public function reprocessOrders() { return $this->hasMany(PurchaseOrder::class, 'reprocess_of_po_id'); }
+    public function isReprocess(): bool { return !empty($this->reprocess_of_po_id); }
+    // Lot # the finished fabric is stocked under: a reprocess order keeps the original lot
+    public function getStockLotNoAttribute(): string { return $this->reprocess_lot_no ?: $this->order_no; }
+
     public function items()           { return $this->hasMany(PurchaseOrderItem::class, 'purchase_order_id'); }
     public function terms()           { return $this->hasMany(PurchaseOrderTerm::class, 'purchase_order_id')->orderBy('id'); }
     public function objections()      { return $this->hasMany(PurchaseOrderObjection::class, 'purchase_order_id'); }
@@ -147,7 +154,7 @@ class PurchaseOrder extends Model
 
     public function canBeEditedBy(User $user): bool
     {
-        return $this->isOwnedBy($user) && in_array($this->status, self::EDITABLE_STATUSES, true);
+        return !$this->isReprocess() && $this->isOwnedBy($user) && in_array($this->status, self::EDITABLE_STATUSES, true);
     }
 
     public function canBeSubmittedBy(User $user): bool
@@ -163,6 +170,8 @@ class PurchaseOrder extends Model
 
     public function canBeDeletedBy(User $user): bool
     {
+        // A reprocess order is never edited, but one not yet approved can be withdrawn
+        if ($this->isReprocess()) return $this->isOwnedBy($user) && in_array($this->status, self::EDITABLE_STATUSES, true);
         return $this->canBeEditedBy($user);
     }
 

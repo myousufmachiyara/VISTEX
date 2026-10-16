@@ -66,18 +66,20 @@
             </select>
           </div>
         @endif
-        @if($options['vendors']->isNotEmpty())
-          <div class="col-6 col-md-2"><label class="small">{{ $group === 'yarn' ? 'Mill / Vendor' : 'Supplier / Vendor' }}</label>
+        @if($options['vendors']->isNotEmpty() && !in_array($key, ['order_margin', 'receivables_aging']))
+          <div class="col-6 col-md-2"><label class="small">{{ in_array($group, ['yarn', 'processing']) ? 'Mill / Vendor' : 'Supplier / Vendor' }}</label>
             <select name="vendor_id" class="form-select form-select-sm select2-js"><option value="">All</option>
               @foreach($options['vendors'] as $v)<option value="{{ $v->id }}" @selected($f['vendor_id'] == $v->id)>{{ $v->name }}</option>@endforeach
             </select>
           </div>
         @endif
+        @if($group !== 'processing')
         <div class="col-6 col-md-2"><label class="small">Item</label>
           <select name="product_id" class="form-select form-select-sm select2-js"><option value="">All</option>
             @foreach($options['products'] as $p)<option value="{{ $p->id }}" @selected($f['product_id'] == $p->id)>{{ $p->name }}</option>@endforeach
           </select>
         </div>
+        @endif
         @if($group !== 'yarn' || $key === 'stock')
         @if($group === 'packaging' || in_array($key, ['stock', 'fresh_stock', 'rejection_stock']))
           <div class="col-6 col-md-2"><label class="small">Warehouse</label>

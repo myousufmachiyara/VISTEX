@@ -78,10 +78,14 @@ class ChallanApiController extends Controller
             ]]);
         }
 
+        // Processing POs: lines are patterns of finished fabric, counted as A / B / C quality
+        $graded = $po->type === 'processing';
         return response()->json($po->items->map(fn($i) => [
-            'purchase_order_item_id' => $i->id, 'product_id' => $i->product_id,
-            'description' => $i->product->name ?? $i->description ?? '',
+            'purchase_order_item_id' => $i->id, 'product_id' => $graded ? null : $i->product_id,
+            'description' => $graded ? trim($i->pattern_code . ' ' . collect([$i->design, $i->color_scheme])->filter()->implode(' - '))
+                                     : ($i->product->name ?? $i->description ?? ''),
             'expected' => round((float) $i->quantity - (float) $i->quantity_received, 3),
+            'graded' => $graded,
         ])->filter(fn($r) => $r['expected'] > 0.001)->values());
     }
 
@@ -132,6 +136,8 @@ class ChallanApiController extends Controller
                 'id' => $i->id, 'product_name' => $i->product->name ?? $i->description,
                 'expected_qty' => (float) $i->expected_qty, 'received_qty' => (float) $i->received_qty,
                 'accepted_qty' => (float) $i->accepted_qty, 'rejected_qty' => (float) $i->rejected_qty, 'decision' => $i->decision,
+                'qty_a' => $i->qty_a !== null ? (float) $i->qty_a : null, 'qty_b' => $i->qty_b !== null ? (float) $i->qty_b : null,
+                'qty_c' => $i->qty_c !== null ? (float) $i->qty_c : null,
             ]),
             'direct_items' => $c->directItems->map(fn($i) => [
                 'id' => $i->id, 'description' => $i->description, 'unit' => $i->unit,
@@ -157,7 +163,7 @@ class ChallanApiController extends Controller
             'items.*.purchase_order_item_id' => 'nullable|exists:purchase_order_items,id',
             'items.*.product_id' => 'nullable|exists:products,id',
             'items.*.expected_qty' => 'required|numeric|min:0',
-            'items.*.received_qty' => 'required|numeric|min:0',
+            'items.*.received_qty' => 'required|numeric|min:0', 'items.*.qty_a' => 'nullable|numeric|min:0', 'items.*.qty_b' => 'nullable|numeric|min:0', 'items.*.qty_c' => 'nullable|numeric|min:0',
         ]);
 
         if ($request->boolean('has_objection') && !$request->filled('objection_remarks') && !$request->hasFile('objection_voice')) {
@@ -265,7 +271,7 @@ class ChallanApiController extends Controller
             'remove_voice'         => 'nullable|boolean',
             'items'                => 'nullable|array',
             'items.*.id'           => 'required|integer',
-            'items.*.received_qty' => 'required|numeric|min:0',
+            'items.*.received_qty' => 'required|numeric|min:0', 'items.*.qty_a' => 'nullable|numeric|min:0', 'items.*.qty_b' => 'nullable|numeric|min:0', 'items.*.qty_c' => 'nullable|numeric|min:0',
         ];
         $request->validate($rules);
 
@@ -359,7 +365,7 @@ class ChallanApiController extends Controller
             'lines'                          => 'required|array|min:1',
             'lines.*.purchase_order_item_id' => 'nullable|integer',
             'lines.*.accepted_qty'           => 'nullable|numeric|min:0',
-            'lines.*.rejected_qty'           => 'nullable|numeric|min:0',
+            'lines.*.rejected_qty'           => 'nullable|numeric|min:0', 'lines.*.qty_a' => 'nullable|numeric|min:0', 'lines.*.qty_b' => 'nullable|numeric|min:0', 'lines.*.qty_c' => 'nullable|numeric|min:0',
             'lines.*.new_quantity'           => 'nullable|numeric|min:0',
             'lines.*.new_rate'               => 'nullable|numeric|min:0',
             'lines.*.note'                   => 'nullable|string|max:255',

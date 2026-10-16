@@ -47,8 +47,7 @@ class ChallanService
                     'product_id' => $item['product_id'] ?? null,
                     'description' => $item['description'] ?? null,
                     'expected_qty' => $item['expected_qty'] ?? 0,
-                    'received_qty' => $item['received_qty'] ?? 0,
-                ]);
+                ] + $this->gateCount($item));
             }
 
             if ($challan->has_objection) {
@@ -162,9 +161,9 @@ class ChallanService
                 foreach ($items as $row) {
                     $item = $rows->get((int) ($row['id'] ?? 0));
                     if (!$item) continue;
-                    $qty = (float) ($row['received_qty'] ?? 0);
-                    if ($qty < 0) throw new \Exception('Received quantity cannot be negative.');
-                    $item->update(['received_qty' => $qty]);
+                    $count = $this->gateCount($row);
+                    if ($count['received_qty'] < 0) throw new \Exception('Received quantity cannot be negative.');
+                    $item->update($count);
                 }
 
                 $this->syncGateObjection($challan, $userId);
@@ -212,6 +211,20 @@ class ChallanService
             if ($objection->source === 'gate' && $objection->status === 'Open') $objection->delete();
             $challan->update(['objection_id' => null]);
         }
+    }
+
+    // Gate count for a line. Processed fabric is counted as A / B / C quality; their total is the received quantity.
+    private function gateCount(array $item): array
+    {
+        $grades = [];
+        foreach (['qty_a', 'qty_b', 'qty_c'] as $k) {
+            if (isset($item[$k]) && $item[$k] !== '') $grades[$k] = round((float) $item[$k], 3);
+        }
+        if ($grades) {
+            foreach ($grades as $v) if ($v < 0) throw new \Exception('Quality counts cannot be negative.');
+            return $grades + ['qty_a' => null, 'qty_b' => null, 'qty_c' => null, 'received_qty' => round(array_sum($grades), 3)];
+        }
+        return ['received_qty' => (float) ($item['received_qty'] ?? 0)];
     }
 
     private function transport(array $data): array

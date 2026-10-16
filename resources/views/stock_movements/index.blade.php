@@ -37,7 +37,7 @@
             <td><a href="{{ route('stock_movements.show', $m->id) }}" class="text-primary">{{ $m->movement_no }}</a>
               @if($m->purchaseOrder)<div class="small text-muted">{{ $m->purchaseOrder->order_no }}</div>@endif</td>
             <td>{{ $m->fromLocation->name ?? '' }}</td>
-            <td>{{ $m->toLocation->name ?? '' }}</td>
+            <td>{{ $m->destination_name }}@if($m->isSale())<div class="small text-muted">{{ $m->saleOrder ? 'Sale ' . $m->saleOrder->so_no : 'Order ' . ($m->job->job_no ?? '') }}</div>@endif</td>
             <td class="small">{{ $m->items->map(fn($i) => $i->product->name ?? '')->unique()->implode(', ') }}</td>
             <td class="text-end">{{ number_format($m->items->sum('quantity'), 2) }}</td>
             <td>{{ $m->lot_no ?? '—' }}</td>

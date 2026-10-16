@@ -4,6 +4,7 @@
 @php($c = $data['challan'])
 @php($po = $data['po'])
 @php($isWeaving = $po['type'] === 'weaving')
+@php($isProcessing = $po['type'] === 'processing')
 <div class="row"><div class="col">
   <form action="{{ route('challans.review', $challan->id) }}" method="POST" id="reviewForm" onkeydown="return event.key != 'Enter';">
     @csrf
@@ -57,7 +58,7 @@
           <thead>
             <tr>
               <th>Item</th><th class="text-end">Ordered</th><th class="text-end">Received Before</th><th class="text-end">Outstanding</th>
-              <th class="text-end">Gate Count</th><th width="12%">Accept</th><th width="12%">Reject</th>
+              <th class="text-end">Gate Count</th><th width="{{ $isProcessing ? '26%' : '12%' }}">Accept{{ $isProcessing ? ' (A / B / C)' : '' }}</th><th width="12%">Reject</th>
               <th width="11%" class="amend-col">New PO Qty</th>@unless($isWeaving)<th width="11%" class="amend-col">New Rate</th>@endunless
             </tr>
           </thead>
@@ -72,8 +73,22 @@
               <td class="text-end">{{ number_format($l['ordered_qty'], 3) }}</td>
               <td class="text-end">{{ number_format($l['already_received'], 3) }}</td>
               <td class="text-end outstanding" data-v="{{ $l['outstanding'] }}"><strong>{{ number_format($l['outstanding'], 3) }}</strong></td>
-              <td class="text-end">{{ number_format($l['gate_qty'], 3) }}</td>
+              <td class="text-end">{{ number_format($l['gate_qty'], 3) }}
+                @if($isProcessing && ($l['gate_a'] + $l['gate_b'] + $l['gate_c']) > 0)<div class="small text-muted">A {{ $l['gate_a'] + 0 }} · B {{ $l['gate_b'] + 0 }} · C {{ $l['gate_c'] + 0 }}</div>@endif
+              </td>
+              @if($isProcessing)
+                @php($ga = ($l['gate_a'] + $l['gate_b'] + $l['gate_c']) > 0 ? $l['gate_a'] : $l['gate_qty'])
+                <td>
+                  <div class="input-group input-group-sm grades">
+                    <span class="input-group-text">A</span><input type="number" step="any" min="0" name="lines[{{ $i }}][qty_a]" class="form-control g" value="{{ old("lines.$i.qty_a", $ga) }}">
+                    <span class="input-group-text">B</span><input type="number" step="any" min="0" name="lines[{{ $i }}][qty_b]" class="form-control g" value="{{ old("lines.$i.qty_b", $l['gate_b']) }}">
+                    <span class="input-group-text">C</span><input type="number" step="any" min="0" name="lines[{{ $i }}][qty_c]" class="form-control g" value="{{ old("lines.$i.qty_c", $l['gate_c']) }}">
+                  </div>
+                  <input type="number" name="lines[{{ $i }}][accepted_qty]" class="form-control form-control-sm acc mt-1" readonly tabindex="-1" title="A + B + C">
+                </td>
+              @else
               <td><input type="number" step="any" min="0" name="lines[{{ $i }}][accepted_qty]" class="form-control acc" value="{{ old("lines.$i.accepted_qty", $l['accepted_qty']) }}"></td>
+              @endif
               <td><input type="number" step="any" min="0" name="lines[{{ $i }}][rejected_qty]" class="form-control rej" value="{{ old("lines.$i.rejected_qty", $l['rejected_qty']) }}"></td>
               <td class="amend-col">
                 @if($isWeaving)
@@ -116,6 +131,15 @@
 
         <div class="row">
           <div class="col-md-3 mb-3 post-col"><label>Receiving Date</label><input type="date" name="receiving_date" class="form-control" value="{{ old('receiving_date', $c['received_date']) }}"></div>
+          @if($isProcessing)
+          <div class="col-md-6 mb-3 post-col d-flex align-items-end">
+            <div class="form-check">
+              <input type="hidden" name="is_final_receiving" value="0">
+              <input class="form-check-input" type="checkbox" name="is_final_receiving" value="1" id="is_final" @checked(old('is_final_receiving'))>
+              <label class="form-check-label" for="is_final">Final delivery — use up all greige still in process at the mill ({{ number_format($data['processing']['greige_in_process'] ?? 0, 2) }} m) and close the PO</label>
+            </div>
+          </div>
+          @endif
           @if($isWeaving)
           <div class="col-md-3 mb-3 post-col d-flex align-items-end">
             <div class="form-check">
@@ -159,6 +183,15 @@ $(function () {
     });
     $('#overWarn').toggle(over && d !== 'amend' && d !== 'reject');
   }
+  // Processed fabric: accepted = A + B + C
+  function sumGrades() {
+    $('.grades').each(function () {
+      const t = $(this).find('.g').toArray().reduce((s, el) => s + (parseFloat(el.value) || 0), 0);
+      $(this).closest('td').find('.acc').val(Math.round(t * 1000) / 1000);
+    });
+  }
+  $(document).on('input', '.grades .g', function () { sumGrades(); refresh(); });
+  sumGrades();
   $(document).on('change input', 'input[name=decision], .acc, .rej', refresh);
   refresh();
 

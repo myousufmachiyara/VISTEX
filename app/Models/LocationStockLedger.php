@@ -8,16 +8,17 @@ class LocationStockLedger extends Model
     protected $table = 'location_stock_ledger';
     public $timestamps = true;
 
-    protected $fillable = ['doc_no', 'location_id', 'product_id', 'status', 'lot_no', 'quantity', 'amount', 'reference_type', 'reference_id', 'entry_date', 'remarks'];
+    protected $fillable = ['doc_no', 'location_id', 'product_id', 'status', 'lot_no', 'grade', 'quantity', 'amount', 'reference_type', 'reference_id', 'entry_date', 'remarks'];
     protected $casts = ['quantity' => 'decimal:3', 'amount' => 'decimal:2', 'entry_date' => 'date'];
 
     public function location() { return $this->belongsTo(Location::class, 'location_id'); }
     public function product()  { return $this->belongsTo(Product::class, 'product_id'); }
 
-    public static function balance(int $locationId, int $productId, string $status = 'fresh', ?string $lotNo = null): float
+    public static function balance(int $locationId, int $productId, string $status = 'fresh', ?string $lotNo = null, ?string $grade = null): float
     {
         $query = self::where('location_id', $locationId)->where('product_id', $productId)->where('status', $status);
         if ($lotNo !== null) $query->where('lot_no', $lotNo);
+        if ($grade) $query->where('grade', $grade);
         return (float) $query->sum('quantity');
     }
 
@@ -33,10 +34,11 @@ class LocationStockLedger extends Model
      * Which lots to take $qty from at a location, oldest first (unlotted stock last).
      * With $lotNo, takes only from that lot. Returns [['lot_no' => ?string, 'quantity' => float], ...].
      */
-    public static function allocate(int $locationId, int $productId, float $qty, ?string $lotNo = null): array
+    public static function allocate(int $locationId, int $productId, float $qty, ?string $lotNo = null, string $status = 'fresh', ?string $grade = null): array
     {
-        $buckets = self::where('location_id', $locationId)->where('product_id', $productId)->where('status', 'fresh')
+        $buckets = self::where('location_id', $locationId)->where('product_id', $productId)->where('status', $status)
             ->when($lotNo !== null && $lotNo !== '', fn($q) => $q->where('lot_no', $lotNo))
+            ->when($grade, fn($q) => $q->where('grade', $grade))
             ->groupBy('lot_no')->selectRaw('lot_no, SUM(quantity) AS qty, MIN(entry_date) AS first_date')
             ->havingRaw('SUM(quantity) > 0.0005')->get()
             ->sortBy(fn($b) => [$b->lot_no === null ? 1 : 0, $b->first_date, $b->lot_no])->values();
@@ -56,11 +58,11 @@ class LocationStockLedger extends Model
     }
 
     // Cost per unit of one lot at a location (a lot is one PO's price); falls back to the location average
-    public static function lotRate(int $locationId, int $productId, ?string $lotNo, float $fallback): float
+    public static function lotRate(int $locationId, int $productId, ?string $lotNo, float $fallback, string $status = 'fresh', ?string $grade = null): float
     {
         if ($lotNo === null || $lotNo === '') return $fallback;
-        $r = self::where('location_id', $locationId)->where('product_id', $productId)->where('status', 'fresh')
-            ->where('lot_no', $lotNo)->selectRaw('SUM(quantity) AS q, SUM(amount) AS a')->first();
+        $r = self::where('location_id', $locationId)->where('product_id', $productId)->where('status', $status)
+            ->where('lot_no', $lotNo)->when($grade, fn($q) => $q->where('grade', $grade))->selectRaw('SUM(quantity) AS q, SUM(amount) AS a')->first();
         return ($r && (float) $r->q > 0.0005) ? (float) $r->a / (float) $r->q : $fallback;
     }
 }

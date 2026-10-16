@@ -35,7 +35,7 @@ class StockMovement extends Model
         'movement_date', 'status', 'approved_by', 'approved_at', 'rejection_reason',
         'remarks', 'attachments', 'vehicle_no', 'driver_name', 'driver_contact', 'gate_images', 'gate_remarks',
         'dispatched_by', 'dispatched_at', 'received_by', 'received_at', 'receive_remarks',
-        'created_by', 'updated_by',
+        'created_by', 'updated_by', 'sale_order_id', 'customer_id', 'cogs_amount', 'job_id',
     ];
 
     protected $casts = [
@@ -53,6 +53,17 @@ class StockMovement extends Model
         'vendor_to_warehouse'    => 'Vendor / Mill → Warehouse',
     ];
 
+    // Sale delivery: goods leave our warehouse for a customer (created from a Sale Order, not by hand)
+    public const SALE = 'warehouse_to_customer';
+
+    public function saleOrder()     { return $this->belongsTo(SaleOrder::class, 'sale_order_id'); }
+    public function job()           { return $this->belongsTo(Job::class, 'job_id'); }
+    public function customer()      { return $this->belongsTo(Customer::class, 'customer_id'); }
+    public function isSale(): bool  { return $this->movement_type === self::SALE; }
+    public function getTypeLabelAttribute(): string { return $this->isSale() ? 'Sale Delivery' : (self::TYPES[$this->movement_type] ?? $this->movement_type); }
+    // Where the goods go: a location, or the customer for a sale delivery
+    public function getDestinationNameAttribute(): string { return $this->isSale() ? ($this->customer->name ?? 'Customer') : ($this->toLocation->name ?? ''); }
+
     public function fromLocation()  { return $this->belongsTo(Location::class, 'from_location_id'); }
     public function toLocation()    { return $this->belongsTo(Location::class, 'to_location_id'); }
     public function purchaseOrder() { return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id'); }
@@ -62,7 +73,11 @@ class StockMovement extends Model
     public function dispatcher()    { return $this->belongsTo(User::class, 'dispatched_by'); }
     public function receiver()      { return $this->belongsTo(User::class, 'received_by'); }
 
-    public function getStatusLabelAttribute(): string { return self::STATUS_LABELS[$this->status] ?? $this->status; }
+    public function getStatusLabelAttribute(): string
+    {
+        if ($this->isSale() && $this->status === self::RECEIVED) return 'Delivered';
+        return self::STATUS_LABELS[$this->status] ?? $this->status;
+    }
 
     public function getStatusBadgeAttribute(): string
     {
@@ -79,7 +94,9 @@ class StockMovement extends Model
     public function needsGateExit(): bool { return $this->movement_type !== 'vendor_to_warehouse'; }
 
     // The mill gives its own lot # when goods arrive at a vendor location
-    public function needsMillLot(): bool { return $this->movement_type === 'warehouse_to_vendor'; }
+    // A reprocess delivery keeps the fabric's own lot #
+    public function needsMillLot(): bool { return $this->movement_type === 'warehouse_to_vendor' && !$this->isReprocess(); }
+    public function isReprocess(): bool { return (bool) $this->purchaseOrder?->isReprocess(); }
 
     // Approval: source location's in-charge, or superadmin
     public function canBeApprovedBy(User $user): bool

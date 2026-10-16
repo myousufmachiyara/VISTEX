@@ -49,7 +49,7 @@ class IssuanceController extends Controller
     {
         $poType = $type ? Issuance::TYPES[$type]['po_type'] : null;
         $orders = $poType
-            ? PurchaseOrder::where('type', $poType)
+            ? PurchaseOrder::where('type', $poType)->whereNull('reprocess_of_po_id')
                 ->whereIn('status', [PurchaseOrder::STATUS_APPROVED, PurchaseOrder::STATUS_ISSUED, PurchaseOrder::STATUS_PARTIAL])
                 ->with('vendor')->orderByDesc('order_date')->get()
             : collect();

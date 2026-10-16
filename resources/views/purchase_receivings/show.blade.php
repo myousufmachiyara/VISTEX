@@ -42,7 +42,7 @@
         <tbody>
           @foreach($receiving->items as $item)
           <tr>
-            <td>{{ $item->product->name ?? '' }}</td>
+            <td>{{ $item->product->name ?? '' }}@if($item->grade_label)<div class="small text-muted">Quality: {{ $item->grade_label }}</div>@endif</td>
             <td class="text-end">{{ number_format($item->quantity_received,3) }}</td>
             <td class="text-end">{{ number_format($item->quantity_rejected,3) }}</td>
             <td class="text-end">{{ number_format($item->quantity_accepted,3) }}</td>
@@ -63,6 +63,35 @@
         </tbody>
       </table>
       <div class="text-end fw-bold">Total: {{ number_format($receiving->amount,2) }}</div>
+      @if(($receiving->purchaseOrder->type ?? null) === 'processing')
+        <div class="row small mt-2">
+          <div class="col-md-6">
+            <strong>Cost:</strong> {{ $receiving->purchaseOrder->isReprocess() ? 'fabric value' : 'greige used' }} {{ number_format($receiving->greige_cost_amount, 2) }} + processing charge {{ number_format($receiving->processing_charge_amount, 2) }}
+            @if($receiving->is_final_receiving)<span class="badge bg-dark ms-1">Final delivery</span>@endif
+          </div>
+          <div class="col-md-6">
+            <strong>{{ $receiving->purchaseOrder->isReprocess() ? 'Fabric used (reprocessed)' : 'Greige used at the mill' }}:</strong>
+            @forelse($receiving->greige_consumed_meta ?? [] as $g)
+              lot {{ $g['lot_no'] ?? '—' }}: {{ rtrim(rtrim(number_format($g['quantity'], 3), '0'), '.') }} m{{ $loop->last ? '' : ' · ' }}
+            @empty
+              none
+            @endforelse
+          </div>
+        </div>
+        @if($receiving->items->sum('quantity_rejected') > 0)<div class="small text-muted mt-1">Rejected meters were not stocked — they stay with the mill for reprocessing.</div>@endif
+        @if($receiving->qc_status)
+          <div class="small mt-2"><strong>QC:</strong>
+            @if($receiving->qcInspection)
+              <a href="{{ route('qc_inspections.show', $receiving->qcInspection->id) }}">{{ $receiving->qcInspection->qc_no }}</a> — {{ $receiving->qcInspection->status }}
+            @else
+              <span class="badge bg-warning text-dark">Pending</span>
+              @can('qc_inspections.create')
+                <form method="POST" action="{{ route('qc_inspections.start', $receiving->id) }}" class="d-inline">@csrf<button class="btn btn-sm btn-outline-primary ms-1">Start QC</button></form>
+              @endcan
+            @endif
+          </div>
+        @endif
+      @endif
 
       @if($receiving->status === 'Approved')
       <div class="alert alert-info mt-3">
