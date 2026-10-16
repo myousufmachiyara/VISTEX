@@ -120,8 +120,8 @@
               <input type="hidden" name="items[${i}][product_id]" value="${r.product_id ?? ''}">
               <input type="hidden" name="items[${i}][expected_qty]" value="${r.quantity}">
             </td>
-            <td class="text-end">${r.quantity} ${r.unit || ''}${r.packs_outstanding ? `<div class="small text-muted">${r.packs_outstanding} × ${r.qty_per_pack}</div>` : ''}</td>
-            <td><input type="number" name="items[${i}][packs]" class="form-control packs" step="any" min="0" data-per="${r.qty_per_pack || ''}" placeholder="${r.qty_per_pack ? r.qty_per_pack + ' per pack' : ''}"></td>
+            <td class="text-end">${r.quantity} ${r.unit || ''}${r.packs_outstanding !== null && r.packs_outstanding !== undefined ? `<div class="small text-muted">${r.packs_outstanding} bags${r.qty_per_pack > 1 ? ' × ' + r.qty_per_pack : ''}</div>` : ''}</td>
+            <td><input type="number" name="items[${i}][packs]" class="form-control packs" step="any" min="0" data-per="${r.qty_per_pack || ''}" value="${r.packs_outstanding ?? ''}" placeholder="${r.qty_per_pack ? r.qty_per_pack + ' per pack' : ''}"></td>
             <td>${r.graded
               ? `<div class="input-group input-group-sm grade-row">
                    <span class="input-group-text">A</span><input type="number" name="items[${i}][qty_a]" class="form-control g" step="any" min="0" value="${r.quantity}">
@@ -134,16 +134,25 @@
           </tr>`));
         $('#gateItems thead th:last').text(rows.some(r => r.graded) ? 'Counted at Gate (A / B / C quality, m)' : 'Counted at Gate');
         $('#gateItems').show();
+        packsTotal();
       });
     });
     if ($('#po_select').val()) $('#po_select').trigger('change');
 
     // Bags / packs: running total; with a known pack size, fill the quantity counted
+    // Bags are pre-filled from the PO (purchase POs); bags ↔ quantity stay in step via the PO pack size
+    function packsTotal() {
+      let t = 0; $('#gateItems .packs').each(function () { t += parseFloat(this.value) || 0; });
+      $('#packsTotal').text(Math.round(t * 100) / 100);
+    }
     $(document).on('input', '#gateItems .packs', function () {
       const per = parseFloat($(this).data('per')), n = parseFloat(this.value);
       if (per && n >= 0) $(this).closest('tr').find('.rq').val(Math.round(n * per * 1000) / 1000);
-      let t = 0; $('#gateItems .packs').each(function () { t += parseFloat(this.value) || 0; });
-      $('#packsTotal').text(Math.round(t * 100) / 100);
+      packsTotal();
+    });
+    $(document).on('input', '#gateItems .rq', function () {
+      const p = $(this).closest('tr').find('.packs'), per = parseFloat(p.data('per')), q = parseFloat(this.value);
+      if (per && q >= 0) { p.val(Math.round(q / per * 100) / 100); packsTotal(); }
     });
 
     // A + B + C = meters received

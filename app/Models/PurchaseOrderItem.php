@@ -20,6 +20,21 @@ class PurchaseOrderItem extends Model
         return $fmt($this->pack_qty) . ' × ' . $fmt($this->qty_per_pack);
     }
 
+    // Bags/packs size from the PO line (purchase POs only — weaving & processing are in meters).
+    // qty_per_pack = 1 means the line was ordered by the bag/pack itself.
+    public function packSize(?string $poType = null): ?float
+    {
+        $type = $poType ?? $this->purchaseOrder?->type;
+        if (in_array($type, ['weaving', 'processing'], true)) return null;
+        return (float) $this->qty_per_pack > 0 ? (float) $this->qty_per_pack : null;
+    }
+
+    public function packsFor(float $qty, ?string $poType = null): ?float
+    {
+        $per = $this->packSize($poType);
+        return $per ? round($qty / $per, 2) : null;
+    }
+
     public function purchaseOrder()   { return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id'); }
     public function product()         { return $this->belongsTo(Product::class, 'product_id'); }
     public function forecast()        { return $this->belongsTo(Forecast::class, 'forecast_id'); }

@@ -88,7 +88,8 @@ class ChallanApiController extends Controller
             'expected' => round((float) $i->quantity - (float) $i->quantity_received, 3),
             'graded' => $graded,
             'unit' => $i->product->measurementUnit->shortcode ?? ($graded ? 'm' : ''),
-            'qty_per_pack' => (float) $i->qty_per_pack > 1 ? (float) $i->qty_per_pack : null,
+            'qty_per_pack' => $i->packSize($po->type),
+            'packs' => $i->packsFor(round((float) $i->quantity - (float) $i->quantity_received, 3), $po->type),
         ])->filter(fn($r) => $r['expected'] > 0.001)->values());
     }
 

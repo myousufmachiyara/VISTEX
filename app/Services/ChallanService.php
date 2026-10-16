@@ -47,7 +47,7 @@ class ChallanService
                     'product_id' => $item['product_id'] ?? null,
                     'description' => $item['description'] ?? null,
                     'expected_qty' => $item['expected_qty'] ?? 0,
-                ] + $this->gateCount($item));
+                ] + $this->withPoPacks($this->gateCount($item), $item['purchase_order_item_id'] ?? null, $po->type));
             }
 
             if ($challan->has_objection) {
@@ -163,6 +163,7 @@ class ChallanService
                     if (!$item) continue;
                     $count = $this->gateCount($row);
                     if ($count['received_qty'] < 0) throw new \Exception('Received quantity cannot be negative.');
+                    $count = $this->withPoPacks($count, $item->purchase_order_item_id, $challan->purchaseOrder?->type);
                     $item->update($count);
                 }
 
@@ -214,6 +215,16 @@ class ChallanService
     }
 
     // Gate count for a line. Processed fabric is counted as A / B / C quality; their total is the received quantity.
+    // Bags left blank → work them out from the PO line's pack size (purchase POs only)
+    private function withPoPacks(array $count, $poItemId, ?string $poType): array
+    {
+        if (isset($count['packs']) && $count['packs'] !== null) return $count;
+        $poi = $poItemId ? \App\Models\PurchaseOrderItem::find($poItemId) : null;
+        $packs = $poi?->packsFor((float) ($count['received_qty'] ?? 0), $poType);
+        if ($packs !== null) $count['packs'] = $packs;
+        return $count;
+    }
+
     private function gateCount(array $item): array
     {
         // Bags / packs counted at the gate (record only)

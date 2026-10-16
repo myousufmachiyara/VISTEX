@@ -80,8 +80,8 @@ class ChallanController extends Controller
             'quantity' => $i->outstanding_qty,
             'graded' => $graded,
             'unit' => $i->product->measurementUnit->shortcode ?? ($graded ? 'm' : ''),
-            'qty_per_pack' => (float) $i->qty_per_pack > 1 ? (float) $i->qty_per_pack : null,
-            'packs_outstanding' => (float) $i->qty_per_pack > 1 ? round($i->outstanding_qty / (float) $i->qty_per_pack, 2) : null,
+            'qty_per_pack' => $i->packSize($po->type),
+            'packs_outstanding' => $i->packsFor((float) $i->outstanding_qty, $po->type),
         ])->filter(fn($r) => $r['quantity'] > 0.001)->values());
     }
 
