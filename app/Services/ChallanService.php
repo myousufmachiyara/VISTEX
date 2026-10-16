@@ -362,11 +362,15 @@ class ChallanService
 
     private function assertPoIsReceivable(PurchaseOrder $po): void
     {
-        if ($po->type === 'purchase' && !in_array($po->status, ['Approved', 'Issued', 'PartiallyReceived'])) {
-            throw new \Exception('This Purchase Order is not yet Approved, or is already fully received.');
+        $label = PurchaseOrder::STATUSES[$po->status] ?? $po->status;
+        if ($po->type === 'purchase' && !in_array($po->status, ['Approved', 'Issued', 'PartiallyReceived'], true)) {
+            throw new \Exception("{$po->order_no} is {$label} — goods can be received only on an Approved, Issued or Partially Received PO.");
         }
-        if (in_array($po->type, ['weaving', 'processing']) && !in_array($po->status, ['Issued', 'PartiallyReceived'])) {
-            throw new \Exception('This Purchase Order has not been Issued yet, or is already fully received.');
+        if (in_array($po->type, ['weaving', 'processing'], true) && !in_array($po->status, ['Issued', 'PartiallyReceived'], true)) {
+            throw new \Exception("{$po->order_no} is {$label} — a " . ucfirst($po->type) . " PO must be Issued (material sent to the mill) before receiving.");
+        }
+        if (!in_array($po->type, ['purchase', 'weaving', 'processing'], true)) {
+            throw new \Exception("{$po->order_no} has an unknown PO type \"{$po->type}\".");
         }
     }
 

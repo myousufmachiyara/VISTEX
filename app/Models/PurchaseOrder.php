@@ -142,6 +142,24 @@ class PurchaseOrder extends Model
     }
 
     // Anything the gate / receiving side may act on
+    // Status / type are compared exactly in PHP but loosely in MySQL (case and trailing spaces ignored).
+    // Keep them canonical in both directions so a PO the database lists is also accepted by the code.
+    public static function canonicalStatus(?string $v): ?string
+    {
+        if ($v === null) return null;
+        $key = strtolower(str_replace([' ', '_', '-'], '', trim($v)));
+        foreach (array_keys(self::STATUSES) as $c) if (strtolower($c) === $key) return $c;
+        return trim($v);
+    }
+    public static function canonicalType(?string $v): ?string
+    {
+        return $v === null ? null : strtolower(trim($v));
+    }
+    public function getStatusAttribute($v) { return self::canonicalStatus($v); }
+    public function setStatusAttribute($v) { $this->attributes['status'] = self::canonicalStatus($v); }
+    public function getTypeAttribute($v) { return self::canonicalType($v); }
+    public function setTypeAttribute($v) { $this->attributes['type'] = self::canonicalType($v); }
+
     public function scopeOpenForReceiving($query)
     {
         return $query->whereIn('status', [self::STATUS_APPROVED, self::STATUS_ISSUED, self::STATUS_PARTIAL]);
