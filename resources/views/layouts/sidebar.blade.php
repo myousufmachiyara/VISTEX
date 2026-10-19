@@ -82,17 +82,15 @@
         {{-- ═══════════════════════════════════════════════════════ --}}
         {{-- TERMS & CONDITIONS — standalone                            --}}
         {{-- ═══════════════════════════════════════════════════════ --}}
-        @can('terms_and_conditions.index')
-        <li class="{{ request()->routeIs('terms_and_conditions.*')?'active':'' }}"><a class="nav-link" href="{{ route('terms_and_conditions.index') }}"><i class="fa fa-file-contract"></i><span>Terms &amp; Conditions</span></a></li>
-        @endcan
 
         {{-- ═══════════════════════════════════════════════════════ --}}
         {{-- PURCHASE — PO, Objections, Challans, Receiving, Return     --}}
         {{-- ═══════════════════════════════════════════════════════ --}}
-        @if(auth()->user()->canAny(['purchase_orders.index','challans.index','purchase_receivings.index','purchase_returns.index','qc_inspections.index']))
+        @if(auth()->user()->canAny(['terms_and_conditions.index','purchase_orders.index','challans.index','purchase_receivings.index','purchase_returns.index','qc_inspections.index']))
         <li class="nav-parent {{ request()->routeIs('purchase_orders.*','purchase_order_objections.*','challans.*','purchase_receivings.*','purchase_returns.*','qc_inspections.*','reprocess.*') ? 'nav-expanded active' : '' }}">
           <a class="nav-link" href="#"><i class="fa fa-shopping-cart"></i><span>Purchase</span></a>
-          <ul class="nav nav-children">
+          <ul class="nav nav-children">   
+            @can('terms_and_conditions.index')<li class="{{ request()->routeIs('terms_and_conditions.*')?'active':'' }}"><a class="nav-link" href="{{ route('terms_and_conditions.index') }}">Terms &amp; Conditions</a></li>@endcan
             @can('purchase_orders.index')<li class="{{ request()->routeIs('purchase_orders.*')?'active':'' }}"><a class="nav-link" href="{{ route('purchase_orders.index') }}">Purchase Orders</a></li>@endcan
             @can('purchase_orders.index')<li class="{{ request()->routeIs('purchase_order_objections.*')?'active':'' }}"><a class="nav-link" href="{{ route('purchase_order_objections.index') }}">Objections</a></li>@endcan
             @can('challans.index')<li class="{{ request()->routeIs('challans.index','challans.show','challans.create')?'active':'' }}"><a class="nav-link" href="{{ route('challans.index') }}">Challans</a></li>@endcan
@@ -136,7 +134,7 @@
         <li class="nav-parent {{ request()->routeIs('jobs.*','sale_orders.*','customer_invoices.*','customer_receipts.*','customer_returns.*') ? 'nav-expanded active' : '' }}">
           <a class="nav-link" href="#"><i class="fa fa-chart-line"></i><span>Sales</span></a>
           <ul class="nav nav-children">
-            @can('jobs.index')<li class="{{ request()->routeIs('jobs.*')?'active':'' }}"><a class="nav-link" href="{{ route('jobs.index') }}">Customer Orders (Jobs)</a></li>@endcan
+            @can('jobs.index')<li class="{{ request()->routeIs('jobs.*')?'active':'' }}"><a class="nav-link" href="{{ route('jobs.index') }}">Customer PO</a></li>@endcan
             @can('sale_orders.index')<li class="{{ request()->routeIs('sale_orders.*')?'active':'' }}"><a class="nav-link" href="{{ route('sale_orders.index') }}">Sale Orders (Yarn / Greige)</a></li>@endcan
             @can('customer_invoices.index')<li class="{{ request()->routeIs('customer_invoices.*')?'active':'' }}"><a class="nav-link" href="{{ route('customer_invoices.index') }}">Customer Invoices</a></li>@endcan
             @can('customer_receipts.index')<li class="{{ request()->routeIs('customer_receipts.*')?'active':'' }}"><a class="nav-link" href="{{ route('customer_receipts.index') }}">Customer Receipts</a></li>@endcan
