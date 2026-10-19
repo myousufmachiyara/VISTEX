@@ -195,4 +195,45 @@ class PurchaseReceivingController extends Controller
             return back()->with('error', $e->getMessage());
         }
     }
+
+    // Revert an approved purchase GRN to Pending Approval (undoes stock, voucher and PDC)
+    public function unapprove(Request $request, $id)
+    {
+        $receiving = PurchaseReceiving::with('purchaseOrder')->findOrFail($id);
+        if (!$receiving->canBeApprovedBy(auth()->user())) abort(403, 'Only this category\'s in-charge or a superadmin can revert this receiving.');
+        $request->validate(['reason' => 'required|string|max:500']);
+        try {
+            $this->service->unapprove($receiving, auth()->id(), $request->reason);
+            Log::info('[PurchaseReceiving] Approval reverted', ['id' => $id, 'by' => auth()->id()]);
+            return redirect()->route('purchase_receivings.show', $id)->with('success', 'Approval reverted — stock, vendor ledger and PDC removed. Edit the GRN and approve it again.');
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function edit($id)
+    {
+        $receiving = PurchaseReceiving::with('purchaseOrder.vendor', 'challan', 'items.product.measurementUnit', 'items.purchaseOrderItem')->findOrFail($id);
+        if (!$receiving->canBeApprovedBy(auth()->user())) abort(403, 'Only this category\'s in-charge or a superadmin can edit this receiving.');
+        if ($receiving->status !== 'PendingApproval' || ($receiving->purchaseOrder->type ?? null) !== 'purchase') {
+            return redirect()->route('purchase_receivings.show', $id)->with('error', 'Only a purchase GRN waiting for approval can be edited — revert the approval first.');
+        }
+        return view('purchase_receivings.edit', compact('receiving'));
+    }
+
+    public function update(Request $request, $id)
+    {
+        $receiving = PurchaseReceiving::with('purchaseOrder')->findOrFail($id);
+        if (!$receiving->canBeApprovedBy(auth()->user())) abort(403);
+        $request->validate([
+            'receiving_date' => 'required|date', 'remarks' => 'nullable|string|max:1000',
+            'items' => 'required|array', 'items.*.quantity_received' => 'required|numeric|min:0', 'items.*.quantity_rejected' => 'nullable|numeric|min:0',
+        ]);
+        try {
+            $this->service->updatePending($receiving, $request->only('receiving_date', 'remarks'), $request->input('items', []), auth()->id());
+            return redirect()->route('purchase_receivings.show', $id)->with('success', 'GRN updated. Approve it to post stock and the vendor ledger.');
+        } catch (\Exception $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+    }
 }

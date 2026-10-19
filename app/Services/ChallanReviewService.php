@@ -259,6 +259,8 @@ class ChallanReviewService
                 'accepted_qty' => round($accepted, 3), 'rejected_qty' => round($rejected, 3),
                 'new_quantity' => $num($l['new_quantity'] ?? null), 'new_rate' => $num($l['new_rate'] ?? null),
                 'note' => $l['note'] ?? null,
+                // bags as confirmed by the inspector (record only); absent = keep the gate's count
+                'packs' => array_key_exists('packs', $l) ? (($l['packs'] === null || $l['packs'] === '') ? null : round(max(0, (float) $l['packs']), 2)) : false,
             ];
         }
         if (empty($out)) throw new \Exception('No lines submitted.');
@@ -296,7 +298,7 @@ class ChallanReviewService
                 'rejected_qty' => $decision === 'reject' ? (float) $item->received_qty : $l['rejected_qty'],
                 'decision' => $lineDecision,
                 'rejection_note' => $l['note'] ?? $item->rejection_note,
-            ]);
+            ] + ($l['packs'] !== false ? ['packs' => $l['packs']] : []));
         }
     }
 

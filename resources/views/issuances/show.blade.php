@@ -21,22 +21,23 @@
         <div class="col-md-3"><strong>To:</strong> {{ $issuance->destinationLocation->name ?? ($issuance->issue_type === 'yarn_weaving' ? 'Weaving mill (yarn in process)' : 'In process for ' . ($issuance->purchaseOrder->order_no ?? 'the PO')) }}</div>
       </div>
       <table class="table table-bordered">
-        <thead><tr><th>Item</th><th>Lot</th><th class="text-end">Qty</th><th>Unit</th><th class="text-end">Rate</th><th class="text-end">Value</th></tr></thead>
+        <thead><tr><th>Item</th><th>Lot</th><th class="text-end">Qty</th><th>Unit</th><th class="text-end">Bags</th><th class="text-end">Rate</th><th class="text-end">Value</th></tr></thead>
         <tbody>
           @foreach($issuance->items as $it)
           <tr>
             <td>{{ $it->product->name ?? '' }}</td><td>{{ $it->lot_no ?? '—' }}</td>
             <td class="text-end">{{ number_format($it->quantity, 3) }}</td><td>{{ $it->product->measurementUnit->shortcode ?? '' }}</td>
+            <td class="text-end">{{ $it->bags !== null ? $it->bags + 0 : '—' }}</td>
             <td class="text-end">{{ number_format($it->rate, 4) }}</td><td class="text-end">{{ number_format($it->amount, 2) }}</td>
           </tr>
           @endforeach
         </tbody>
-        <tfoot><tr class="fw-bold"><td colspan="2" class="text-end">Total</td><td class="text-end">{{ number_format($issuance->total_quantity, 3) }}</td><td></td><td></td><td class="text-end">{{ number_format($issuance->total_amount, 2) }}</td></tr></tfoot>
+        <tfoot><tr class="fw-bold"><td colspan="2" class="text-end">Total</td><td class="text-end">{{ number_format($issuance->total_quantity, 3) }}</td><td></td><td class="text-end">{{ $issuance->no_of_bags !== null ? $issuance->no_of_bags + 0 : '' }}</td><td></td><td class="text-end">{{ number_format($issuance->total_amount, 2) }}</td></tr></tfoot>
       </table>
       <div class="row mb-2 small">
         <div class="col-md-3"><strong>Vehicle:</strong> {{ $issuance->vehicle_no ?: '—' }}</div>
         <div class="col-md-3"><strong>Driver:</strong> {{ $issuance->driver_name ?: '—' }} {{ $issuance->driver_contact ? '(' . $issuance->driver_contact . ')' : '' }}</div>
-        <div class="col-md-2"><strong>Bags:</strong> {{ $issuance->no_of_bags !== null ? rtrim(rtrim(number_format((float) $issuance->no_of_bags, 2), '0'), '.') : '—' }}</div>
+        <div class="col-md-2"><strong>Total Bags:</strong> {{ $issuance->no_of_bags !== null ? rtrim(rtrim(number_format((float) $issuance->no_of_bags, 2), '0'), '.') : '—' }}</div>
         <div class="col-md-2"><strong>Prepared By:</strong> {{ $issuance->prepared_by_name ?: '—' }}</div>
         <div class="col-md-2"><strong>Received By:</strong> {{ $issuance->received_by_name ?: '—' }}</div>
       </div>

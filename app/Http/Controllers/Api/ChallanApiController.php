@@ -71,11 +71,13 @@ class ChallanApiController extends Controller
     public function poExpectedItems($poId)
     {
         $po = PurchaseOrder::with('items.product.measurementUnit')->findOrFail($poId);
+        $open = $this->service->openQty($po); // the gate cannot receive more than this
 
         if ($po->type === 'weaving') {
             return response()->json([[
                 'purchase_order_item_id' => null, 'product_id' => $po->greige_product_id,
-                'description' => $po->item_name ?? 'Greige (per formula)', 'expected' => (float) $po->total_meters_required,
+                'description' => $po->item_name ?? 'Greige (per formula)', 'expected' => max(0, $open[0]['left']),
+                'max' => max(0, $open[0]['left']), 'unit' => 'm',
             ]]);
         }
 
@@ -85,11 +87,11 @@ class ChallanApiController extends Controller
             'purchase_order_item_id' => $i->id, 'product_id' => $graded ? null : $i->product_id,
             'description' => $graded ? trim($i->pattern_code . ' ' . collect([$i->design, $i->color_scheme])->filter()->implode(' - '))
                                      : ($i->product->name ?? $i->description ?? ''),
-            'expected' => round((float) $i->quantity - (float) $i->quantity_received, 3),
+            'expected' => max(0, $open[$i->id]['left'] ?? 0), 'max' => max(0, $open[$i->id]['left'] ?? 0),
             'graded' => $graded,
             'unit' => $i->product->measurementUnit->shortcode ?? ($graded ? 'm' : ''),
             'qty_per_pack' => $i->packSize($po->type),
-            'packs' => $i->packsFor(round((float) $i->quantity - (float) $i->quantity_received, 3), $po->type),
+            'packs' => $i->packsFor(max(0, $open[$i->id]['left'] ?? 0), $po->type),
         ])->filter(fn($r) => $r['expected'] > 0.001)->values());
     }
 
@@ -112,7 +114,9 @@ class ChallanApiController extends Controller
 
     public function show($id)
     {
-        $c = Challan::with('purchaseOrder.vendor', 'category', 'vendor', 'receivedBy', 'reviewedBy', 'receiving', 'items.product', 'directItems')->findOrFail($id);
+        $c = Challan::with('purchaseOrder.vendor', 'purchaseOrder.items', 'category', 'vendor', 'receivedBy', 'reviewedBy', 'receiving', 'items.product', 'items.purchaseOrderItem', 'directItems')->findOrFail($id);
+        $poType = $c->purchaseOrder?->type;
+        $open = $c->purchaseOrder && $c->isAwaitingReview() ? $this->service->openQty($c->purchaseOrder, $c->id) : [];
 
         return response()->json([
             'id' => $c->id, 'challan_no' => $c->challan_no, 'entry_type' => $c->entry_type,
@@ -143,6 +147,8 @@ class ChallanApiController extends Controller
                 'qty_a' => $i->qty_a !== null ? (float) $i->qty_a : null, 'qty_b' => $i->qty_b !== null ? (float) $i->qty_b : null,
                 'qty_c' => $i->qty_c !== null ? (float) $i->qty_c : null,
                 'packs' => $i->packs !== null ? (float) $i->packs : null,
+                'qty_per_pack' => $i->purchaseOrderItem?->packSize($poType),
+                'max_qty' => ($o = $open[$poType === 'weaving' ? 0 : (int) $i->purchase_order_item_id] ?? null) ? max(0, $o['left']) : null,
             ]),
             'direct_items' => $c->directItems->map(fn($i) => [
                 'id' => $i->id, 'description' => $i->description, 'unit' => $i->unit,
@@ -374,6 +380,7 @@ class ChallanApiController extends Controller
             'lines.*.new_quantity'           => 'nullable|numeric|min:0',
             'lines.*.new_rate'               => 'nullable|numeric|min:0',
             'lines.*.note'                   => 'nullable|string|max:255',
+            'lines.*.packs'                  => 'nullable|numeric|min:0',
             'amend'                          => 'nullable|array',
         ]);
 

@@ -120,7 +120,7 @@
               <input type="hidden" name="items[${i}][product_id]" value="${r.product_id ?? ''}">
               <input type="hidden" name="items[${i}][expected_qty]" value="${r.quantity}">
             </td>
-            <td class="text-end">${r.quantity} ${r.unit || ''}${r.packs_outstanding !== null && r.packs_outstanding !== undefined ? `<div class="small text-muted">${r.packs_outstanding} bags${r.qty_per_pack > 1 ? ' × ' + r.qty_per_pack : ''}</div>` : ''}</td>
+            <td class="text-end">${r.quantity} ${r.unit || ''}${r.held > 0 ? `<div class="small text-warning">${r.held} on challans awaiting inspection</div>` : ''}${r.packs_outstanding !== null && r.packs_outstanding !== undefined ? `<div class="small text-muted">${r.packs_outstanding} bags${r.qty_per_pack > 1 ? ' × ' + r.qty_per_pack : ''}</div>` : ''}</td>
             <td><input type="number" name="items[${i}][packs]" class="form-control packs" step="any" min="0" data-per="${r.qty_per_pack || ''}" value="${r.packs_outstanding ?? ''}" placeholder="${r.qty_per_pack ? r.qty_per_pack + ' per pack' : ''}"></td>
             <td>${r.graded
               ? `<div class="input-group input-group-sm grade-row">
@@ -128,9 +128,10 @@
                    <span class="input-group-text">B</span><input type="number" name="items[${i}][qty_b]" class="form-control g" step="any" min="0" value="0">
                    <span class="input-group-text">C</span><input type="number" name="items[${i}][qty_c]" class="form-control g" step="any" min="0" value="0">
                  </div>
-                 <input type="hidden" name="items[${i}][received_qty]" class="g-total" value="${r.quantity}">
+                 <input type="hidden" name="items[${i}][received_qty]" class="g-total" value="${r.quantity}" data-max="${r.max ?? ''}">
                  <small class="text-muted g-sum">Total ${r.quantity} m</small>`
-              : `<input type="number" name="items[${i}][received_qty]" class="form-control rq" step="any" min="0" value="${r.quantity}">`}</td>
+              : `<input type="number" name="items[${i}][received_qty]" class="form-control rq" step="any" min="0" max="${r.max ?? ''}" value="${r.quantity}" title="Cannot be more than ${r.max} open on the PO">
+                 <small class="text-muted">max ${r.max} ${r.unit || ''}</small>`}</td>
           </tr>`));
         $('#gateItems thead th:last').text(rows.some(r => r.graded) ? 'Counted at Gate (A / B / C quality, m)' : 'Counted at Gate');
         $('#gateItems').show();
@@ -138,6 +139,16 @@
       });
     });
     if ($('#po_select').val()) $('#po_select').trigger('change');
+
+    // Not more than the PO has open (A + B + C rows are hidden inputs, so check them here)
+    $('#gateItems').closest('form').on('submit', function (e) {
+      let over = null;
+      $('#gateItems .g-total').each(function () {
+        const max = parseFloat($(this).data('max'));
+        if (!isNaN(max) && parseFloat(this.value) > max + 0.0005) over = max;
+      });
+      if (over !== null) { e.preventDefault(); alert('Quantity is more than the PO has open (' + over + ' m). Correct the A / B / C counts.'); }
+    });
 
     // Bags / packs: running total; with a known pack size, fill the quantity counted
     // Bags are pre-filled from the PO (purchase POs); bags ↔ quantity stay in step via the PO pack size

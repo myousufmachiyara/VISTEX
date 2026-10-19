@@ -130,9 +130,9 @@ class IssuanceController extends Controller
             'items.*.product_id'      => 'required|exists:products,id',
             'items.*.quantity'        => 'nullable|numeric|min:0',
             'items.*.lot_no'          => 'nullable|string|max:100',
+            'items.*.bags'            => 'nullable|numeric|min:0',
             'items.*.purchase_order_item_id' => 'nullable|exists:purchase_order_items,id',
             'attachments.*'           => 'nullable|file|max:5120',
-            'no_of_bags'              => 'nullable|numeric|min:0',
             'prepared_by_name'        => 'nullable|string|max:100',
             'received_by_name'        => 'nullable|string|max:100',
         ] + ChallanController::TRANSPORT_RULES;
@@ -237,7 +237,7 @@ class IssuanceController extends Controller
             <tr><td><b>From</b></td><td>' . e($issuance->sourceLocation->name ?? '-') . '</td>
                 <td><b>To</b></td><td>' . e($issuance->destinationLocation->name ?? ($issuance->purchaseOrder->vendor->name ?? '-')) . '</td></tr>
             <tr><td><b>Vehicle No.</b></td><td>' . e($issuance->vehicle_no ?: '-') . '</td>
-                <td><b>No. of Bags</b></td><td>' . ($issuance->no_of_bags !== null ? rtrim(rtrim(number_format((float) $issuance->no_of_bags, 2), '0'), '.') : '-') . '</td></tr>
+                <td><b>Total Bags</b></td><td>' . ($issuance->no_of_bags !== null ? rtrim(rtrim(number_format((float) $issuance->no_of_bags, 2), '0'), '.') : '-') . '</td></tr>
             <tr><td><b>Driver</b></td><td>' . e($issuance->driver_name ?: '-') . '</td>
                 <td><b>Driver Contact</b></td><td>' . e($issuance->driver_contact ?: '-') . '</td></tr>
         </table>';
@@ -246,25 +246,30 @@ class IssuanceController extends Controller
         $pdf->Ln(3);
 
         $html = '<table border="1" cellpadding="4" style="font-size:10px;">
-            <tr style="font-weight:bold;background-color:#f5f5f5;"><th width="6%">#</th><th width="44%">Item</th><th width="20%">Lot</th><th width="18%" align="right">Quantity</th><th width="12%">Unit</th></tr>';
+            <tr style="font-weight:bold;background-color:#f5f5f5;"><th width="6%">#</th><th width="38%">Item</th><th width="18%">Lot</th><th width="16%" align="right">Quantity</th><th width="10%">Unit</th><th width="12%" align="right">Bags</th></tr>';
+        $bagFmt = fn($v) => $v === null ? '-' : rtrim(rtrim(number_format((float) $v, 2), '0'), '.');
         foreach ($issuance->items as $i => $item) {
             $html .= '<tr><td>' . ($i + 1) . '</td><td>' . e($item->product->name ?? '') . '</td><td>' . e($item->lot_no ?? '') . '</td>
-                <td align="right">' . number_format($item->quantity, 3) . '</td><td>' . e($item->product->measurementUnit->shortcode ?? '') . '</td></tr>';
+                <td align="right">' . number_format($item->quantity, 3) . '</td><td>' . e($item->product->measurementUnit->shortcode ?? '') . '</td>
+                <td align="right">' . $bagFmt($item->bags) . '</td></tr>';
         }
-        $html .= '<tr><td colspan="3" align="right"><b>Total</b></td><td align="right"><b>' . number_format($issuance->total_quantity, 3) . '</b></td><td></td></tr></table>';
+        $html .= '<tr><td colspan="3" align="right"><b>Total</b></td><td align="right"><b>' . number_format($issuance->total_quantity, 3) . '</b></td><td></td><td align="right"><b>' . $bagFmt($issuance->no_of_bags) . '</b></td></tr></table>';
         $pdf->writeHTML($html, true, false, false, false, '');
 
         if ($issuance->remarks) { $pdf->Ln(2); $pdf->MultiCell(0, 5, 'Remarks: ' . $issuance->remarks, 0, 'L'); }
 
-        $pdf->Ln(20);
-        $y = $pdf->GetY();
-        $pdf->SetFont('helvetica', '', 10);
-        $pdf->SetXY(20, $y - 6); $pdf->Cell(60, 6, (string) ($issuance->prepared_by_name ?? ''), 0, 0, 'C');
-        $pdf->SetXY(130, $y - 6); $pdf->Cell(60, 6, (string) ($issuance->received_by_name ?? ''), 0, 0, 'C');
-        $pdf->Line(20, $y, 80, $y); $pdf->Line(130, $y, 190, $y);
-        $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->SetXY(20, $y + 1); $pdf->Cell(60, 6, 'Prepared By', 0, 0, 'C');
-        $pdf->SetXY(130, $y + 1); $pdf->Cell(60, 6, 'Received By (Mill)', 0, 0, 'C');
+        // Signature places: one box each for Prepared By and Received By (name, signature, date)
+        $pdf->Ln(10);
+        $sigBox = fn(string $title, ?string $name) => '<td width="47%" style="border:1px solid #333;">'
+            . '<b>' . $title . '</b><br><br>'
+            . 'Name: ' . ($name ? '<b>' . e($name) . '</b>' : '______________________________') . '<br><br><br>'
+            . 'Signature: ______________________________<br><br>'
+            . 'Date: ____________________</td>';
+        $pdf->writeHTML('<table cellpadding="6" width="100%" style="font-size:10px;"><tr>'
+            . $sigBox('PREPARED BY', $issuance->prepared_by_name)
+            . '<td width="6%"></td>'
+            . $sigBox('RECEIVED BY (MILL)', $issuance->received_by_name)
+            . '</tr></table>', true, false, false, false, '');
 
         return $pdf->Output($issuance->issue_no . '.pdf', 'I');
     }

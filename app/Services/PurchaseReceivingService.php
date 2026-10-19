@@ -278,6 +278,104 @@ class PurchaseReceivingService
         });
     }
 
+    /**
+     * Revert an approved purchase GRN back to Pending Approval, so it can be corrected and approved again.
+     * Undoes stock (fresh + rejected), the purchase voucher and the payment PDC.
+     * Refused once the goods have been used/moved, returned, or a cheque has been prepared.
+     */
+    public function unapprove(PurchaseReceiving $receiving, int $userId, string $reason): PurchaseReceiving
+    {
+        return DB::transaction(function () use ($receiving, $userId, $reason) {
+            $receiving = PurchaseReceiving::with('items.product', 'purchaseOrder')->lockForUpdate()->findOrFail($receiving->id);
+            $po = $receiving->purchaseOrder;
+            if ($receiving->status !== 'Approved') throw new \Exception("{$receiving->receiving_no} is not approved.");
+            if (!$po || $po->type !== 'purchase') {
+                throw new \Exception('Only purchase GRNs can be reverted. Weaving and processing receivings post yarn/greige consumption at the mill and must be corrected with a new receiving.');
+            }
+            if (trim($reason) === '') throw new \Exception('Give a reason for reverting the approval.');
+            if (\App\Models\PurchaseReturn::where('purchase_receiving_id', $receiving->id)->exists()
+                || $receiving->items->contains(fn($i) => (float) $i->quantity_returned > 0)) {
+                throw new \Exception("Goods on {$receiving->receiving_no} have already been returned to the vendor — cancel the purchase return first.");
+            }
+            $pdc = \App\Models\Pdc::where('reference_type', 'PurchaseReceiving')->where('reference_id', $receiving->id)->first();
+            if ($pdc && $pdc->cheques()->exists()) {
+                throw new \Exception("Cheques are already prepared against {$pdc->pdc_no} for this GRN — remove them before reverting.");
+            }
+
+            // Stock must still be where this GRN put it (not issued, sold or moved)
+            $rows = LocationStockLedger::whereIn('reference_type', ['PurchaseReceiving', 'PurchaseReceivingRejection'])
+                ->where('reference_id', $receiving->id)->get();
+            foreach ($rows as $row) {
+                $left = LocationStockLedger::balance($row->location_id, $row->product_id, $row->status, $row->lot_no);
+                if ($left < (float) $row->quantity - 0.001) {
+                    $name = $row->product->name ?? 'item';
+                    $fmt = fn($v) => rtrim(rtrim(number_format($v, 3), '0'), '.');
+                    throw new \Exception("Cannot revert: only {$fmt(max(0, $left))} of the {$fmt($row->quantity)} {$name} (lot {$row->lot_no}) received on {$receiving->receiving_no} is still in stock — the rest has been issued, sold or moved.");
+                }
+            }
+
+            LocationStockLedger::whereIn('reference_type', ['PurchaseReceiving', 'PurchaseReceivingRejection'])->where('reference_id', $receiving->id)->delete();
+            $this->voucherService->deleteByReference('PurchaseReceiving', $receiving->id);
+            $pdc?->delete();
+
+            $user = \App\Models\User::find($userId);
+            $note = '[Approval reverted by ' . ($user->name ?? "user #{$userId}") . ' on ' . now()->format('d-M-Y') . ': ' . trim($reason) . ']';
+            $receiving->update([
+                'status' => 'PendingApproval', 'approved_by' => null, 'approved_at' => null, 'updated_by' => $userId,
+                'remarks' => trim(($receiving->remarks ?? '') . ' ' . $note),
+            ]);
+            return $receiving->fresh(['items.product', 'purchaseOrder']);
+        });
+    }
+
+    /**
+     * Correct a purchase GRN that is waiting for approval: date, remarks, and per line the received / rejected quantity.
+     * $items = [receiving_item_id => ['quantity_received' => .., 'quantity_rejected' => ..]]
+     */
+    public function updatePending(PurchaseReceiving $receiving, array $data, array $items, int $userId): PurchaseReceiving
+    {
+        return DB::transaction(function () use ($receiving, $data, $items, $userId) {
+            $receiving = PurchaseReceiving::with('items.product', 'items.purchaseOrderItem', 'purchaseOrder', 'challan.items')->lockForUpdate()->findOrFail($receiving->id);
+            $po = $receiving->purchaseOrder;
+            if ($receiving->status !== 'PendingApproval') throw new \Exception("{$receiving->receiving_no} is {$receiving->status} — revert the approval first to edit it.");
+            if (!$po || $po->type !== 'purchase') throw new \Exception('Only purchase GRNs can be edited here.');
+            $fmt = fn($v) => rtrim(rtrim(number_format($v, 3), '0'), '.');
+
+            foreach ($receiving->items as $item) {
+                if (!isset($items[$item->id])) continue;
+                $qty = round(max(0, (float) ($items[$item->id]['quantity_received'] ?? $item->quantity_received)), 3);
+                $rej = round(max(0, (float) ($items[$item->id]['quantity_rejected'] ?? $item->quantity_rejected)), 3);
+                if ($rej > $qty + 0.0001) throw new \Exception('Rejected quantity cannot be more than received for ' . ($item->product->name ?? 'an item') . '.');
+                $oldAccepted = (float) $item->quantity_received - (float) $item->quantity_rejected;
+                $newAccepted = round($qty - $rej, 3);
+
+                if ($poi = $item->purchaseOrderItem) {
+                    $poi->refresh();
+                    $outstanding = round((float) $poi->quantity - (float) $poi->quantity_received + $oldAccepted, 3);
+                    if ($newAccepted > $outstanding + 0.001) {
+                        throw new \Exception('Cannot accept ' . $fmt($newAccepted) . ' of ' . ($item->product->name ?? 'item') . " — only {$fmt($outstanding)} is open on {$po->order_no}.");
+                    }
+                    $poi->update(['quantity_received' => round((float) $poi->quantity_received - $oldAccepted + $newAccepted, 3)]);
+                }
+                $item->update(['quantity_received' => $qty, 'quantity_rejected' => $rej, 'amount' => round($newAccepted * (float) $item->rate, 2)]);
+
+                // keep the inspection record on the challan in step
+                $ci = $receiving->challan?->items->firstWhere('purchase_order_item_id', $item->purchase_order_item_id);
+                $ci?->update(['accepted_qty' => $newAccepted, 'rejected_qty' => $rej]);
+            }
+
+            $subtotal = (float) $receiving->items()->sum('amount');
+            $gst = $po->gst_applicable ? round($subtotal * ((float) $po->gst_rate / 100), 2) : 0;
+            $receiving->update([
+                'receiving_date' => $data['receiving_date'] ?? $receiving->receiving_date,
+                'remarks' => array_key_exists('remarks', $data) ? $data['remarks'] : $receiving->remarks,
+                'amount' => round($subtotal + $gst, 2), 'updated_by' => $userId,
+            ]);
+            $this->refreshPoStatus($po);
+            return $receiving->fresh(['items.product', 'purchaseOrder']);
+        });
+    }
+
     private function createPdcForReceiving(PurchaseReceiving $receiving, PurchaseOrder $po, float $amount, ?int $userId): void
     {
         if (!in_array($po->payment_term_type, ['cash', 'credit', 'pdc']) || $amount <= 0) return;

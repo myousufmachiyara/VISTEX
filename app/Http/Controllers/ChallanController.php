@@ -63,12 +63,13 @@ class ChallanController extends Controller
     public function poItems($poId)
     {
         $po = PurchaseOrder::with('items.product', 'greigeProduct')->findOrFail($poId);
+        $open = $this->service->openQty($po); // what is still open after received + other pending challans
 
         if ($po->type === 'weaving') {
             return response()->json([[
                 'purchase_order_item_id' => null, 'product_id' => $po->greige_product_id,
                 'product_name' => $po->greigeProduct->name ?? $po->item_name ?? 'Greige (meters)',
-                'quantity' => round((float) $po->total_meters_required, 3),
+                'quantity' => max(0, $open[0]['left']), 'max' => max(0, $open[0]['left']), 'held' => $open[0]['held'], 'unit' => 'm',
             ]]);
         }
 
@@ -77,11 +78,11 @@ class ChallanController extends Controller
             'purchase_order_item_id' => $i->id, 'product_id' => $graded ? null : $i->product_id,
             'product_name' => $graded ? trim($i->pattern_code . ' ' . collect([$i->design, $i->color_scheme])->filter()->implode(' - '))
                                       : ($i->product->name ?? trim(($i->pattern_code ?? '') . ' ' . ($i->description ?? ''))),
-            'quantity' => $i->outstanding_qty,
+            'quantity' => max(0, $open[$i->id]['left'] ?? 0), 'max' => max(0, $open[$i->id]['left'] ?? 0), 'held' => $open[$i->id]['held'] ?? 0,
             'graded' => $graded,
             'unit' => $i->product->measurementUnit->shortcode ?? ($graded ? 'm' : ''),
             'qty_per_pack' => $i->packSize($po->type),
-            'packs_outstanding' => $i->packsFor((float) $i->outstanding_qty, $po->type),
+            'packs_outstanding' => $i->packsFor(max(0, $open[$i->id]['left'] ?? 0), $po->type),
         ])->filter(fn($r) => $r['quantity'] > 0.001)->values());
     }
 
@@ -189,7 +190,19 @@ class ChallanController extends Controller
         }
 
         $categories = ProductCategory::orderBy('name')->get(['id', 'name']);
-        return view('challans.edit', compact('challan', 'categories'));
+        // Per line: PO pack size (bags × per pack = qty) and the most this challan may still count
+        $lineInfo = [];
+        if ($po = $challan->purchaseOrder) {
+            $open = $this->service->openQty($po->loadMissing('items'), $challan->id);
+            foreach ($challan->items as $it) {
+                $key = $po->type === 'weaving' ? 0 : (int) $it->purchase_order_item_id;
+                $lineInfo[$it->id] = [
+                    'per' => $it->purchaseOrderItem?->packSize($po->type),
+                    'max' => isset($open[$key]) ? max(0, $open[$key]['left']) : null,
+                ];
+            }
+        }
+        return view('challans.edit', compact('challan', 'categories', 'lineInfo'));
     }
 
     public function update(Request $request, $id)
@@ -292,6 +305,7 @@ class ChallanController extends Controller
             'lines.*.new_quantity'           => 'nullable|numeric|min:0',
             'lines.*.new_rate'               => 'nullable|numeric|min:0',
             'lines.*.note'                   => 'nullable|string|max:255',
+            'lines.*.packs'                  => 'nullable|numeric|min:0',
             'amend.expected_date'            => 'nullable|date',
             'amend.total_meters_required'    => 'nullable|numeric|min:0.001',
             'amend.rate_per_pick'            => 'nullable|numeric|min:0',

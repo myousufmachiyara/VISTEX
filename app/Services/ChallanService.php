@@ -49,6 +49,7 @@ class ChallanService
                     'expected_qty' => $item['expected_qty'] ?? 0,
                 ] + $this->withPoPacks($this->gateCount($item), $item['purchase_order_item_id'] ?? null, $po->type));
             }
+            $this->assertWithinPo($challan, $po);
 
             if ($challan->has_objection) {
                 $objection = \App\Models\PurchaseOrderObjection::create([
@@ -166,6 +167,7 @@ class ChallanService
                     $count = $this->withPoPacks($count, $item->purchase_order_item_id, $challan->purchaseOrder?->type);
                     $item->update($count);
                 }
+                if ($challan->purchaseOrder) $this->assertWithinPo($challan, $challan->purchaseOrder);
 
                 $this->syncGateObjection($challan, $userId);
             }
@@ -376,6 +378,54 @@ class ChallanService
             'remarks' => trim(($challan->remarks ?? '') . ' [Rejected: ' . $reason . ']'),
         ]);
         return $challan->fresh();
+    }
+
+    /**
+     * What the gate may still receive on a PO:
+     *   ordered − received (approved GRNs) − pending GRNs − other challans still waiting for inspection.
+     * Returns [po_item_id => ['left' => qty, 'held' => qty]]; weaving (greige meters, PO total) uses key 0.
+     */
+    public function openQty(PurchaseOrder $po, ?int $exceptChallanId = null): array
+    {
+        $otherOpen = ChallanItem::whereHas('challan', fn($q) => $q->where('purchase_order_id', $po->id)
+                ->whereIn('status', [Challan::AWAITING, Challan::AMENDING])->when($exceptChallanId, fn($q) => $q->where('id', '!=', $exceptChallanId)))
+            ->selectRaw('COALESCE(purchase_order_item_id, 0) k, SUM(received_qty) q')->groupBy('k')->pluck('q', 'k');
+        $grn = fn(string $status) => \App\Models\PurchaseReceivingItem::whereHas('purchaseReceiving', fn($q) => $q->where('purchase_order_id', $po->id)->where('status', $status))
+            ->selectRaw('COALESCE(purchase_order_item_id, 0) k, SUM(quantity_received) q')->groupBy('k')->pluck('q', 'k');
+        $pending = $grn('PendingApproval');
+
+        if ($po->type === 'weaving') {
+            $received = (float) $grn('Approved')->sum();
+            $held = (float) $otherOpen->sum() + (float) $pending->sum();
+            return [0 => ['left' => round((float) $po->total_meters_required - $received - $held, 3), 'held' => round($held, 3)]];
+        }
+        $out = [];
+        foreach ($po->items as $poi) {
+            $held = (float) ($otherOpen[$poi->id] ?? 0) + (float) ($pending[$poi->id] ?? 0);
+            $out[$poi->id] = ['left' => round((float) $poi->quantity - (float) $poi->quantity_received - $held, 3), 'held' => round($held, 3)];
+        }
+        return $out;
+    }
+
+    // The gate may not receive more than the PO still has open (line by line; weaving on the PO total).
+    public function assertWithinPo(Challan $challan, PurchaseOrder $po): void
+    {
+        $open = $this->openQty($po->loadMissing('items.product.measurementUnit'), $challan->id);
+        $fmt  = fn($v) => rtrim(rtrim(number_format($v, 3), '0'), '.');
+        $items = $challan->items()->get();
+        $groups = $po->type === 'weaving' ? [0 => $items] : $items->groupBy(fn($i) => (int) $i->purchase_order_item_id)->all();
+
+        foreach ($groups as $key => $rows) {
+            if (!isset($open[$key])) continue;
+            ['left' => $left, 'held' => $held] = $open[$key];
+            $mine = (float) collect($rows)->sum('received_qty');
+            if ($mine <= $left + 0.001) continue;
+            $poi  = $key ? $po->items->firstWhere('id', $key) : null;
+            $unit = $po->type === 'weaving' ? 'm' : ($poi?->product?->measurementUnit?->shortcode ?? '');
+            $name = $po->type === 'weaving' ? '' : ' of ' . collect($rows)->first()->display_name;
+            throw new \Exception(trim("Cannot receive {$fmt($mine)} {$unit}") . "{$name} — {$po->order_no} has only " . trim($fmt(max(0, $left)) . " {$unit}") . ' open'
+                . ($held > 0 ? ' (' . trim($fmt($held) . " {$unit}") . ' is already on other challans awaiting inspection)' : '') . '.');
+        }
     }
 
     private function assertPoIsReceivable(PurchaseOrder $po): void

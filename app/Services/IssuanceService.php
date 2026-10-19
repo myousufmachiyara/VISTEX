@@ -45,6 +45,7 @@ class IssuanceService
             ]);
 
             $this->apply($issuance, $po, $items, $userId);
+            $this->syncBagTotal($issuance);
 
             if ($po->status === PurchaseOrder::STATUS_APPROVED) {
                 $po->update(['status' => PurchaseOrder::STATUS_ISSUED]);
@@ -74,6 +75,7 @@ class IssuanceService
                 'updated_by'              => $userId,
             ]);
             $this->apply($issuance->fresh(), $po, $items, $userId);
+            $this->syncBagTotal($issuance);
 
             return $issuance->fresh(['items.product', 'purchaseOrder.vendor']);
         });
@@ -160,6 +162,7 @@ class IssuanceService
                 'product_id' => (int) $i['product_id'], 'lot_no' => trim((string) ($i['lot_no'] ?? '')) ?: null,
                 'purchase_order_item_id' => $i['purchase_order_item_id'] ?? null,
                 'quantity' => round(($grouped[$key]['quantity'] ?? 0) + (float) $i['quantity'], 3),
+                'bags' => self::addBags($grouped[$key]['bags'] ?? null, $i['bags'] ?? null),
             ];
         }
 
@@ -198,7 +201,7 @@ class IssuanceService
 
             IssuanceItem::create([
                 'issuance_id' => $issuance->id, 'product_id' => $product->id, 'lot_no' => $g['lot_no'],
-                'purchase_order_item_id' => $g['purchase_order_item_id'], 'quantity' => $g['quantity'], 'rate' => $rate, 'amount' => $amount,
+                'purchase_order_item_id' => $g['purchase_order_item_id'], 'quantity' => $g['quantity'], 'bags' => $g['bags'] ?? null, 'rate' => $rate, 'amount' => $amount,
             ]);
 
             LocationStockLedger::create([
@@ -264,7 +267,8 @@ class IssuanceService
             foreach ($buckets as $b) {
                 if ($left <= 0.0005) break;
                 $take = round(min($left, (float) $b->qty), 3);
-                $out[] = array_merge($g, ['lot_no' => $b->lot_no, 'quantity' => $take]);
+                // bags are a record of the line — keep them on its first lot only
+                $out[] = array_merge($g, ['lot_no' => $b->lot_no, 'quantity' => $take, 'bags' => $left === $g['quantity'] ? ($g['bags'] ?? null) : null]);
                 $left = round($left - $take, 3);
             }
         }
@@ -273,10 +277,27 @@ class IssuanceService
         $merged = [];
         foreach ($out as $g) {
             $k = $g['product_id'] . '|' . $g['lot_no'];
-            if (isset($merged[$k])) $merged[$k]['quantity'] = round($merged[$k]['quantity'] + $g['quantity'], 3);
-            else $merged[$k] = $g;
+            if (isset($merged[$k])) {
+                $merged[$k]['quantity'] = round($merged[$k]['quantity'] + $g['quantity'], 3);
+                $merged[$k]['bags'] = self::addBags($merged[$k]['bags'] ?? null, $g['bags'] ?? null);
+            } else $merged[$k] = $g;
         }
         return array_values($merged);
+    }
+
+    // Header "No. of Bags" = total of the item lines (record only)
+    private function syncBagTotal(Issuance $issuance): void
+    {
+        $bags = $issuance->items()->whereNotNull('bags')->get();
+        $issuance->update(['no_of_bags' => $bags->isEmpty() ? null : round((float) $bags->sum('bags'), 2)]);
+    }
+
+    // Bags are optional: null + null stays null, otherwise add
+    private static function addBags($a, $b): ?float
+    {
+        $a = ($a === null || $a === '') ? null : max(0, (float) $a);
+        $b = ($b === null || $b === '') ? null : max(0, (float) $b);
+        return $a === null && $b === null ? null : round(($a ?? 0) + ($b ?? 0), 2);
     }
 
     private function reverse(Issuance $issuance): void
@@ -314,7 +335,6 @@ class IssuanceService
             'vehicle_no'       => $str('vehicle_no') ? strtoupper($str('vehicle_no')) : null,
             'driver_name'      => $str('driver_name'),
             'driver_contact'   => $str('driver_contact'),
-            'no_of_bags'       => $str('no_of_bags') !== null ? round(max(0, (float) $data['no_of_bags']), 2) : null,
             'prepared_by_name' => $str('prepared_by_name'),
             'received_by_name' => $str('received_by_name'),
         ];

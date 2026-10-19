@@ -87,8 +87,8 @@
 
         @include('challans._transport', ['challan' => $issuance ?? null])
         <div class="row">
-          <div class="col-md-4 mb-3"><label>No. of Bags <small class="text-muted">(record only)</small></label>
-            <input type="number" step="0.01" min="0" name="no_of_bags" class="form-control" value="{{ old('no_of_bags', isset($issuance) && $issuance->no_of_bags !== null ? (float) $issuance->no_of_bags : '') }}"></div>
+          <div class="col-md-4 mb-3"><label>Total Bags <small class="text-muted">(sum of the lines)</small></label>
+            <input type="text" class="form-control" id="bagsTotal" readonly value="0"></div>
           <div class="col-md-4 mb-3"><label>Prepared By</label>
             <input type="text" name="prepared_by_name" class="form-control" maxlength="100" value="{{ old('prepared_by_name', $issuance->prepared_by_name ?? auth()->user()->name) }}"></div>
           <div class="col-md-4 mb-3"><label>Received By <small class="text-muted">(mill representative)</small></label>
@@ -109,7 +109,7 @@
 @if($type)
 @php
   $existingItems = $editing
-      ? $issuance->items->map(fn($i) => ['product_id' => $i->product_id, 'quantity' => (float) $i->quantity, 'lot_no' => $i->lot_no, 'purchase_order_item_id' => $i->purchase_order_item_id])->values()
+      ? $issuance->items->map(fn($i) => ['product_id' => $i->product_id, 'quantity' => (float) $i->quantity, 'bags' => $i->bags !== null ? (float) $i->bags : null, 'lot_no' => $i->lot_no, 'purchase_order_item_id' => $i->purchase_order_item_id])->values()
       : [];
 @endphp
 <script>
@@ -135,7 +135,7 @@ $(function () {
       const body = $('#linesTable tbody').empty();
       const prefill = OLD.length ? OLD : EXISTING;
       if (d.type === 'weaving') {
-        $('#linesHead').html('<tr><th>Yarn</th><th class="text-end">Required</th><th class="text-end">Issued</th><th class="text-end">Remaining</th><th class="text-end">In Warehouse</th><th width="18%">Lot</th><th width="16%">Issue Qty</th></tr>');
+        $('#linesHead').html('<tr><th>Yarn</th><th class="text-end">Required</th><th class="text-end">Issued</th><th class="text-end">Remaining</th><th class="text-end">In Warehouse</th><th width="16%">Lot</th><th width="14%">Issue Qty</th><th width="10%">Bags</th></tr>');
         d.lines.forEach((l, i) => {
           const pre = prefill.find(p => +p.product_id === +l.product_id) || {};
           body.append(`<tr>
@@ -145,9 +145,10 @@ $(function () {
             <td class="text-end ${l.available < l.remaining ? 'text-danger' : ''}">${l.available.toFixed(3)}</td>
             <td><select name="items[${i}][lot_no]" class="form-control">${lotOptions(l.lots, pre.lot_no)}</select></td>
             <td><input type="number" name="items[${i}][quantity]" class="form-control" step="any" min="0" max="${Math.max(l.remaining, 0)}" value="${pre.quantity ?? ''}" placeholder="max ${Math.max(l.remaining,0).toFixed(3)}"></td>
+            <td><input type="number" name="items[${i}][bags]" class="form-control bags" step="any" min="0" value="${pre.bags ?? ''}"></td>
           </tr>`);
         });
-        if (!d.lines.length) body.append('<tr><td colspan="7" class="text-muted">This PO has no warp/weft yarn set.</td></tr>');
+        if (!d.lines.length) body.append('<tr><td colspan="8" class="text-muted">This PO has no warp/weft yarn set.</td></tr>');
       } else {
         greige = d;
         const srcSel = $('#source_select');
@@ -158,11 +159,12 @@ $(function () {
         $('#millInfo').show().html(`<strong>${d.vendor}</strong> — PO lines ${d.po_total.toLocaleString()} m · greige issued so far ${d.issued.toLocaleString()} m · about ${left.toLocaleString()} m still to issue.`
           + (here && !here.can_issue ? '<br><span class="text-danger">Only this location\'s in-charge (or a superadmin) can issue here.</span>' : '')
           + (!d.stock.length ? '<br><span class="text-danger">No greige at this mill location yet — send it by Stock Movement first.</span>' : ''));
-        $('#linesHead').html('<tr><th>Greige</th><th class="text-end">At Mill</th><th width="20%">Mill Lot #</th><th width="22%">For PO Line</th><th width="15%">Qty</th><th></th></tr>');
+        $('#linesHead').html('<tr><th>Greige</th><th class="text-end">At Mill</th><th width="20%">Mill Lot #</th><th width="22%">For PO Line</th><th width="13%">Qty</th><th width="10%">Bags</th><th></th></tr>');
         rowIdx = 0;
         (prefill.length ? prefill : [{}]).forEach(p => addGreigeRow(p));
       }
       $('#linesWrap').show();
+      bagsTotal();
     });
   }
 
@@ -177,6 +179,7 @@ $(function () {
       <td><select name="items[${i}][lot_no]" class="form-control g-lot"><option value="">Any lot</option></select></td>
       <td><select name="items[${i}][purchase_order_item_id]" class="form-control">${poOpts}</select></td>
       <td><input type="number" name="items[${i}][quantity]" class="form-control" step="any" min="0" value="${pre.quantity ?? ''}"></td>
+      <td><input type="number" name="items[${i}][bags]" class="form-control bags" step="any" min="0" value="${pre.bags ?? ''}"></td>
       <td><button type="button" class="btn btn-sm btn-outline-danger g-remove">&times;</button></td>
     </tr>`);
     $('#linesTable tbody').append(row);
@@ -186,6 +189,13 @@ $(function () {
       row.find('.g-lot').html(lotOptions(s ? s.lots : {}, pre.lot_no));
     }).trigger('change');
   }
+
+  function bagsTotal() {
+    let t = 0; $('#linesTable .bags').each(function () { t += parseFloat(this.value) || 0; });
+    $('#bagsTotal').val(Math.round(t * 100) / 100);
+  }
+  $(document).on('input', '#linesTable .bags', bagsTotal);
+  $(document).on('click', '.g-remove', () => setTimeout(bagsTotal));
 
   $('#po_select, #source_select').on('change', load);
   $(document).on('click', '#addGreigeRow', () => addGreigeRow());

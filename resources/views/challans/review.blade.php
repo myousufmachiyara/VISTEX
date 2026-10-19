@@ -76,7 +76,10 @@
               <td class="text-end">{{ number_format($l['already_received'], 3) }}</td>
               <td class="text-end outstanding" data-v="{{ $l['outstanding'] }}"><strong>{{ number_format($l['outstanding'], 3) }}</strong></td>
               <td class="text-end">{{ number_format($l['gate_qty'], 3) }}
-                @if(($l['gate_packs'] ?? null) !== null)<div class="small text-muted">{{ $l['gate_packs'] + 0 }} bags / packs</div>@endif
+                <div class="input-group input-group-sm mt-1" style="max-width:150px;margin-left:auto">
+                  <input type="number" name="lines[{{ $i }}][packs]" class="form-control text-end" step="any" min="0" placeholder="bags" value="{{ old("lines.$i.packs", ($l['gate_packs'] ?? null) !== null ? $l['gate_packs'] + 0 : '') }}">
+                  <span class="input-group-text">bags</span>
+                </div>
                 @if($isProcessing && (($l['gate_a'] ?? 0) + ($l['gate_b'] ?? 0) + ($l['gate_c'] ?? 0)) > 0)<div class="small text-muted">A {{ $l['gate_a'] + 0 }} · B {{ $l['gate_b'] + 0 }} · C {{ $l['gate_c'] + 0 }}</div>@endif
               </td>
               @if($isProcessing)

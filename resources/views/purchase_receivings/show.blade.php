@@ -30,6 +30,26 @@
         </form>
       </div></div></div>
       @endif
+      @php $isPurchase = ($receiving->purchaseOrder->type ?? null) === 'purchase'; $canManage = $receiving->canBeApprovedBy(auth()->user()); @endphp
+      @if($isPurchase && $canManage && $receiving->status === 'PendingApproval')
+        <div class="mb-3"><a href="{{ route('purchase_receivings.edit', $receiving->id) }}" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i> Edit GRN</a></div>
+      @endif
+      @if($isPurchase && $canManage && $receiving->status === 'Approved')
+        <div class="mb-3">
+          <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#unapproveModal"><i class="fas fa-undo"></i> Revert Approval</button>
+          <small class="text-muted ms-2">Removes the stock, vendor ledger entry and PDC so the GRN can be edited and approved again.</small>
+        </div>
+        <div class="modal fade" id="unapproveModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+          <form action="{{ route('purchase_receivings.unapprove', $receiving->id) }}" method="POST">@csrf
+            <div class="modal-header"><h5>Revert approval of {{ $receiving->receiving_no }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+              <p class="small">The GRN goes back to <strong>Pending Approval</strong>. Its stock, purchase voucher and payment PDC are removed. This is refused if the goods were already issued, sold, moved or returned, or a cheque has been prepared.</p>
+              <textarea name="reason" class="form-control" rows="3" required placeholder="Reason (e.g. wrong quantity entered)"></textarea>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-warning">Revert Approval</button></div>
+          </form>
+        </div></div></div>
+      @endif
       @if($receiving->status === 'Rejected')<div class="alert alert-danger"><strong>Rejected:</strong> {{ $receiving->rejection_reason }}</div>@endif
 
       <div class="row mb-3">

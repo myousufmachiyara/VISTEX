@@ -316,6 +316,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('{id}/print',         [PurchaseReceivingController::class, 'print'])        ->name('print')  ->middleware('check.permission:purchase_receivings.index');
         Route::get('{id}',               [PurchaseReceivingController::class, 'show'])         ->name('show')   ->middleware('check.permission:purchase_receivings.index');
         Route::post('{id}/approve',      [PurchaseReceivingController::class, 'approve'])      ->name('approve')->middleware('check.permission:purchase_receivings.edit');
+        Route::post('{id}/unapprove',    [PurchaseReceivingController::class, 'unapprove'])    ->name('unapprove')->middleware('check.permission:purchase_receivings.edit');
+        Route::get('{id}/edit',          [PurchaseReceivingController::class, 'edit'])         ->name('edit')   ->middleware('check.permission:purchase_receivings.edit');
+        Route::put('{id}',               [PurchaseReceivingController::class, 'update'])       ->name('update') ->middleware('check.permission:purchase_receivings.edit');
         Route::post('{id}/reject',       [PurchaseReceivingController::class, 'reject'])       ->name('reject') ->middleware('check.permission:purchase_receivings.edit');
     });
 

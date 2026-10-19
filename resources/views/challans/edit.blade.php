@@ -60,7 +60,8 @@
                 <tr>
                   <td>{{ $item->display_name }}<input type="hidden" name="items[{{ $i }}][id]" value="{{ $item->id }}"></td>
                   <td class="text-end">{{ number_format($item->expected_qty, 3) }}</td>
-                  <td><input type="number" name="items[{{ $i }}][packs]" class="form-control" step="any" min="0" value="{{ old("items.$i.packs", $item->packs !== null ? $item->packs + 0 : '') }}"></td>
+                  @php $li = $lineInfo[$item->id] ?? ['per' => null, 'max' => null]; @endphp
+                  <td><input type="number" name="items[{{ $i }}][packs]" class="form-control packs" step="any" min="0" data-per="{{ $li['per'] }}" placeholder="{{ $li['per'] ? ($li['per'] + 0) . ' per pack' : '' }}" value="{{ old("items.$i.packs", $item->packs !== null ? $item->packs + 0 : '') }}"></td>
                   <td>
                     @if($item->qty_a !== null || $item->qty_b !== null || $item->qty_c !== null || ($po->type ?? null) === 'processing')
                       <div class="input-group input-group-sm">
@@ -70,7 +71,8 @@
                       </div>
                       <input type="hidden" name="items[{{ $i }}][received_qty]" value="{{ (float) $item->received_qty }}">
                     @else
-                      <input type="number" name="items[{{ $i }}][received_qty]" class="form-control" step="any" min="0" required value="{{ old("items.$i.received_qty", (float) $item->received_qty) }}">
+                      <input type="number" name="items[{{ $i }}][received_qty]" class="form-control rq" step="any" min="0" @if($li['max'] !== null) max="{{ $li['max'] }}" @endif required value="{{ old("items.$i.received_qty", (float) $item->received_qty) }}">
+                      @if($li['max'] !== null)<small class="text-muted">max {{ $li['max'] + 0 }} open on the PO</small>@endif
                     @endif
                   </td>
                 </tr>
@@ -127,6 +129,16 @@
 <script>
   $(function () {
     $('#has_objection').on('change', function () { $('#objectionBox').toggle(this.checked); }).trigger('change');
+
+    // Bags × PO pack size = quantity (and back), same as on the new-challan screen
+    $(document).on('input', '.packs', function () {
+      const per = parseFloat($(this).data('per')), n = parseFloat(this.value);
+      if (per && n >= 0) $(this).closest('tr').find('.rq').val(Math.round(n * per * 1000) / 1000);
+    });
+    $(document).on('input', '.rq', function () {
+      const p = $(this).closest('tr').find('.packs'), per = parseFloat(p.data('per')), q = parseFloat(this.value);
+      if (per && q >= 0) p.val(Math.round(q / per * 100) / 100);
+    });
 
     $('#editForm').on('submit', function () {
       const kept = $('input[name="keep_images[]"]:checked').length;
