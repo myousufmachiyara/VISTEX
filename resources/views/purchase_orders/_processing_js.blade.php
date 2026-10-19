@@ -92,7 +92,7 @@
   const renumberNotes = () => $('#procNotesBody .note-no').each((i, td) => $(td).text((i + 1) + '.'));
 
   function loadJob(jobId, replace) {
-    if (!jobId) return;
+    if (!jobId) { $('#jobHint').text('No customer order — enter the patterns to process for stock.'); return; }
     fetch(`{{ url('purchase-orders/job-items') }}/${jobId}` + (editingId ? `?exclude_po=${editingId}` : ''))
       .then(r => r.json()).then(data => {
         $('#jobHint').text(`${data.customer}${data.customer_po ? ' · PO ' + data.customer_po : ''}${data.delivery_date ? ' · delivery ' + data.delivery_date : ''}`);

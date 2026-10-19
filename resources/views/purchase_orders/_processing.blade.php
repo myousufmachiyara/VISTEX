@@ -8,14 +8,14 @@
   <h6>Customer Order &amp; Program</h6>
   <div class="row">
     <div class="col-md-5 mb-3">
-      <label>Customer Order <span class="text-danger">*</span></label>
-      <select name="job_id" id="job_select" class="form-control select2-js" required>
-        <option value="">Select approved customer order</option>
+      <label>Customer Order <small class="text-muted">(optional)</small></label>
+      <select name="job_id" id="job_select" class="form-control select2-js">
+        <option value="">None — processing for stock</option>
         @foreach($approvedJobs as $job)
           <option value="{{ $job->id }}" @selected(old('job_id', $ppo?->job_id) == $job->id)>{{ $job->job_no }} — {{ $job->customer->name ?? '' }}{{ $job->customer_po_number ? ' — PO ' . $job->customer_po_number : '' }}</option>
         @endforeach
       </select>
-      <small class="text-muted" id="jobHint">Only approved customer orders are listed.</small>
+      <small class="text-muted" id="jobHint">Pick an approved customer order to load its lines, or leave blank and enter the patterns yourself.</small>
     </div>
     <div class="col-md-3 mb-3">
       <label>PO Type</label>

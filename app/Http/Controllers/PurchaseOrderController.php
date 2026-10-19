@@ -183,7 +183,7 @@ class PurchaseOrderController extends Controller
         }
 
         return array_merge($base, [
-            'job_id' => 'required|exists:job_orders,id', 'program' => 'nullable|string|max:255',
+            'job_id' => 'nullable|exists:job_orders,id', 'program' => 'nullable|string|max:255',
             'service_type_id' => 'required|exists:service_types,id',
             'greige_product_id' => 'required|exists:products,id',
             'fabric_specs' => 'nullable|array',
@@ -449,8 +449,8 @@ class PurchaseOrderController extends Controller
         <tr>
             <td style="border:1px solid #333; text-align:center;">' . $count . '</td>
             <td style="border:1px solid #333;">' . e($item->product->name ?? '') . '</td>
-            <td style="border:1px solid #333; text-align:center;">' . number_format($item->pack_qty, 0) . '</td>
-            <td style="border:1px solid #333; text-align:center;">' . number_format($item->pack_qty, 3) . ' ' . e($item->product->measurementUnit->shortcode ?? '') . '</td>
+            <td style="border:1px solid #333; text-align:center;">' . number_format($item->quantity, 0) . '</td>
+            <td style="border:1px solid #333; text-align:center;">' . number_format($item->quantity, 3) . ' ' . e($item->product->measurementUnit->shortcode ?? '') . '</td>
             <td style="border:1px solid #333; text-align:right;">' . number_format($item->rate, 2) . '</td>
             <td style="border:1px solid #333; text-align:right;">' . number_format($amount, 2) . '</td>
         </tr>';
