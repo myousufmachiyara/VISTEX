@@ -17,6 +17,8 @@ class ProcessingReports extends BaseReports
     public static function catalog(): array
     {
         return [
+            'mill_stock_summary' => ['title' => 'Stock at Mills — Summary',      'filter' => 'asof',  'desc' => 'Total stock at each vendor mill on a date: waiting, issued for processing, reprocess, rejected, on the way, yarn.'],
+            'mill_stock'         => ['title' => 'Stock at Mills — Details',      'filter' => 'asof',  'desc' => 'Every item and lot at vendor mills on a date, with its stage, PO and value.'],
             'mill_payables'      => ['title' => 'Mill Payables (Processing)',    'filter' => 'range', 'desc' => 'Per Processing / Reprocess PO: charges billed, QC claims, PDC and cheques cleared.'],
             'vendor_balances'    => ['title' => 'Vendor Balances',               'filter' => 'asof',  'desc' => 'What we owe each vendor / mill, and PDC still to be paid.'],
             'lot_costing'        => ['title' => 'Lot Costing (greige → SKU)',    'filter' => 'range', 'desc' => 'Cost per meter of each processing lot, where it is now, and what it sold for.'],
@@ -28,12 +30,118 @@ class ProcessingReports extends BaseReports
     public function run(string $key, array $f): array
     {
         return match ($key) {
+            'mill_stock_summary' => $this->millStock($f, true),
+            'mill_stock' => $this->millStock($f, false),
             'mill_payables' => $this->millPayables($f),
             'vendor_balances' => $this->vendorBalances($f),
             'lot_costing' => $this->lotCosting($f),
             'order_margin' => $this->orderMargin($f),
             'receivables_aging' => $this->receivablesAging($f),
         };
+    }
+
+    // ── Stock at vendor mills ───────────────────────────────────────
+
+    public const MILL_STAGES = [
+        'fresh' => 'At mill — not yet issued', 'in_process' => 'Issued for processing', 'reprocess' => 'Reprocess',
+        'rejected' => 'Rejected', 'in_transit' => 'On the way to the mill', 'yarn' => 'Yarn at weaving mill',
+    ];
+
+    /** Everything sitting at vendor (mill) locations on a date, plus yarn issued to weaving mills and not yet woven. */
+    private function millStock(array $f, bool $summary): array
+    {
+        $asof = $f['asof'];
+        $lines = DB::table('location_stock_ledger as l')
+            ->join('locations as loc', 'loc.id', '=', 'l.location_id')
+            ->join('products as p', 'p.id', '=', 'l.product_id')
+            ->leftJoin('product_categories as c', 'c.id', '=', 'p.category_id')
+            ->leftJoin('measurement_units as u', 'u.id', '=', 'p.measurement_unit')
+            ->leftJoin('vendors as v', 'v.id', '=', 'loc.vendor_id')
+            ->whereNotNull('loc.vendor_id')->where('l.entry_date', '<=', $asof)
+            ->whereIn('l.status', ['fresh', 'in_process', 'reprocess', 'rejected', 'in_transit'])
+            ->when($f['vendor_id'], fn($q, $v) => $q->where('loc.vendor_id', $v))
+            ->when($f['product_id'], fn($q, $v) => $q->where('l.product_id', $v))
+            ->groupBy('loc.vendor_id', 'v.name', 'l.location_id', 'loc.name', 'l.status', 'l.product_id', 'p.name', 'c.name', 'u.shortcode', 'l.lot_no')
+            ->havingRaw('ABS(SUM(l.quantity)) > 0.0005')
+            ->selectRaw('loc.vendor_id, v.name as mill, l.location_id, loc.name as location, l.status, l.product_id, p.name as item, c.name as category,
+                         u.shortcode as unit, l.lot_no, SUM(l.quantity) as qty, SUM(l.amount) as amount, MAX(l.entry_date) as last_date')
+            ->get();
+
+        // Processing PO behind each lot: issuances for "issued", the stock movement that took it to the mill otherwise
+        $lots = $lines->pluck('lot_no')->filter()->unique()->values()->all() ?: ['-'];
+        $byIssue = DB::table('location_stock_ledger as l')->join('issuances as s', fn($j) => $j->on('s.id', '=', 'l.reference_id')->where('l.reference_type', 'Issuance'))
+            ->join('purchase_orders as po', 'po.id', '=', 's.purchase_order_id')->whereIn('l.lot_no', $lots)->where('l.quantity', '>', 0)
+            ->get(['l.location_id', 'l.product_id', 'l.lot_no', 'po.id', 'po.order_no'])
+            ->groupBy(fn($r) => "{$r->location_id}|{$r->product_id}|{$r->lot_no}");
+        $byMove = DB::table('stock_movements as m')->join('purchase_orders as po', 'po.id', '=', 'm.purchase_order_id')->whereNull('m.deleted_at')
+            ->whereIn('m.lot_no', $lots)->get(['m.lot_no', 'po.id', 'po.order_no'])->keyBy('lot_no');
+
+        $rows = [];
+        foreach ($lines as $l) {
+            $po = ($byIssue["{$l->location_id}|{$l->product_id}|{$l->lot_no}"] ?? collect())->unique('id');
+            $poNo = $po->pluck('order_no')->implode(', ') ?: ($byMove[$l->lot_no]->order_no ?? '');
+            $poId = $po->first()->id ?? ($byMove[$l->lot_no]->id ?? null);
+            $rows[] = ['mill' => $l->mill ?: '—', 'vendor_id' => $l->vendor_id, 'location' => $l->location, 'stage' => self::MILL_STAGES[$l->status], 'stage_key' => $l->status,
+                'category' => $l->category, 'item' => $l->item, 'lot' => $l->lot_no ?: '—', 'po_no' => $poNo ?: '—',
+                'po_no_link' => $poId ? route('purchase_orders.show', $poId) : null,
+                'qty' => round((float) $l->qty, 3), 'unit' => $l->unit, 'amount' => round((float) $l->amount, 2), 'date' => $l->last_date];
+        }
+
+        // Yarn issued to weaving mills and not yet consumed by greige receipts
+        $yarn = DB::table('yarn_in_process_ledger as y')
+            ->join('products as p', 'p.id', '=', 'y.product_id')
+            ->leftJoin('measurement_units as u', 'u.id', '=', 'p.measurement_unit')
+            ->leftJoin('vendors as v', 'v.id', '=', 'y.vendor_id')
+            ->leftJoin('purchase_orders as po', 'po.id', '=', 'y.purchase_order_id')
+            ->where('y.entry_date', '<=', $asof)
+            ->when($f['vendor_id'], fn($q, $v) => $q->where('y.vendor_id', $v))
+            ->when($f['product_id'], fn($q, $v) => $q->where('y.product_id', $v))
+            ->groupBy('y.vendor_id', 'v.name', 'y.purchase_order_id', 'po.order_no', 'y.product_id', 'p.name', 'u.shortcode')
+            ->havingRaw('SUM(y.quantity) > 0.0005')
+            ->selectRaw('y.vendor_id, v.name as mill, y.purchase_order_id, po.order_no, p.name as item, u.shortcode as unit,
+                         SUM(y.quantity) as qty, SUM(y.amount) as amount, MAX(y.entry_date) as last_date')
+            ->get();
+        foreach ($yarn as $y) {
+            $rows[] = ['mill' => $y->mill ?: '—', 'vendor_id' => $y->vendor_id, 'location' => 'Weaving mill', 'stage' => self::MILL_STAGES['yarn'], 'stage_key' => 'yarn',
+                'category' => 'Yarn', 'item' => $y->item, 'lot' => '—', 'po_no' => $y->order_no ?: '—',
+                'po_no_link' => $y->purchase_order_id ? route('purchase_orders.show', $y->purchase_order_id) : null,
+                'qty' => round((float) $y->qty, 3), 'unit' => $y->unit, 'amount' => round((float) $y->amount, 2), 'date' => $y->last_date];
+        }
+
+        $notes = ['Stock at vendor (mill) locations on ' . date('d-M-Y', strtotime($asof)) . ', plus yarn issued to weaving mills and not yet woven into greige.',
+                  'Quantities are in each item\'s own unit (greige / fabric in meters, yarn in its purchase unit).'];
+
+        if (!$summary) {
+            usort($rows, fn($a, $b) => [$a['mill'], array_search($a['stage_key'], array_keys(self::MILL_STAGES)), $a['item'], $a['lot']]
+                                      <=> [$b['mill'], array_search($b['stage_key'], array_keys(self::MILL_STAGES)), $b['item'], $b['lot']]);
+            return ['columns' => [
+                self::col('mill', 'Mill / Vendor'), self::col('location', 'Location'), self::col('stage', 'Stage'), self::col('category', 'Category'),
+                self::col('item', 'Item'), self::col('lot', 'Lot #'), self::col('po_no', 'P.O #', 'link'), self::col('qty', 'Quantity', 'qty', true),
+                self::col('unit', 'Unit'), self::col('amount', 'Value', 'money', true), self::col('date', 'Last Movement', 'date')],
+                'rows' => $rows, 'notes' => $notes];
+        }
+
+        // Summary: one row per mill, a quantity column per stage, total value
+        $out = [];
+        foreach (collect($rows)->groupBy('mill') as $mill => $g) {
+            $r = ['mill' => $mill, 'mill_link' => route('reports.show', ['processing', 'mill_stock', 'asof' => $asof, 'vendor_id' => $g->first()['vendor_id']])];
+            foreach (array_keys(self::MILL_STAGES) as $k) {
+                $v = $g->where('stage_key', $k)->sum('qty');
+                $r[$k] = abs($v) > 0.0005 ? round($v, 3) : null;
+            }
+            $r['lots'] = $g->where('stage_key', '!=', 'yarn')->pluck('lot')->filter(fn($x) => $x !== '—')->unique()->count() ?: null;
+            $r['amount'] = round($g->sum('amount'), 2);
+            $out[] = $r;
+        }
+        usort($out, fn($a, $b) => $b['amount'] <=> $a['amount']);
+        $notes[] = 'Click a mill to see its items and lots.';
+        return ['columns' => [
+            self::col('mill', 'Mill / Vendor', 'link'),
+            self::col('fresh', 'At mill, not issued', 'qty', true), self::col('in_process', 'Issued for processing', 'qty', true),
+            self::col('reprocess', 'Reprocess', 'qty', true), self::col('rejected', 'Rejected', 'qty', true),
+            self::col('in_transit', 'On the way', 'qty', true), self::col('yarn', 'Yarn at weaving mill', 'qty', true),
+            self::col('lots', 'Lots', 'qty', true), self::col('amount', 'Total Value', 'money', true)],
+            'rows' => $out, 'notes' => $notes];
     }
 
     // ── Mill payables ───────────────────────────────────────────────
