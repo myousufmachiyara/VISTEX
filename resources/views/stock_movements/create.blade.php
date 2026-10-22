@@ -87,7 +87,7 @@ $(function () {
     const t = $('#movement_type').val();
     const fromVendor = t === 'vendor_to_warehouse', toVendor = t === 'warehouse_to_vendor';
     const opts = (vendor, sel) => '<option value="">Select</option>' + locations.filter(l => !!l.vendor_id === vendor)
-      .map(l => `<option value="${l.id}" data-vendor="${l.vendor_id ?? ''}" ${String(sel) === String(l.id) ? 'selected' : ''}>${esc(l.name)}${l.vendor ? ' (' + esc(l.vendor) + ')' : ''}</option>`).join('');
+      .map(l => `<option value="${l.id}" data-vendor="${l.vendor_id ?? ''}" ${String(sel) === String(l.id) ? 'selected' : ''}>${esc(l.vendor)}${l.name ? ' (' + esc(l.name) + ')' : ''}</option>`).join('');
     $('#from_location').html(opts(fromVendor, old.from)); $('#to_location').html(opts(toVendor, old.to));
     $('#poField').toggle(toVendor); if (!toVendor) $('#po_select').val('');
     $('#flowHint').text(hints[t]);
