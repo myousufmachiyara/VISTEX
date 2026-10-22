@@ -14,6 +14,8 @@ class NotificationService
 
     public function notifyRole(string $role, string $type, string $title, string $body, string $linkType, int $linkId): void
     {
+        // A role that was never set up on this system simply has nobody to notify
+        if (!\Spatie\Permission\Models\Role::where('name', $role)->where('guard_name', 'web')->exists()) return;
         $userIds = User::role($role)->pluck('id')->all();
         $this->notifyUsers($userIds, $type, $title, $body, $linkType, $linkId);
     }
