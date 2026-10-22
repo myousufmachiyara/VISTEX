@@ -51,7 +51,7 @@
         <h6>Items</h6>
         <div class="table-responsive">
           <table class="table table-bordered table-sm" id="itemsTable">
-            <thead class="table-light"><tr><th>#</th><th style="min-width:220px">Item</th><th style="min-width:200px">Lot</th><th class="text-end">Available</th><th class="text-end" style="min-width:110px">Quantity</th><th></th></tr></thead>
+            <thead class="table-light"><tr><th>#</th><th style="min-width:220px">Item</th><th style="min-width:200px">PO #</th><th class="text-end">Available</th><th class="text-end" style="min-width:110px">Quantity</th><th></th></tr></thead>
             <tbody id="itemsBody"></tbody>
           </table>
         </div>
