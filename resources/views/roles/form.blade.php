@@ -15,15 +15,23 @@
 
     $modulePermissions = [];
     $reportPermissions = collect();
+    $specialPermissions = collect(); // anything outside View/Create/Edit/Delete/Print, e.g. Gate Out
+
+    // Plain-language names for special permissions
+    $specialLabels = [
+        'stock_movements.gate' => ['Gate Out', 'Verify goods at the gate and let approved stock movements / deliveries leave (Gate Out screen).'],
+    ];
 
     foreach ($permissions as $permission) {
         if (str_starts_with($permission->name, 'reports.')) {
             $reportPermissions->push($permission);
         } else {
             $parts = explode('.', $permission->name);
-            if (count($parts) === 2) {
+            if (count($parts) === 2 && isset($actions[$parts[1]])) {
                 [$module, $action] = $parts;
                 $modulePermissions[$module][$action] = $permission->name;
+            } else {
+                $specialPermissions->push($permission);
             }
         }
     }
@@ -164,6 +172,33 @@
                     </div>
                 </div>
             </section>
+
+            {{-- ── Special Permissions (e.g. Gate Out) ─────────────── --}}
+            @if($specialPermissions->isNotEmpty())
+            <section class="card mt-3">
+                <header class="card-header"><h2 class="card-title mb-0">Special Permissions</h2></header>
+                <div class="card-body p-0">
+                    <table class="table table-bordered mb-0">
+                        <thead class="bg-primary text-white">
+                            <tr><th class="ps-3">Permission</th><th>What it allows</th><th class="text-center" style="width:100px">Access</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach($specialPermissions as $permission)
+                                @php [$label, $help] = $specialLabels[$permission->name] ?? [ucwords(str_replace(['.', '_'], [' — ', ' '], $permission->name)), '']; @endphp
+                                <tr>
+                                    <td class="align-middle ps-3"><strong>{{ $label }}</strong> <small class="text-muted">({{ $permission->name }})</small></td>
+                                    <td class="align-middle small text-muted">{{ $help }}</td>
+                                    <td class="text-center align-middle">
+                                        <input type="checkbox" name="permissions[]" class="special-checkbox" value="{{ $permission->name }}"
+                                               {{ (is_array(old('permissions')) ? in_array($permission->name, old('permissions')) : ($role && $role->hasPermissionTo($permission->name))) ? 'checked' : '' }}>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            @endif
 
             {{-- ── Report Permissions ───────────────────────────── --}}
             <section class="card mt-3">
