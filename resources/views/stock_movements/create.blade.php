@@ -26,11 +26,11 @@
           </div>
           <div class="col-md-4 mb-3">
             <label>From <span class="text-danger">*</span></label>
-            <select name="from_location_id" id="from_location" class="form-control" required></select>
+            <select name="from_location_id" id="from_location" class="form-control select2-js" required></select>
           </div>
           <div class="col-md-4 mb-3">
             <label>To <span class="text-danger">*</span></label>
-            <select name="to_location_id" id="to_location" class="form-control" required></select>
+            <select name="to_location_id" id="to_location" class="form-control select2-js" required></select>
           </div>
           <div class="col-md-3 mb-3">
             <label>Date <span class="text-danger">*</span></label>
