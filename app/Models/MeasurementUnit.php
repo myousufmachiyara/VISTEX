@@ -22,6 +22,19 @@ class MeasurementUnit extends Model
     // ── Helper ──────────────────────────────────────────────────────
 
     /**
+     * The "meter" unit, whatever it is called on this system (m, mtr, mtrs, meter, metre…).
+     * Created as "Meter (m)" if there is none, so fabric lines and products never end up without a unit.
+     */
+    public static function meterId(): int
+    {
+        $names = ['m', 'mtr', 'mtrs', 'meter', 'meters', 'metre', 'metres', 'mt'];
+        $id = static::query()->where(function ($q) use ($names) {
+            $q->whereIn(\DB::raw('LOWER(TRIM(shortcode))'), $names)->orWhereIn(\DB::raw('LOWER(TRIM(name))'), $names);
+        })->orderByRaw("CASE WHEN LOWER(TRIM(shortcode)) = 'm' THEN 0 ELSE 1 END")->value('id');
+        return (int) ($id ?: static::create(['name' => 'Meter', 'shortcode' => 'm'])->id);
+    }
+
+    /**
      * Display label used in dropdowns across all modules.
      * e.g. "Pounds (lbs)"
      */

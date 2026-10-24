@@ -122,7 +122,7 @@ class ReprocessService
                 'remarks' => $data['remarks'] ?? null, 'created_by' => $userId, 'updated_by' => $userId,
             ]);
 
-            $meter = DB::table('measurement_units')->where('shortcode', 'm')->value('id');
+            $meter = \App\Models\MeasurementUnit::meterId();
             foreach ($poLines as $l) {
                 $product = Product::find($l['pid']);
                 PurchaseOrderItem::create([

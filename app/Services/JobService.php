@@ -96,7 +96,7 @@ class JobService
 
     private function writeLines(Job $job, array $items, array $calcs): void
     {
-        $meter = MeasurementUnit::where('shortcode', 'm')->value('id');
+        $meter = MeasurementUnit::meterId();
         $clean = fn($v) => ($v = trim((string) $v)) === '' ? null : $v;
 
         foreach ($items as $idx => $item) {

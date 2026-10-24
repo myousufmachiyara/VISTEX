@@ -249,7 +249,7 @@ class ProcessingReceivingService
         return Product::create([
             'category_id' => $category->id, 'sku' => $sku,
             'name' => trim($item->pattern_code . ' ' . collect([$item->design, $item->color_scheme])->filter()->implode(' - ')),
-            'measurement_unit' => DB::table('measurement_units')->where('shortcode', 'm')->value('id') ?? $item->measurement_unit,
+            'measurement_unit' => \App\Models\MeasurementUnit::meterId(),
             'attributes' => array_filter([
                 'design_code' => $item->pattern_code, 'color' => $item->color_scheme,
                 'print_method' => $po->serviceType->name ?? null, 'finished_width' => $po->fabric_specs['finished_width'] ?? null,

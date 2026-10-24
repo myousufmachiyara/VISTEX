@@ -173,7 +173,7 @@ class PurchaseOrderService
 
     private function writeProcessingItems(PurchaseOrder $order, array $items): void
     {
-        $meter = \App\Models\MeasurementUnit::where('shortcode', 'm')->value('id');
+        $meter = \App\Models\MeasurementUnit::meterId();
         $clean = fn($v) => ($v = trim((string) $v)) === '' ? null : $v;
 
         foreach ($items as $item) {
