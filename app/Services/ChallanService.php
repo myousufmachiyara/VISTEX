@@ -244,7 +244,8 @@ class ChallanService
             foreach ($grades as $v) if ($v < 0) throw new \Exception('Quality counts cannot be negative.');
             return $grades + ['qty_a' => null, 'qty_b' => null, 'qty_c' => null, 'received_qty' => round(array_sum($grades), 3)];
         }
-        return ['received_qty' => (float) ($item['received_qty'] ?? 0)];
+        // Quantity only (processed fabric is no longer split A/B/C at the gate) — clear any old split
+        return ['received_qty' => (float) ($item['received_qty'] ?? 0), 'qty_a' => null, 'qty_b' => null, 'qty_c' => null];
     }
 
     private function transport(array $data): array

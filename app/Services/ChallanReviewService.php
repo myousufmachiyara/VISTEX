@@ -249,9 +249,12 @@ class ChallanReviewService
             }
             $grades = null;
             if ($po->type === 'processing') {
-                $grades = ['qty_a' => max(0, round((float) ($l['qty_a'] ?? 0), 3)), 'qty_b' => max(0, round((float) ($l['qty_b'] ?? 0), 3)), 'qty_c' => max(0, round((float) ($l['qty_c'] ?? 0), 3))];
-                if (array_sum($grades) <= 0.0001 && $accepted > 0) $grades['qty_a'] = round($accepted, 3); // no grades given: all A
-                $accepted = array_sum($grades);
+                // Processed fabric is counted by quantity only (kanta) — no A/B/C quality at inspection.
+                // Older app builds may still send grades: fall back to their sum if no accepted qty was given.
+                if ($accepted <= 0.0001) {
+                    $accepted = max(0, (float) ($l['qty_a'] ?? 0)) + max(0, (float) ($l['qty_b'] ?? 0)) + max(0, (float) ($l['qty_c'] ?? 0));
+                }
+                $grades = ['qty_a' => round($accepted, 3), 'qty_b' => 0, 'qty_c' => 0];
             }
             $out[] = [
                 'grades' => $grades,

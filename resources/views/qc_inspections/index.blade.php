@@ -56,7 +56,7 @@
     <div class="card-body">
       <div class="table-responsive">
       <table class="table table-bordered table-striped" id="qcTable">
-        <thead><tr><th>Date</th><th>QC #</th><th>GRN #</th><th>Lot (PO #)</th><th>Mill</th><th class="text-end">A</th><th class="text-end">B</th><th class="text-end">C</th><th class="text-end">Reprocess</th><th class="text-end">Short</th><th class="text-end">Claim</th><th>Status</th></tr></thead>
+        <thead><tr><th>Date</th><th>QC #</th><th>GRN #</th><th>Lot (PO #)</th><th>Mill</th><th class="text-end">A</th><th class="text-end">B</th><th class="text-end">C</th><th class="text-end">Reprocess</th><th class="text-end">Short</th><th class="text-end">Claimed</th><th>Status</th></tr></thead>
         <tbody>
         @foreach($inspections as $q)
           <tr>

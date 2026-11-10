@@ -61,7 +61,7 @@
           <thead>
             <tr>
               <th>Item</th><th class="text-end">Ordered</th><th class="text-end">Received Before</th><th class="text-end">Outstanding</th>
-              <th class="text-end">Gate Count</th><th width="{{ $isProcessing ? '26%' : '12%' }}">Accept{{ $isProcessing ? ' (A / B / C)' : '' }}</th><th width="12%">Reject</th>
+              <th class="text-end">Gate Count</th><th width="12%">Accept{{ $isProcessing ? ' (Kanta, m)' : '' }}</th><th width="12%">Reject</th>
               <th width="11%" class="amend-col">New PO Qty</th>@unless($isWeaving)<th width="11%" class="amend-col">New Rate</th>@endunless
             </tr>
           </thead>
@@ -80,21 +80,8 @@
                   <input type="number" name="lines[{{ $i }}][packs]" class="form-control text-end" step="any" min="0" placeholder="bags" value="{{ old("lines.$i.packs", ($l['gate_packs'] ?? null) !== null ? $l['gate_packs'] + 0 : '') }}">
                   <span class="input-group-text">bags</span>
                 </div>
-                @if($isProcessing && (($l['gate_a'] ?? 0) + ($l['gate_b'] ?? 0) + ($l['gate_c'] ?? 0)) > 0)<div class="small text-muted">A {{ $l['gate_a'] + 0 }} · B {{ $l['gate_b'] + 0 }} · C {{ $l['gate_c'] + 0 }}</div>@endif
               </td>
-              @if($isProcessing)
-                @php($ga = ($l['gate_a'] + $l['gate_b'] + $l['gate_c']) > 0 ? $l['gate_a'] : $l['gate_qty'])
-                <td>
-                  <div class="input-group input-group-sm grades">
-                    <span class="input-group-text">A</span><input type="number" step="any" min="0" name="lines[{{ $i }}][qty_a]" class="form-control g" value="{{ old("lines.$i.qty_a", $ga) }}">
-                    <span class="input-group-text">B</span><input type="number" step="any" min="0" name="lines[{{ $i }}][qty_b]" class="form-control g" value="{{ old("lines.$i.qty_b", $l['gate_b']) }}">
-                    <span class="input-group-text">C</span><input type="number" step="any" min="0" name="lines[{{ $i }}][qty_c]" class="form-control g" value="{{ old("lines.$i.qty_c", $l['gate_c']) }}">
-                  </div>
-                  <input type="number" name="lines[{{ $i }}][accepted_qty]" class="form-control form-control-sm acc mt-1" readonly tabindex="-1" title="A + B + C">
-                </td>
-              @else
               <td><input type="number" step="any" min="0" name="lines[{{ $i }}][accepted_qty]" class="form-control acc" value="{{ old("lines.$i.accepted_qty", $l['accepted_qty']) }}"></td>
-              @endif
               <td><input type="number" step="any" min="0" name="lines[{{ $i }}][rejected_qty]" class="form-control rej" value="{{ old("lines.$i.rejected_qty", $l['rejected_qty']) }}"></td>
               <td class="amend-col">
                 @if($isWeaving)
@@ -189,15 +176,6 @@ $(function () {
     });
     $('#overWarn').toggle(over && d !== 'amend' && d !== 'reject');
   }
-  // Processed fabric: accepted = A + B + C
-  function sumGrades() {
-    $('.grades').each(function () {
-      const t = $(this).find('.g').toArray().reduce((s, el) => s + (parseFloat(el.value) || 0), 0);
-      $(this).closest('td').find('.acc').val(Math.round(t * 1000) / 1000);
-    });
-  }
-  $(document).on('input', '.grades .g', function () { sumGrades(); refresh(); });
-  sumGrades();
   $(document).on('change input', 'input[name=decision], .acc, .rej', refresh);
   refresh();
 

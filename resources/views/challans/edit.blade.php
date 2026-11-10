@@ -63,17 +63,8 @@
                   @php $li = $lineInfo[$item->id] ?? ['per' => null, 'max' => null]; @endphp
                   <td><input type="number" name="items[{{ $i }}][packs]" class="form-control packs" step="any" min="0" data-per="{{ $li['per'] }}" placeholder="{{ $li['per'] ? ($li['per'] + 0) . ' per pack' : '' }}" value="{{ old("items.$i.packs", $item->packs !== null ? $item->packs + 0 : '') }}"></td>
                   <td>
-                    @if($item->qty_a !== null || $item->qty_b !== null || $item->qty_c !== null || ($po->type ?? null) === 'processing')
-                      <div class="input-group input-group-sm">
-                        <span class="input-group-text">A</span><input type="number" name="items[{{ $i }}][qty_a]" class="form-control" step="any" min="0" value="{{ old("items.$i.qty_a", (float) ($item->qty_a ?? $item->received_qty)) }}">
-                        <span class="input-group-text">B</span><input type="number" name="items[{{ $i }}][qty_b]" class="form-control" step="any" min="0" value="{{ old("items.$i.qty_b", (float) $item->qty_b) }}">
-                        <span class="input-group-text">C</span><input type="number" name="items[{{ $i }}][qty_c]" class="form-control" step="any" min="0" value="{{ old("items.$i.qty_c", (float) $item->qty_c) }}">
-                      </div>
-                      <input type="hidden" name="items[{{ $i }}][received_qty]" value="{{ (float) $item->received_qty }}">
-                    @else
                       <input type="number" name="items[{{ $i }}][received_qty]" class="form-control rq" step="any" min="0" @if($li['max'] !== null) max="{{ $li['max'] }}" @endif required value="{{ old("items.$i.received_qty", (float) $item->received_qty) }}">
                       @if($li['max'] !== null)<small class="text-muted">max {{ $li['max'] + 0 }} open on the PO</small>@endif
-                    @endif
                   </td>
                 </tr>
               @empty

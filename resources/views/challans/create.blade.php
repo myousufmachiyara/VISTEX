@@ -122,33 +122,15 @@
             </td>
             <td class="text-end">${r.quantity} ${r.unit || ''}${r.held > 0 ? `<div class="small text-warning">${r.held} on challans awaiting inspection</div>` : ''}${r.packs_outstanding !== null && r.packs_outstanding !== undefined ? `<div class="small text-muted">${r.packs_outstanding} bags${r.qty_per_pack > 1 ? ' × ' + r.qty_per_pack : ''}</div>` : ''}</td>
             <td><input type="number" name="items[${i}][packs]" class="form-control packs" step="any" min="0" data-per="${r.qty_per_pack || ''}" value="${r.packs_outstanding ?? ''}" placeholder="${r.qty_per_pack ? r.qty_per_pack + ' per pack' : ''}"></td>
-            <td>${r.graded
-              ? `<div class="input-group input-group-sm grade-row">
-                   <span class="input-group-text">A</span><input type="number" name="items[${i}][qty_a]" class="form-control g" step="any" min="0" value="${r.quantity}">
-                   <span class="input-group-text">B</span><input type="number" name="items[${i}][qty_b]" class="form-control g" step="any" min="0" value="0">
-                   <span class="input-group-text">C</span><input type="number" name="items[${i}][qty_c]" class="form-control g" step="any" min="0" value="0">
-                 </div>
-                 <input type="hidden" name="items[${i}][received_qty]" class="g-total" value="${r.quantity}" data-max="${r.max ?? ''}">
-                 <small class="text-muted g-sum">Total ${r.quantity} m</small>`
-              : `<input type="number" name="items[${i}][received_qty]" class="form-control rq" step="any" min="0" max="${r.max ?? ''}" value="${r.quantity}" title="Cannot be more than ${r.max} open on the PO">
-                 <small class="text-muted">max ${r.max} ${r.unit || ''}</small>`}</td>
+            <td><input type="number" name="items[${i}][received_qty]" class="form-control rq" step="any" min="0" max="${r.max ?? ''}" value="${r.quantity}" title="Cannot be more than ${r.max} open on the PO">
+                <small class="text-muted">max ${r.max} ${r.unit || ''}</small></td>
           </tr>`));
-        $('#gateItems thead th:last').text(rows.some(r => r.graded) ? 'Counted at Gate (A / B / C quality, m)' : 'Counted at Gate');
+        $('#gateItems thead th:last').text(rows.some(r => r.graded) ? 'Counted at Gate (m)' : 'Counted at Gate');
         $('#gateItems').show();
         packsTotal();
       });
     });
     if ($('#po_select').val()) $('#po_select').trigger('change');
-
-    // Not more than the PO has open (A + B + C rows are hidden inputs, so check them here)
-    $('#gateItems').closest('form').on('submit', function (e) {
-      let over = null;
-      $('#gateItems .g-total').each(function () {
-        const max = parseFloat($(this).data('max'));
-        if (!isNaN(max) && parseFloat(this.value) > max + 0.0005) over = max;
-      });
-      if (over !== null) { e.preventDefault(); alert('Quantity is more than the PO has open (' + over + ' m). Correct the A / B / C counts.'); }
-    });
 
     // Bags / packs: running total; with a known pack size, fill the quantity counted
     // Bags are pre-filled from the PO (purchase POs); bags ↔ quantity stay in step via the PO pack size
@@ -164,14 +146,6 @@
     $(document).on('input', '#gateItems .rq', function () {
       const p = $(this).closest('tr').find('.packs'), per = parseFloat(p.data('per')), q = parseFloat(this.value);
       if (per && q >= 0) { p.val(Math.round(q / per * 100) / 100); packsTotal(); }
-    });
-
-    // A + B + C = meters received
-    $(document).on('input', '.grade-row .g', function () {
-      const td = $(this).closest('td');
-      const total = td.find('.g').toArray().reduce((s, el) => s + (parseFloat(el.value) || 0), 0);
-      td.find('.g-total').val(Math.round(total * 1000) / 1000);
-      td.find('.g-sum').text('Total ' + (Math.round(total * 1000) / 1000) + ' m');
     });
 
     let idx = 0;

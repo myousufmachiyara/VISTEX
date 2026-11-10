@@ -46,19 +46,20 @@
 
   <table class="lines">
     <thead><tr>
-      <th>Item</th><th class="r">Received A/B/C</th><th class="r">Rolls</th><th class="r">Net kg</th><th class="r">Measured m</th><th class="r">Width"</th>
-      <th class="r">GSM PO / Actual</th><th class="r">A</th><th class="r">B</th><th class="r">C</th><th class="r">Reprocess</th><th class="r">Short</th><th>Defects</th>
+      <th>Item</th><th class="r">Received m</th><th class="r">Rolls</th><th class="r">Measured m</th><th class="r">Width"</th>
+      <th class="r">Gross kg</th><th class="r">GSM</th><th>Status</th><th class="r">A</th><th class="r">B</th><th class="r">C</th><th class="r">Reprocess</th><th class="r">Short</th><th>Defects</th>
     </tr></thead>
     <tbody>
     @foreach($qc->items as $l)
       <tr>
         <td>{{ $l->product->name ?? '' }}</td>
-        <td class="r">{{ $f($l->received_a) }} / {{ $f($l->received_b) }} / {{ $f($l->received_c) }}</td>
+        <td class="r">{{ $f($l->received_total) }}</td>
         <td class="r">{{ $l->rolls ?? '—' }}</td>
-        <td class="r">{{ $f($l->net_kg) }}</td>
         <td class="r">{{ $f($l->measured_meters) }}</td>
         <td class="r">{{ $f($l->width_inch) }}</td>
-        <td class="r">{{ $f($l->expected_gsm) }} / {{ $f($l->actual_gsm) }}</td>
+        <td class="r">{{ $f($l->gross_kg) }}</td>
+        <td class="r">{{ $f($l->expected_gsm) }}</td>
+        <td>{{ $l->status ?? '—' }}{{ $l->status_remarks ? ' — ' . $l->status_remarks : '' }}</td>
         <td class="r">{{ $f($l->final_a) }}</td>
         <td class="r">{{ $f($l->final_b) }}</td>
         <td class="r">{{ $f($l->final_c) }}</td>
@@ -71,9 +72,25 @@
   </table>
 
   <table class="kv" style="margin-top:12px">
-    <tr><td class="k">Shortage charged</td><td>{{ $f($qc->shortage_amount) }}</td><td class="k">Quality claim</td><td>{{ $f($qc->claim_amount) }} {{ $qc->claim_reason ? '(' . $qc->claim_reason . ')' : '' }}</td></tr>
-    <tr><td class="k">Remarks</td><td colspan="3">{{ $qc->remarks ?? '—' }}</td></tr>
+    <tr><td class="k">Shortage charged</td><td>{{ $f($qc->shortage_amount) }}</td><td class="k">Remarks</td><td>{{ $qc->remarks ?? '—' }}</td></tr>
   </table>
+
+  @if($qc->statusLogs->isNotEmpty())
+  <table class="lines" style="margin-top:12px">
+    <thead><tr><th>When</th><th>Item</th><th>Status</th><th>Remarks</th><th>By</th></tr></thead>
+    <tbody>
+    @foreach($qc->statusLogs as $g)
+      <tr>
+        <td>{{ $g->created_at->format('d-M-Y H:i') }}</td>
+        <td>{{ $g->item->product->name ?? '' }}</td>
+        <td>{{ $g->from_status ? $g->from_status . ' → ' : '' }}{{ $g->to_status }}</td>
+        <td>{{ $g->remarks }}</td>
+        <td>{{ $g->user->name ?? '' }}</td>
+      </tr>
+    @endforeach
+    </tbody>
+  </table>
+  @endif
 
   <div class="sign"><div>QC Inspector</div><div>Warehouse In-charge</div><div>Approved By</div></div>
 </div>

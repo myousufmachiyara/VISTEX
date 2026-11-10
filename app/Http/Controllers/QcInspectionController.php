@@ -36,7 +36,7 @@ class QcInspectionController extends Controller
 
     public function show($id)
     {
-        $qc = QcInspection::with('items.product', 'purchaseOrder.vendor', 'receiving.challan', 'location', 'creator', 'closer')->findOrFail($id);
+        $qc = QcInspection::with('items.product', 'purchaseOrder.vendor', 'receiving.challan', 'location', 'creator', 'closer', 'statusLogs.user', 'statusLogs.item.product')->findOrFail($id);
         return view('qc_inspections.show', compact('qc'));
     }
 
@@ -44,26 +44,32 @@ class QcInspectionController extends Controller
     {
         $request->validate([
             'inspection_date' => 'required|date',
-            'claim_amount'    => 'nullable|numeric|min:0',
-            'claim_reason'    => 'nullable|string|max:255',
             'remarks'         => 'nullable|string',
-            'items'           => 'array',
-            'items.*.rolls'   => 'nullable|integer|min:0',
-            'items.*.gross_kg' => 'nullable|numeric|min:0', 'items.*.tare_kg' => 'nullable|numeric|min:0',
-            'items.*.measured_meters' => 'nullable|numeric|min:0',
-            'items.*.width_inch' => 'nullable|numeric|min:0', 'items.*.expected_gsm' => 'nullable|numeric|min:0',
+            'items'           => 'required|array',
+            'items.*.rolls'   => 'required|integer|min:1',
+            'items.*.measured_meters' => 'required|numeric|gt:0',
+            'items.*.width_inch'      => 'required|numeric|gt:0',
+            'items.*.status'          => 'required|in:' . implode(',', array_keys(\App\Models\QcInspectionItem::STATUSES)),
+            'items.*.status_remarks'  => 'required|string|max:1000',
+            'items.*.gross_kg' => 'nullable|numeric|min:0', 'items.*.expected_gsm' => 'nullable|numeric|min:0',
             'items.*.final_a' => 'nullable|numeric|min:0', 'items.*.final_b' => 'nullable|numeric|min:0', 'items.*.final_c' => 'nullable|numeric|min:0',
             'items.*.reprocess_qty' => 'nullable|numeric|min:0', 'items.*.shortage_qty' => 'nullable|numeric|min:0',
             'items.*.defects' => 'nullable|array', 'items.*.defect_notes' => 'nullable|string|max:1000',
+        ], [
+            'items.*.rolls.required' => 'Rolls is required on every line.',
+            'items.*.measured_meters.required' => 'Measured meters is required on every line.',
+            'items.*.width_inch.required' => 'Width is required on every line.',
+            'items.*.status.required' => 'Status is required on every line.',
+            'items.*.status_remarks.required' => 'Status remarks are required on every line.',
         ]);
 
         $qc = QcInspection::findOrFail($id);
         try {
-            $this->service->save($qc, $request->only('inspection_date', 'claim_amount', 'claim_reason', 'remarks'), $request->input('items', []), auth()->id());
+            $this->service->save($qc, $request->only('inspection_date', 'remarks'), $request->input('items', []), auth()->id());
             if ($request->input('action') === 'close') {
                 abort_unless(auth()->user()->can('qc_inspections.edit'), 403, 'You cannot close QC.');
                 $this->service->close($qc, auth()->id());
-                return redirect()->route('qc_inspections.show', $qc->id)->with('success', "QC {$qc->qc_no} closed. Stock regraded" . ($qc->fresh()->claim_amount > 0 || $qc->fresh()->shortage_amount > 0 ? ' and claim posted to the mill.' : '.'));
+                return redirect()->route('qc_inspections.show', $qc->id)->with('success', "QC {$qc->qc_no} closed. Stock regraded" . ($qc->fresh()->shortage_amount > 0 ? ' and shortage claimed from the mill.' : '.'));
             }
             return redirect()->route('qc_inspections.show', $qc->id)->with('success', 'QC saved.');
         } catch (\Exception $e) {
@@ -73,7 +79,7 @@ class QcInspectionController extends Controller
 
     public function print($id)
     {
-        $qc = QcInspection::with('items.product', 'purchaseOrder.vendor', 'receiving.challan', 'location', 'creator', 'closer')->findOrFail($id);
+        $qc = QcInspection::with('items.product', 'purchaseOrder.vendor', 'receiving.challan', 'location', 'creator', 'closer', 'statusLogs.user', 'statusLogs.item.product')->findOrFail($id);
         return view('qc_inspections.print', compact('qc'));
     }
 }

@@ -27,6 +27,7 @@ class QcInspection extends Model
     public function location()      { return $this->belongsTo(Location::class, 'location_id'); }
     public function creator()       { return $this->belongsTo(User::class, 'created_by'); }
     public function closer()        { return $this->belongsTo(User::class, 'closed_by'); }
+    public function statusLogs()    { return $this->hasMany(QcStatusLog::class)->latest('id'); }
 
     public function isOpen(): bool { return $this->status === self::OPEN; }
 
