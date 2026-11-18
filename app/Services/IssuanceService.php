@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\{Issuance, IssuanceItem, Location, LocationStockLedger, Product, PurchaseOrder, PurchaseReceiving, YarnInProcessLedger};
+use App\Models\{Issuance, IssuanceItem, Job, JobItem, Location, LocationStockLedger, Product, PurchaseOrder, PurchaseReceiving, YarnInProcessLedger};
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -12,6 +12,11 @@ use Illuminate\Support\Facades\DB;
  *                     Dr Yarn in Process / Cr Stock. Capped per yarn at the PO's warp/weft requirement.
  *  greige_processing  at the processing mill: greige already there (Stock Movement, mill lot #) is issued to
  *                     the Processing PO — fresh → in_process at the mill, lot kept. No voucher (still our stock).
+ *
+ *  fabric_cutting     QC-passed processed fabric in our warehouse is issued to the cutting department against
+ *                     an open customer job (line-wise): fresh → for_cutting, same location / lot / grade. No voucher
+ *                     (still our stock). Cutting (Production) only cuts fabric that is "for_cutting".
+ *                     Entered in yards, stocked in meters.
  *
  * First issuance moves the PO Approved -> Issued, which is what makes a
  * weaving/processing PO receivable at the gate.
@@ -27,13 +32,14 @@ class IssuanceService
     public function create(array $data, array $items, ?int $userId = null): Issuance
     {
         return DB::transaction(function () use ($data, $items, $userId) {
-            [$type, $po] = $this->validateHeader($data);
+            [$type, $po, $job] = $this->validateHeader($data);
 
             $issuance = Issuance::create([
                 'issue_no'                => $this->numberService->next('issuance', 'issuances', 'issue_no', 'ISS'),
                 'issue_type'              => $type,
-                'purchase_order_id'       => $po->id,
-                'vendor_id'               => $po->vendor_id,
+                'purchase_order_id'       => $po?->id,
+                'job_id'                  => $job?->id,
+                'vendor_id'               => $po?->vendor_id,
                 'source_location_id'      => $data['source_location_id'],
                 'destination_location_id' => null,
                 'issue_date'              => $data['issue_date'],
@@ -44,14 +50,14 @@ class IssuanceService
                 'updated_by'              => $userId,
             ]);
 
-            $this->apply($issuance, $po, $items, $userId);
+            $job ? $this->applyCutting($issuance, $job, $items) : $this->apply($issuance, $po, $items, $userId);
             $this->syncBagTotal($issuance);
 
-            if ($po->status === PurchaseOrder::STATUS_APPROVED) {
+            if ($po && $po->status === PurchaseOrder::STATUS_APPROVED) {
                 $po->update(['status' => PurchaseOrder::STATUS_ISSUED]);
             }
 
-            return $issuance->load('items.product', 'purchaseOrder.vendor');
+            return $issuance->load('items.product', 'purchaseOrder.vendor', 'job.customer');
         });
     }
 
@@ -62,7 +68,8 @@ class IssuanceService
             if ($issuance->isWarehouseToMill()) throw new \Exception('This issuance sent greige straight from the warehouse (older method). Delete it and issue again at the mill.');
             $data['issue_type'] = $issuance->issue_type;
             $data['purchase_order_id'] = $issuance->purchase_order_id;
-            [, $po] = $this->validateHeader($data);
+            $data['job_id'] = $issuance->job_id;
+            [, $po, $job] = $this->validateHeader($data);
 
             $this->reverse($issuance);
             $issuance->update([
@@ -74,10 +81,10 @@ class IssuanceService
                 ...self::extraFields($data),
                 'updated_by'              => $userId,
             ]);
-            $this->apply($issuance->fresh(), $po, $items, $userId);
+            $job ? $this->applyCutting($issuance->fresh(), $job, $items) : $this->apply($issuance->fresh(), $po, $items, $userId);
             $this->syncBagTotal($issuance);
 
-            return $issuance->fresh(['items.product', 'purchaseOrder.vendor']);
+            return $issuance->fresh(['items.product', 'purchaseOrder.vendor', 'job.customer']);
         });
     }
 
@@ -127,6 +134,16 @@ class IssuanceService
         if (!$def) throw new \Exception('Unknown issuance type.');
         if (!$def['active']) throw new \Exception("{$def['label']} is not enabled yet — pending client discussion.");
 
+        if ($type === 'fabric_cutting') {
+            $job = Job::with('customer')->find($data['job_id'] ?? 0);
+            if (!$job) throw new \Exception('Select the customer job.');
+            if ($job->status !== 'Approved') throw new \Exception("{$job->job_no} is {$job->status} — fabric is issued for cutting only against an approved, open job.");
+            if (!empty($data['customer_id']) && (int) $data['customer_id'] !== (int) $job->customer_id) throw new \Exception("{$job->job_no} belongs to another customer.");
+            $source = Location::find($data['source_location_id'] ?? 0);
+            if (!$source || !$source->isOwnWarehouse()) throw new \Exception('Select one of our warehouses to issue from.');
+            return [$type, null, $job];
+        }
+
         $po = PurchaseOrder::with('vendor')->findOrFail($data['purchase_order_id'] ?? 0);
         if ($po->type !== $def['po_type']) throw new \Exception("{$def['label']} must be issued against a {$def['against']}.");
         if ($po->isReprocess()) throw new \Exception("{$po->order_no} is a reprocess order — its fabric goes into process when the mill receives the gate pass.");
@@ -142,7 +159,7 @@ class IssuanceService
         } elseif (!$source || !$source->isOwnWarehouse()) {
             throw new \Exception('Select one of our warehouses to issue from.');
         }
-        return [$type, $po];
+        return [$type, $po, null];
     }
 
     private function apply(Issuance $issuance, PurchaseOrder $po, array $items, ?int $userId): void
@@ -245,6 +262,90 @@ class IssuanceService
     }
 
     /**
+     * Per job line: required (job qty) and already issued for cutting — both in yards.
+     * Job quantities are entered in meters.
+     */
+    public function jobRequirement(Job $job, ?int $excludeIssuanceId = null): array
+    {
+        $issued = IssuanceItem::join('issuances', 'issuances.id', '=', 'issuance_items.issuance_id')
+            ->where('issuances.job_id', $job->id)->where('issuances.issue_type', 'fabric_cutting')->whereNull('issuances.deleted_at')
+            ->when($excludeIssuanceId, fn($q) => $q->where('issuances.id', '!=', $excludeIssuanceId))
+            ->groupBy('issuance_items.job_item_id')
+            ->selectRaw('issuance_items.job_item_id, SUM(issuance_items.quantity) as qty')
+            ->pluck('qty', 'job_item_id');
+
+        $out = [];
+        foreach ($job->items as $ji) {
+            $out[$ji->id] = [
+                'required_yd' => Issuance::toYards((float) $ji->quantity),
+                'issued_yd'   => Issuance::toYards((float) ($issued[$ji->id] ?? 0)),
+            ];
+        }
+        return $out;
+    }
+
+    /** Required ÷ issued × 100 (both in yards) — e.g. 100 yd required, 110 yd issued = 90.9 %. */
+    public static function cuttingPercent(float $requiredYd, float $issuedYd): ?float
+    {
+        return $issuedYd > 0 ? round($requiredYd / $issuedYd * 100, 1) : null;
+    }
+
+    /**
+     * $items: [['job_item_id','product_id','lot_no','grade','quantity_yd'], ...]
+     * Fabric must be processed, QC closed, fresh in the warehouse. Moves fresh → for_cutting.
+     */
+    private function applyCutting(Issuance $issuance, Job $job, array $items): void
+    {
+        $items = array_values(array_filter($items, fn($i) => (float) ($i['quantity_yd'] ?? 0) > 0));
+        if (empty($items)) throw new \Exception('Enter the yards to issue for at least one job line.');
+
+        $sourceId = (int) $issuance->source_location_id;
+        $jobItems = $job->items->keyBy('id');
+        $production = app(ProductionService::class);
+        $need = []; $totalQty = 0; $totalAmount = 0;
+
+        foreach ($items as $i) {
+            $ji = $jobItems[(int) ($i['job_item_id'] ?? 0)] ?? null;
+            if (!$ji) throw new \Exception("Pick the {$job->job_no} line each fabric is issued for.");
+            $label = trim(implode(' · ', array_filter([$ji->collection, $ji->design, $ji->color_scheme]))) ?: "line {$ji->id}";
+
+            $product = Product::with('category')->findOrFail($i['product_id'] ?? 0);
+            if (($product->category->code ?? '') !== 'processed') throw new \Exception("{$product->name} is not processed fabric.");
+            $lot = trim((string) ($i['lot_no'] ?? '')) ?: null;
+            $grade = trim((string) ($i['grade'] ?? '')) ?: null;
+            if ($lot && $production->qcPending($lot)) throw new \Exception("Lot {$lot} still has QC open — close QC before issuing it for cutting.");
+
+            $yd = round((float) $i['quantity_yd'], 3);
+            $m = Issuance::toMeters($yd);
+
+            $k = "{$product->id}|{$lot}|{$grade}";
+            $need[$k] = ($need[$k] ?? 0) + $m;
+            $have = LocationStockLedger::balance($sourceId, $product->id, 'fresh', $lot, $grade);
+            if ($need[$k] > $have + 0.001) {
+                $where = ($lot ? " lot {$lot}" : '') . ($grade ? " grade {$grade}" : '');
+                throw new \Exception("Not enough {$product->name}{$where} for {$label}: in stock " . Issuance::toYards($have) . ' yd, issuing ' . Issuance::toYards($need[$k]) . ' yd.');
+            }
+
+            $rate = LocationStockLedger::lotRate($sourceId, $product->id, $lot, $product->weightedAverageCost($sourceId), 'fresh', $grade);
+            $amount = round($m * $rate, 2);
+            $totalQty += $m; $totalAmount += $amount;
+
+            IssuanceItem::create([
+                'issuance_id' => $issuance->id, 'product_id' => $product->id, 'lot_no' => $lot, 'grade' => $grade,
+                'job_item_id' => $ji->id, 'quantity' => $m, 'bags' => self::addBags(null, $i['bags'] ?? null), 'rate' => $rate, 'amount' => $amount,
+            ]);
+
+            $row = ['doc_no' => $issuance->issue_no, 'location_id' => $sourceId, 'product_id' => $product->id, 'lot_no' => $lot, 'grade' => $grade,
+                    'reference_type' => 'Issuance', 'reference_id' => $issuance->id, 'entry_date' => $issuance->issue_date];
+            LocationStockLedger::create($row + ['status' => 'fresh', 'quantity' => -$m, 'amount' => -$amount]);
+            LocationStockLedger::create($row + ['status' => 'for_cutting', 'quantity' => $m, 'amount' => $amount,
+                'remarks' => "For cutting — {$job->job_no} {$label}"]);
+        }
+
+        $issuance->update(['total_quantity' => round($totalQty, 3), 'total_amount' => round($totalAmount, 2)]);
+    }
+
+    /**
      * Split lines without a lot across the lots in stock, oldest first.
      * Untracked stock (no lot) is used last. If there isn't enough stock the line
      * is left as-is and the normal stock check reports the shortage.
@@ -310,6 +411,23 @@ class IssuanceService
 
     private function assertReversible(Issuance $issuance): void
     {
+        // Fabric for cutting: everything issued must still be uncut
+        if ($issuance->isForCutting()) {
+            $need = [];
+            foreach ($issuance->items as $it) {
+                $k = "{$it->product_id}|{$it->lot_no}|{$it->grade}";
+                $need[$k] = ['item' => $it, 'qty' => ($need[$k]['qty'] ?? 0) + (float) $it->quantity];
+            }
+            foreach ($need as $n) {
+                $it = $n['item'];
+                $left = LocationStockLedger::balance($issuance->source_location_id, $it->product_id, 'for_cutting', $it->lot_no, $it->grade);
+                if ($left + 0.001 < $n['qty']) {
+                    throw new \Exception('Cannot change this issuance — part of ' . ($it->product->name ?? 'the fabric') . ($it->lot_no ? " lot {$it->lot_no}" : '') . ' has already been cut.');
+                }
+            }
+            return;
+        }
+
         $received = PurchaseReceiving::where('purchase_order_id', $issuance->purchase_order_id)
             ->whereIn('status', ['Approved', 'PendingApproval'])->exists();
         if ($received) {

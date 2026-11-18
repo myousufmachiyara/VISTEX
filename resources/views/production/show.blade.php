@@ -4,6 +4,10 @@
 @php
   $isCut = $order->type === 'cutting';
   $q = fn($v) => rtrim(rtrim(number_format((float) $v, 3), '0'), '.');
+  $yd = fn($m) => number_format(\App\Models\Issuance::toYards((float) $m), 2);
+  // yards per piece of a put-up (stored as meters per piece)
+  $ypu = function ($putUp) { $a = $putUp?->getAttribute('attributes'); if (is_string($a)) $a = json_decode($a, true);
+      return \App\Models\Issuance::toYards((float) ($a['meters_per_unit'] ?? 0)); };
 @endphp
 <div class="row"><div class="col">
   @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
@@ -24,20 +28,21 @@
       <div class="table-responsive">
       <table class="table table-bordered table-sm">
         <thead class="table-light"><tr>
-          <th>{{ $isCut ? 'Fabric' : 'Cut pieces' }}</th><th>Lot #</th><th>Grade</th><th class="text-end">{{ $isCut ? 'Meters used' : 'Pieces' }}</th>
-          <th>Output</th><th class="text-end">Pieces</th>
-          @if($isCut)<th class="text-end">Leftover m</th><th class="text-end">Rejected m</th>@else<th>Packaging</th>@endif
+          <th>{{ $isCut ? 'Fabric' : 'Cut pieces' }}</th><th>Lot #</th><th>Grade</th><th class="text-end">{{ $isCut ? 'Yards used' : 'Pieces' }}</th>
+          <th>Output</th><th class="text-end">Pieces</th><th class="text-end">Yards</th>
+          @if($isCut)<th class="text-end">Leftover yd</th><th class="text-end">Rejected yd</th>@else<th>Packaging</th>@endif
           <th class="text-end">Value</th><th>Customer order line</th>
         </tr></thead>
         <tbody>
         @foreach($order->lines as $l)
           <tr>
             <td>{{ $l->inputProduct->name ?? '' }}</td><td>{{ $l->lot_no ?? '—' }}</td><td>{{ $l->grade ?? '—' }}</td>
-            <td class="text-end">{{ $q($l->input_qty) }}</td>
+            <td class="text-end">@if($isCut){{ $yd($l->input_qty) }}<div class="small text-muted">{{ $q($l->input_qty) }} m</div>@else{{ $q($l->input_qty) }}@endif</td>
             <td>{{ $l->outputProduct->name ?? '' }} <div class="small text-muted">{{ $l->outputProduct->sku ?? '' }}</div></td>
             <td class="text-end">{{ $q($l->output_qty) }}</td>
+            <td class="text-end">{{ number_format((float) $l->output_qty * $ypu($l->putUp), 2) }}</td>
             @if($isCut)
-              <td class="text-end">{{ $q($l->leftover_qty) }}</td><td class="text-end">{{ $q($l->rejected_qty) }}</td>
+              <td class="text-end">{{ $yd($l->leftover_qty) }}</td><td class="text-end">{{ $yd($l->rejected_qty) }}</td>
             @else
               <td class="small">
                 @forelse($l->consumptions as $c){{ $c->product->name ?? '' }}: {{ $q($c->quantity) }}<br>@empty<span class="text-muted">none</span>@endforelse

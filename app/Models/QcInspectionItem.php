@@ -21,7 +21,7 @@ class QcInspectionItem extends Model
         'stains'          => 'Stains / spots',
         'holes'           => 'Holes / tears',
         'crease'          => 'Crease / crush marks',
-        'width_short'     => 'Width short',
+        'width_short'     => 'Variation width short',
         'gsm_off'         => 'GSM off',
         'bowing'          => 'Bowing / skew',
         'hand_feel'       => 'Hand feel / finish',

@@ -40,6 +40,18 @@ class QcInspectionController extends Controller
         return view('qc_inspections.show', compact('qc'));
     }
 
+    // Reopen a closed QC for editing (reverses the close)
+    public function reopen(Request $request, $id)
+    {
+        $request->validate(['reason' => 'required|string|max:500']);
+        try {
+            $qc = $this->service->reopen(QcInspection::findOrFail($id), $request->reason, auth()->id());
+            return redirect()->route('qc_inspections.show', $qc->id)->with('success', "QC {$qc->qc_no} reopened — edit it and close again.");
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
+    }
+
     public function update(Request $request, $id)
     {
         $request->validate([

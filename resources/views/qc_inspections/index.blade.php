@@ -56,7 +56,7 @@
     <div class="card-body">
       <div class="table-responsive">
       <table class="table table-bordered table-striped" id="qcTable">
-        <thead><tr><th>Date</th><th>QC #</th><th>GRN #</th><th>Lot (PO #)</th><th>Mill</th><th class="text-end">A</th><th class="text-end">B</th><th class="text-end">C</th><th class="text-end">Reprocess</th><th class="text-end">Short</th><th class="text-end">Claimed</th><th>Status</th></tr></thead>
+        <thead><tr><th>Date</th><th>QC #</th><th>GRN #</th><th>Lot (PO #)</th><th>Mill</th><th class="text-end">A</th><th class="text-end">B</th><th class="text-end">C</th><th class="text-end">Reprocess</th><th class="text-end">Short</th><th class="text-end">Claimed</th><th>Status</th><th></th></tr></thead>
         <tbody>
         @foreach($inspections as $q)
           <tr>
@@ -72,6 +72,13 @@
             <td class="text-end">{{ number_format($q->items->sum('shortage_qty'), 2) }}</td>
             <td class="text-end">{{ number_format($q->claim_amount + $q->shortage_amount, 2) }}</td>
             <td><span class="badge bg-{{ $q->status_badge }}">{{ $q->status }}</span></td>
+            <td class="text-nowrap">
+              @if($q->isOpen())
+                @can('qc_inspections.create')<a href="{{ route('qc_inspections.show', $q->id) }}" class="btn btn-sm btn-outline-primary">Edit</a>@endcan
+              @else
+                @can('qc_inspections.edit')<a href="{{ route('qc_inspections.show', $q->id) }}#reopen" class="btn btn-sm btn-outline-warning" title="Reopen this closed QC to edit it">Edit</a>@endcan
+              @endif
+            </td>
           </tr>
         @endforeach
         </tbody>

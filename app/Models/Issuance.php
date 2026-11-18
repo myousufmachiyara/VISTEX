@@ -25,6 +25,10 @@ class Issuance extends Model
             'label' => 'Greige for Processing', 'against' => 'Processing PO', 'po_type' => 'processing', 'active' => true,
             'help'  => 'The mill\'s location in-charge issues greige already at the mill (sent by Stock Movement, under the mill\'s lot #) to this Processing PO. It is then "in process" for the PO.',
         ],
+        'fabric_cutting' => [
+            'label' => 'Processed Fabric for Cutting', 'against' => 'Customer Job', 'po_type' => null, 'active' => true,
+            'help'  => 'QC-passed processed fabric is issued to the cutting department against an open customer job. It stays in the warehouse as "issued for cutting" and only this fabric can be cut. Quantities are in yards (stock is kept in meters).',
+        ],
         'greige_sale' => [
             'label' => 'Greige against Sale Order', 'against' => 'Sale Order', 'po_type' => null, 'active' => false,
             'help'  => 'Done from Sales → Sale Orders: each delivery goes out on a gate pass.',
@@ -56,6 +60,22 @@ class Issuance extends Model
     public function destinationLocation() { return $this->belongsTo(Location::class, 'destination_location_id'); }
     public function items()               { return $this->hasMany(IssuanceItem::class, 'issuance_id'); }
     public function creator()             { return $this->belongsTo(User::class, 'created_by'); }
+
+    public const METERS_PER_YARD = 0.9144;
+    public static function toYards(float $meters): float { return round($meters / self::METERS_PER_YARD, 3); }
+    public static function toMeters(float $yards): float { return round($yards * self::METERS_PER_YARD, 3); }
+
+    public function isForCutting(): bool { return $this->issue_type === 'fabric_cutting'; }
+
+    // Who / what the issuance is against: the PO (mill) or the customer job
+    public function getAgainstNoAttribute(): ?string
+    {
+        return $this->isForCutting() ? $this->job?->job_no : $this->purchaseOrder?->order_no;
+    }
+    public function getIssuedToAttribute(): string
+    {
+        return $this->isForCutting() ? 'Cutting — ' . ($this->job?->customer?->name ?? '') : ($this->purchaseOrder?->vendor?->name ?? '');
+    }
 
     public function getTypeLabelAttribute(): string
     {

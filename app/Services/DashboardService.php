@@ -155,7 +155,7 @@ class DashboardService
         return DB::table('location_stock_ledger as l')->join('products as p', 'p.id', '=', 'l.product_id')->join('product_categories as c', 'c.id', '=', 'p.category_id')
             ->join('locations as loc', 'loc.id', '=', 'l.location_id')
             ->groupBy('c.name')->selectRaw("c.name,
-                SUM(CASE WHEN loc.vendor_id IS NULL AND l.status IN ('fresh','reprocess') THEN l.amount ELSE 0 END) AS own,
+                SUM(CASE WHEN loc.vendor_id IS NULL AND l.status IN ('fresh','for_cutting','reprocess') THEN l.amount ELSE 0 END) AS own,
                 SUM(CASE WHEN loc.vendor_id IS NOT NULL AND l.status IN ('fresh','in_process') THEN l.amount ELSE 0 END) AS mills,
                 SUM(CASE WHEN l.status = 'in_transit' THEN l.amount ELSE 0 END) AS transit")
             ->get()->map(fn($r) => ['category' => $r->name, 'own' => round((float) $r->own, 2), 'mills' => round((float) $r->mills, 2), 'transit' => round((float) $r->transit, 2)])

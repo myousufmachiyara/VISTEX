@@ -2,14 +2,16 @@
 
 namespace App\Services;
 
-use App\Models\{JobItem, Location, LocationStockLedger, Product, ProductCategory, ProductionConsumption, ProductionOrder, ProductionOrderLine, PurchaseReceiving, PutUpPackaging};
+use App\Models\{Issuance, JobItem, Location, LocationStockLedger, Product, ProductCategory, ProductionConsumption, ProductionOrder, ProductionOrderLine, PurchaseReceiving, PutUpPackaging};
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
  * Cutting & packing at our warehouse.
- *   cut  : processed fabric (lot, grade) → Cut Pcs of a put-up (pieces × meters per piece)
- *          + leftover meters (Leftover) + damaged meters (Rejection). Fabric must have closed QC.
+ *   cut  : processed fabric issued for cutting (Issuance → "Processed Fabric for Cutting", stock status
+ *          for_cutting) (lot, grade) → Cut Pcs of a put-up (pieces × yards per piece)
+ *          + leftover yards (Leftover) + damaged yards (Rejection). Fabric must have closed QC.
+ *          The cutting floor works in yards; stock stays in meters (1 yd = 0.9144 m).
  *   pack : Cut Pcs → packed SKU (pattern × put-up), using the put-up's packaging list (BOM).
  * Every output keeps the lot # and grade; cost moves with the stock (+ packaging cost on packing).
  */
@@ -21,11 +23,11 @@ class ProductionService
         private AccountMappingService $mapping,
     ) {}
 
-    /** Fabric that can be cut at a location: processed fabric, fresh, by lot and grade, QC closed. */
+    /** Fabric that can be cut at a location: processed fabric issued for cutting, by lot and grade (meters + yards). */
     public function cuttable(int $locationId): array
     {
-        return $this->stockOf($locationId, 'processed')
-            ->map(fn($r) => $r + ['qc_pending' => $this->qcPending($r['lot_no'])])->values()->all();
+        return $this->stockOf($locationId, 'processed', 'for_cutting')
+            ->map(fn($r) => $r + ['qty_yd' => Issuance::toYards($r['qty']), 'qc_pending' => $this->qcPending($r['lot_no'])])->values()->all();
     }
 
     /** Cut pieces waiting to be packed at a location. */
@@ -35,15 +37,16 @@ class ProductionService
             $p = Product::find($r['product_id']);
             $putUp = Product::find($this->attr($p, 'put_up_product_id'));
             return $r + ['put_up_product_id' => $putUp?->id, 'put_up' => $putUp?->name,
+                         'ypu' => $putUp ? Issuance::toYards((float) $this->attr($putUp, 'meters_per_unit')) : null,
                          'bom' => $putUp ? $this->bom($putUp->id) : []];
         })->values()->all();
     }
 
-    private function stockOf(int $locationId, string $categoryCode)
+    private function stockOf(int $locationId, string $categoryCode, string $status = 'fresh')
     {
         $cat = ProductCategory::where('code', $categoryCode)->value('id');
         return LocationStockLedger::query()->join('products as p', 'p.id', '=', 'location_stock_ledger.product_id')
-            ->where('location_stock_ledger.location_id', $locationId)->where('location_stock_ledger.status', 'fresh')->where('p.category_id', $cat)
+            ->where('location_stock_ledger.location_id', $locationId)->where('location_stock_ledger.status', $status)->where('p.category_id', $cat)
             ->groupBy('location_stock_ledger.product_id', 'p.name', 'p.attributes', 'location_stock_ledger.lot_no', 'location_stock_ledger.grade')
             ->selectRaw('location_stock_ledger.product_id, p.name AS product, p.attributes AS attrs, location_stock_ledger.lot_no, location_stock_ledger.grade, SUM(location_stock_ledger.quantity) AS qty')
             ->havingRaw('SUM(location_stock_ledger.quantity) > 0.0005')->orderBy('p.name')->orderBy('location_stock_ledger.lot_no')->get()
@@ -79,7 +82,8 @@ class ProductionService
     }
 
     /**
-     * $lines: [['product_id','lot_no','grade','put_up_product_id','pieces','leftover_qty','rejected_qty','job_item_id'], ...]
+     * $lines: [['product_id','lot_no','grade','put_up_product_id','pieces','leftover_yd','rejected_yd','job_item_id'], ...]
+     *         (leftover_qty / rejected_qty in meters are still accepted)
      * $data: location_id, order_date, job_id, remarks, pack_now
      */
     public function cut(array $data, array $lines, int $userId): ProductionOrder
@@ -103,20 +107,23 @@ class ProductionService
                 if ($lot && $this->qcPending($lot)) throw new \Exception("Lot {$lot} has QC still open — close QC before cutting.");
 
                 $pieces = round((float) $l['pieces'], 3);
-                $leftover = max(0, round((float) ($l['leftover_qty'] ?? 0), 3));
-                $rejected = max(0, round((float) ($l['rejected_qty'] ?? 0), 3));
+                // Cutting floor enters yards; stock is in meters
+                $meters = fn($yd, $m) => isset($l[$yd]) && $l[$yd] !== '' ? Issuance::toMeters(max(0, (float) $l[$yd])) : max(0, round((float) ($l[$m] ?? 0), 3));
+                $leftover = $meters('leftover_yd', 'leftover_qty');
+                $rejected = $meters('rejected_yd', 'rejected_qty');
                 $cutMeters = round($pieces * $mpu, 3);
                 $total = round($cutMeters + $leftover + $rejected, 3);
 
                 $k = "{$fabric->id}|{$lot}|{$grade}";
                 $need[$k] = ($need[$k] ?? 0) + $total;
-                $have = LocationStockLedger::balance($loc->id, $fabric->id, 'fresh', $lot, $grade);
+                $have = LocationStockLedger::balance($loc->id, $fabric->id, 'for_cutting', $lot, $grade);
                 if ($need[$k] > $have + 0.001) {
-                    throw new \Exception("{$fabric->name}" . ($lot ? " lot {$lot}" : '') . ($grade ? " grade {$grade}" : '') . ": needs {$need[$k]} m, only " . round($have, 3) . ' m in stock.');
+                    throw new \Exception("{$fabric->name}" . ($lot ? " lot {$lot}" : '') . ($grade ? " grade {$grade}" : '') . ': needs ' . Issuance::toYards($need[$k]) . ' yd, only '
+                        . Issuance::toYards($have) . ' yd issued for cutting. Issue more from Issuance → Processed Fabric for Cutting.');
                 }
                 $jobItem = $this->checkJobItem($l['job_item_id'] ?? null, $fabric, $putUp);
 
-                $rate = LocationStockLedger::lotRate($loc->id, $fabric->id, $lot, $fabric->weightedAverageCost($loc->id), 'fresh', $grade);
+                $rate = LocationStockLedger::lotRate($loc->id, $fabric->id, $lot, $fabric->weightedAverageCost($loc->id), 'for_cutting', $grade);
                 $totalAmt = round($total * $rate, 2);
                 $leftAmt = round($leftover * $rate, 2); $rejAmt = round($rejected * $rate, 2);
                 $cutAmt = round($totalAmt - $leftAmt - $rejAmt, 2);
@@ -130,7 +137,7 @@ class ProductionService
                 ]);
 
                 $post = fn($pid, $status, $g, $qty, $amt) => $this->post($order, $loc->id, $pid, $status, $lot, $g, $qty, $amt);
-                $post($fabric->id, 'fresh', $grade, -$total, -$totalAmt);
+                $post($fabric->id, 'for_cutting', $grade, -$total, -$totalAmt);
                 $post($cutPcs->id, 'fresh', $grade, $pieces, $cutAmt);
                 if ($leftover > 0) $post($this->leftoverProduct('leftover', 'LO', $fabric)->id, 'fresh', null, $leftover, $leftAmt);
                 if ($rejected > 0) $post($this->leftoverProduct('rejection', 'RJ', $fabric)->id, 'fresh', null, $rejected, $rejAmt);

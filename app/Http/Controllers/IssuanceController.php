@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Issuance, Location, LocationStockLedger, Product, ProductCategory, PurchaseOrder};
+use App\Models\{Customer, Issuance, Job, Location, LocationStockLedger, Product, ProductCategory, PurchaseOrder};
 use App\Services\IssuanceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -13,7 +13,7 @@ class IssuanceController extends Controller
 
     public function index(Request $request)
     {
-        $issuances = Issuance::with('purchaseOrder.vendor', 'sourceLocation', 'destinationLocation', 'items.product')
+        $issuances = Issuance::with('purchaseOrder.vendor', 'job.customer', 'sourceLocation', 'destinationLocation', 'items.product')
             ->when($request->filled('type'), fn($q) => $q->where('issue_type', $request->type))
             ->orderByDesc('issue_date')->orderByDesc('id')->get();
 
@@ -36,17 +36,28 @@ class IssuanceController extends Controller
 
     public function edit($id)
     {
-        $issuance = Issuance::with('items.product', 'purchaseOrder')->findOrFail($id);
+        $issuance = Issuance::with('items.product', 'purchaseOrder', 'job')->findOrFail($id);
         if ($issuance->isWarehouseToMill()) {
             return redirect()->route('issuances.show', $id)->with('error', 'This issuance sent greige straight from the warehouse (older method). Delete it and issue again at the mill.');
         }
-        return view('issuances.create', array_merge($this->formData($issuance->issue_type), [
+        return view('issuances.create', array_merge($this->formData($issuance->issue_type, $issuance->job_id), [
             'issuance' => $issuance, 'preselectPo' => $issuance->purchase_order_id,
         ]));
     }
 
-    private function formData(?string $type): array
+    /** Approved customer jobs with something still to deliver (+ the one being edited). */
+    private function openJobs(?int $includeJobId = null)
     {
+        return Job::with('customer:id,name')
+            ->where(fn($q) => $q->where(fn($o) => $o->approved()->whereHas('items', fn($i) => $i->where(fn($w) => $w->whereColumn('quantity_fulfilled', '<', 'quantity')->orWhereNull('quantity_fulfilled'))))
+                ->when($includeJobId, fn($q2) => $q2->orWhere('id', $includeJobId)))
+            ->orderByDesc('id')->get(['id', 'job_no', 'customer_id', 'customer_po_number', 'status']);
+    }
+
+    private function formData(?string $type, ?int $jobId = null): array
+    {
+        $jobs = $type === 'fabric_cutting' ? $this->openJobs($jobId) : collect();
+
         $poType = $type ? Issuance::TYPES[$type]['po_type'] : null;
         $orders = $poType
             ? PurchaseOrder::where('type', $poType)->whereNull('reprocess_of_po_id')
@@ -58,8 +69,45 @@ class IssuanceController extends Controller
             'type'       => $type,
             'types'      => Issuance::TYPES,
             'orders'     => $orders,
+            'jobs'       => $jobs,
+            'customers'  => $jobs->pluck('customer')->filter()->unique('id')->sortBy('name')->values(),
             'warehouses' => Location::own()->active()->orderByDesc('is_default')->orderBy('name')->get(['id', 'name']),
         ];
+    }
+
+    // AJAX: job lines (required / issued in yards) + QC-passed processed fabric in this warehouse
+    public function jobDetails(Request $request, $jobId)
+    {
+        $job = Job::with('items', 'customer')->findOrFail($jobId);
+        $sourceId = $request->integer('source_location_id') ?: Location::defaultId();
+        $req = $this->service->jobRequirement($job, $request->integer('exclude') ?: null);
+        $production = app(\App\Services\ProductionService::class);
+
+        $catId = ProductCategory::where('code', 'processed')->value('id');
+        $stock = $sourceId ? LocationStockLedger::query()->join('products as p', 'p.id', '=', 'location_stock_ledger.product_id')
+            ->where('location_stock_ledger.location_id', $sourceId)->where('location_stock_ledger.status', 'fresh')->where('p.category_id', $catId)
+            ->groupBy('location_stock_ledger.product_id', 'p.name', 'p.attributes', 'location_stock_ledger.lot_no', 'location_stock_ledger.grade')
+            ->selectRaw('location_stock_ledger.product_id, p.name, p.attributes, location_stock_ledger.lot_no, location_stock_ledger.grade, SUM(location_stock_ledger.quantity) AS qty')
+            ->havingRaw('SUM(location_stock_ledger.quantity) > 0.0005')->orderBy('p.name')->orderBy('location_stock_ledger.lot_no')->get() : collect();
+
+        return response()->json([
+            'customer' => $job->customer->name ?? '',
+            'customer_id' => $job->customer_id,
+            'lines' => $job->items->map(fn($i) => [
+                'id' => $i->id, 'collection' => $i->collection, 'design' => $i->design, 'color' => $i->color_scheme,
+                'pattern_code' => $i->pattern_code,
+                'required_yd' => $req[$i->id]['required_yd'] ?? 0, 'issued_yd' => $req[$i->id]['issued_yd'] ?? 0,
+            ])->values(),
+            'stock' => $stock->map(function ($r) use ($production) {
+                $attrs = json_decode((string) $r->attributes, true) ?: [];
+                return [
+                    'product_id' => (int) $r->product_id, 'product' => $r->name, 'lot_no' => $r->lot_no, 'grade' => $r->grade,
+                    'pattern' => $attrs['design_code'] ?? null, 'color' => $attrs['color'] ?? null,
+                    'qty_m' => round((float) $r->qty, 3), 'qty_yd' => Issuance::toYards((float) $r->qty),
+                    'qc_pending' => $production->qcPending($r->lot_no),
+                ];
+            })->values(),
+        ]);
     }
 
     // AJAX: what may be issued against this PO from this warehouse
@@ -118,8 +166,27 @@ class IssuanceController extends Controller
         ]);
     }
 
-    private function rules(): array
+    private function rules(?string $type = null): array
     {
+        if ($type === 'fabric_cutting') {
+            return [
+                'customer_id'             => 'required|exists:customers,id',
+                'job_id'                  => 'required|exists:job_orders,id',
+                'source_location_id'      => 'required|exists:locations,id',
+                'issue_date'              => 'required|date',
+                'remarks'                 => 'nullable|string',
+                'items'                   => 'required|array|min:1',
+                'items.*.job_item_id'     => 'required|exists:job_order_items,id',
+                'items.*.product_id'      => 'required|exists:products,id',
+                'items.*.lot_no'          => 'nullable|string|max:100',
+                'items.*.grade'           => 'nullable|string|max:5',
+                'items.*.quantity_yd'     => 'nullable|numeric|min:0',
+                'items.*.bags'            => 'nullable|numeric|min:0',
+                'attachments.*'           => 'nullable|file|max:5120',
+                'prepared_by_name'        => 'nullable|string|max:100',
+                'received_by_name'        => 'nullable|string|max:100',
+            ] + ChallanController::TRANSPORT_RULES;
+        }
         return [
             'purchase_order_id'       => 'required|exists:purchase_orders,id',
             'source_location_id'      => 'required|exists:locations,id',
@@ -156,7 +223,7 @@ class IssuanceController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate(array_merge($this->rules(), ['issue_type' => 'required|in:' . implode(',', array_keys(Issuance::TYPES))]));
+        $request->validate(array_merge($this->rules($request->issue_type), ['issue_type' => 'required|in:' . implode(',', array_keys(Issuance::TYPES))]));
         try {
             $this->assertMillInCharge($request, $request->issue_type);
             $issuance = $this->service->create(
@@ -173,8 +240,8 @@ class IssuanceController extends Controller
 
     public function update(Request $request, $id)
     {
-        $issuance = Issuance::with('items', 'purchaseOrder')->findOrFail($id);
-        $request->validate($this->rules());
+        $issuance = Issuance::with('items.product', 'purchaseOrder', 'job')->findOrFail($id);
+        $request->validate($this->rules($issuance->issue_type));
         try {
             $this->assertMillInCharge($request, $issuance->issue_type);
             $this->service->update($issuance,
@@ -188,14 +255,15 @@ class IssuanceController extends Controller
 
     public function show($id)
     {
-        $issuance = Issuance::with('items.product.measurementUnit', 'purchaseOrder.vendor', 'sourceLocation', 'destinationLocation', 'creator')->findOrFail($id);
-        return view('issuances.show', compact('issuance'));
+        $issuance = Issuance::with('items.product.measurementUnit', 'items.jobItem', 'purchaseOrder.vendor', 'job.customer', 'sourceLocation', 'destinationLocation', 'creator')->findOrFail($id);
+        $requirement = $issuance->isForCutting() && $issuance->job ? $this->service->jobRequirement($issuance->job->load('items')) : [];
+        return view('issuances.show', compact('issuance', 'requirement'));
     }
 
     public function destroy($id)
     {
         try {
-            $issuance = Issuance::with('items', 'purchaseOrder', 'sourceLocation')->findOrFail($id);
+            $issuance = Issuance::with('items.product', 'purchaseOrder', 'sourceLocation')->findOrFail($id);
             if ($issuance->issue_type === 'greige_processing' && !$issuance->isWarehouseToMill()
                 && !Issuance::canIssueAt($issuance->sourceLocation, auth()->user())) {
                 throw new \Exception('Only the mill location in-charge (or a superadmin) can reverse this issuance.');
@@ -210,7 +278,8 @@ class IssuanceController extends Controller
 
     public function print($id)
     {
-        $issuance = Issuance::with('items.product.measurementUnit', 'purchaseOrder.vendor', 'sourceLocation', 'destinationLocation')->findOrFail($id);
+        $issuance = Issuance::with('items.product.measurementUnit', 'items.jobItem', 'purchaseOrder.vendor', 'job.customer', 'sourceLocation', 'destinationLocation')->findOrFail($id);
+        $cutting = $issuance->isForCutting();
 
         $pdf = new \App\Services\myPDF();
         $pdf->setPrintHeader(false);
@@ -232,10 +301,10 @@ class IssuanceController extends Controller
         $pdf->Ln(15);
 
         $info = '<table border="1" cellpadding="4" style="font-size:10px;">
-            <tr><td width="20%"><b>Issued To</b></td><td width="30%">' . e($issuance->purchaseOrder->vendor->name ?? '-') . '</td>
-                <td width="20%"><b>Against</b></td><td width="30%">' . e($issuance->purchaseOrder->order_no ?? '-') . '</td></tr>
+            <tr><td width="20%"><b>' . ($cutting ? 'Customer' : 'Issued To') . '</b></td><td width="30%">' . e($cutting ? ($issuance->job->customer->name ?? '-') : ($issuance->purchaseOrder->vendor->name ?? '-')) . '</td>
+                <td width="20%"><b>Against</b></td><td width="30%">' . e($issuance->against_no ?? '-') . '</td></tr>
             <tr><td><b>From</b></td><td>' . e($issuance->sourceLocation->name ?? '-') . '</td>
-                <td><b>To</b></td><td>' . e($issuance->destinationLocation->name ?? ($issuance->purchaseOrder->vendor->name ?? '-')) . '</td></tr>
+                <td><b>To</b></td><td>' . e($issuance->destinationLocation->name ?? ($cutting ? 'Cutting department' : ($issuance->purchaseOrder->vendor->name ?? '-'))) . '</td></tr>
             <tr><td><b>Vehicle No.</b></td><td>' . e($issuance->vehicle_no ?: '-') . '</td>
                 <td><b>Total Bags</b></td><td>' . ($issuance->no_of_bags !== null ? rtrim(rtrim(number_format((float) $issuance->no_of_bags, 2), '0'), '.') : '-') . '</td></tr>
             <tr><td><b>Driver</b></td><td>' . e($issuance->driver_name ?: '-') . '</td>
@@ -248,6 +317,22 @@ class IssuanceController extends Controller
         $html = '<table border="1" cellpadding="4" style="font-size:10px;">
             <tr style="font-weight:bold;background-color:#f5f5f5;"><th width="6%">#</th><th width="38%">Item</th><th width="18%">Lot</th><th width="16%" align="right">Quantity</th><th width="10%">Unit</th><th width="12%" align="right">Bags</th></tr>';
         $bagFmt = fn($v) => $v === null ? '-' : rtrim(rtrim(number_format((float) $v, 2), '0'), '.');
+        if ($cutting) {
+            // Fabric for cutting: job line, fabric, lot/grade, yards (meters), required and %
+            $req = $issuance->job ? $this->service->jobRequirement($issuance->job->load('items')) : [];
+            $html = '<table border="1" cellpadding="4" style="font-size:9px;">
+                <tr style="font-weight:bold;background-color:#f5f5f5;"><th width="4%">#</th><th width="22%">Collection / Design / Color</th><th width="22%">Fabric</th><th width="14%">Lot / Grade</th><th width="10%" align="right">Issued yd</th><th width="9%" align="right">Meters</th><th width="10%" align="right">Required yd</th><th width="9%" align="right">%</th></tr>';
+            foreach ($issuance->items as $i => $item) {
+                $ji = $item->jobItem; $r = $req[$item->job_item_id] ?? ['required_yd' => 0, 'issued_yd' => 0];
+                $pct = IssuanceService::cuttingPercent($r['required_yd'], $r['issued_yd']);
+                $html .= '<tr><td>' . ($i + 1) . '</td><td>' . e(trim(implode(' / ', array_filter([$ji->collection ?? null, $ji->design ?? null, $ji->color_scheme ?? null])))) . '</td>
+                    <td>' . e($item->product->name ?? '') . '</td><td>' . e(($item->lot_no ?? '-') . ' / ' . ($item->grade ?? '-')) . '</td>
+                    <td align="right">' . number_format($item->quantity_yd, 2) . '</td><td align="right">' . number_format($item->quantity, 2) . '</td>
+                    <td align="right">' . number_format($r['required_yd'], 2) . '</td><td align="right">' . ($pct !== null ? number_format($pct, 1) . '%' : '-') . '</td></tr>';
+            }
+            $html .= '<tr><td colspan="4" align="right"><b>Total</b></td><td align="right"><b>' . number_format(Issuance::toYards((float) $issuance->total_quantity), 2) . '</b></td><td align="right"><b>' . number_format($issuance->total_quantity, 2) . '</b></td><td colspan="2" align="right">% = required ÷ issued × 100</td></tr></table>';
+            $pdf->writeHTML($html, true, false, false, false, '');
+        } else {
         foreach ($issuance->items as $i => $item) {
             $html .= '<tr><td>' . ($i + 1) . '</td><td>' . e($item->product->name ?? '') . '</td><td>' . e($item->lot_no ?? '') . '</td>
                 <td align="right">' . number_format($item->quantity, 3) . '</td><td>' . e($item->product->measurementUnit->shortcode ?? '') . '</td>
@@ -255,6 +340,7 @@ class IssuanceController extends Controller
         }
         $html .= '<tr><td colspan="3" align="right"><b>Total</b></td><td align="right"><b>' . number_format($issuance->total_quantity, 3) . '</b></td><td></td><td align="right"><b>' . $bagFmt($issuance->no_of_bags) . '</b></td></tr></table>';
         $pdf->writeHTML($html, true, false, false, false, '');
+        }
 
         if ($issuance->remarks) { $pdf->Ln(2); $pdf->MultiCell(0, 5, 'Remarks: ' . $issuance->remarks, 0, 'L'); }
 
@@ -268,7 +354,7 @@ class IssuanceController extends Controller
         $pdf->writeHTML('<table cellpadding="6" width="100%" style="font-size:10px;"><tr>'
             . $sigBox('PREPARED BY', $issuance->prepared_by_name)
             . '<td width="6%"></td>'
-            . $sigBox('RECEIVED BY (MILL)', $issuance->received_by_name)
+            . $sigBox($cutting ? 'RECEIVED BY (CUTTING)' : 'RECEIVED BY (MILL)', $issuance->received_by_name)
             . '</tr></table>', true, false, false, false, '');
 
         return $pdf->Output($issuance->issue_no . '.pdf', 'I');

@@ -249,7 +249,7 @@ class ProcessingReports extends BaseReports
             $net = $greige + $processing + $reprocess - $claims;
 
             // Where the lot's value sits now, and what has been sold
-            $stock = (float) DB::table('location_stock_ledger')->where('lot_no', $lot)->whereIn('status', ['fresh', 'reprocess', 'in_process', 'in_transit'])
+            $stock = (float) DB::table('location_stock_ledger')->where('lot_no', $lot)->whereIn('status', ['fresh', 'for_cutting', 'reprocess', 'in_process', 'in_transit'])
                 ->whereIn('product_id', DB::table('products as pr')->join('product_categories as c', 'c.id', '=', 'pr.category_id')
                     ->whereIn('c.code', ['processed', 'cut_pcs', 'sku', 'leftover', 'rejection'])->select('pr.id'))->sum('amount');
             [$cogs, $revenue] = $this->soldFromLot($lot);

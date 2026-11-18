@@ -342,6 +342,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/',                 [IssuanceController::class, 'index'])     ->name('index')  ->middleware('check.permission:issuances.index');
         Route::get('create',            [IssuanceController::class, 'create'])    ->name('create') ->middleware('check.permission:issuances.create');
         Route::get('po-details/{poId}', [IssuanceController::class, 'poDetails']) ->name('po_details')->middleware('check.permission:issuances.index');
+        Route::get('job-details/{jobId}', [IssuanceController::class, 'jobDetails'])->name('job_details')->middleware('check.permission:issuances.index');
         Route::post('/',                [IssuanceController::class, 'store'])     ->name('store')  ->middleware('check.permission:issuances.create');
         Route::get('{id}',              [IssuanceController::class, 'show'])      ->name('show')   ->middleware('check.permission:issuances.index');
         Route::get('{id}/edit',         [IssuanceController::class, 'edit'])      ->name('edit')   ->middleware('check.permission:issuances.edit');
@@ -430,6 +431,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('start/{receivingId}', [\App\Http\Controllers\QcInspectionController::class, 'start'])  ->name('start') ->middleware('check.permission:qc_inspections.create');
         Route::get('{id}',                 [\App\Http\Controllers\QcInspectionController::class, 'show'])   ->name('show')  ->middleware('check.permission:qc_inspections.index');
         Route::put('{id}',                 [\App\Http\Controllers\QcInspectionController::class, 'update']) ->name('update')->middleware('check.permission:qc_inspections.create');
+        Route::post('{id}/reopen',         [\App\Http\Controllers\QcInspectionController::class, 'reopen']) ->name('reopen')->middleware('check.permission:qc_inspections.edit');
         Route::get('{id}/print',           [\App\Http\Controllers\QcInspectionController::class, 'print'])  ->name('print') ->middleware('check.permission:qc_inspections.print');
     });
 

@@ -122,6 +122,57 @@ class QcInspectionService
         });
     }
 
+    /**
+     * Reopen a closed QC so it can be edited and closed again.
+     * Undoes everything close() did: regrade / reprocess / shortage stock rows, the debit note
+     * voucher and the PDC reduction. Not allowed once the lot has moved on after the QC
+     * (issued for cutting, cut, moved, sent for reprocess, sold ...).
+     */
+    public function reopen(QcInspection $qc, string $reason, int $userId): QcInspection
+    {
+        return DB::transaction(function () use ($qc, $reason, $userId) {
+            $qc = QcInspection::with('purchaseOrder', 'receiving')->lockForUpdate()->findOrFail($qc->id);
+            if ($qc->isOpen()) throw new \Exception('This QC is already open.');
+            $reason = trim($reason);
+            if ($reason === '') throw new \Exception('Give a reason for reopening the QC.');
+
+            $lot = $qc->purchaseOrder->stock_lot_no;
+            $qcRows = LocationStockLedger::where('reference_type', 'QcInspection')->where('reference_id', $qc->id);
+            $lastQcRowId = (int) (clone $qcRows)->max('id');
+
+            // Anything that touched this lot after the QC closed means the fabric has moved on
+            $moved = LocationStockLedger::where('lot_no', $lot)
+                ->whereNotIn('reference_type', ['PurchaseReceiving', 'QcInspection'])
+                ->when($lastQcRowId, fn($q) => $q->where('id', '>', $lastQcRowId),
+                       fn($q) => $q->where('created_at', '>=', $qc->closed_at ?? now()))
+                ->orderBy('id')->first();
+            if ($moved) {
+                throw new \Exception("Cannot reopen — lot {$lot} has already been used after this QC ({$moved->doc_no}). Reverse that first.");
+            }
+
+            $qcRows->delete();
+            $this->vouchers->deleteByReference('QcInspection', $qc->id);
+
+            // Give back what close() took off the processing-charge PDC
+            if ((float) $qc->pdc_reduced_by > 0) {
+                $pdc = Pdc::where('reference_type', 'PurchaseReceiving')->where('reference_id', $qc->purchase_receiving_id)->lockForUpdate()->first();
+                if ($pdc) $pdc->update(['amount' => round((float) $pdc->amount + (float) $qc->pdc_reduced_by, 2), 'updated_by' => $userId]);
+            }
+
+            $qc->update([
+                'status' => QcInspection::OPEN, 'shortage_amount' => 0, 'pdc_reduced_by' => 0,
+                'closed_by' => null, 'closed_at' => null, 'updated_by' => $userId,
+            ]);
+            $qc->receiving->update(['qc_status' => 'InProgress']);
+
+            QcStatusLog::create([
+                'qc_inspection_id' => $qc->id, 'qc_inspection_item_id' => null,
+                'from_status' => 'Closed', 'to_status' => 'Reopened', 'remarks' => $reason, 'changed_by' => $userId,
+            ]);
+            return $qc->fresh('items');
+        });
+    }
+
     public function close(QcInspection $qc, int $userId): QcInspection
     {
         return DB::transaction(function () use ($qc, $userId) {

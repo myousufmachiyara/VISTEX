@@ -28,11 +28,11 @@
             <td data-order="{{ $iss->issue_date->format('Y-m-d') }}">{{ $iss->issue_date->format('d-M-Y') }}</td>
             <td><a href="{{ route('issuances.show', $iss->id) }}" class="text-primary">{{ $iss->issue_no }}</a></td>
             <td>{{ $iss->type_label }}</td>
-            <td>@if($iss->purchaseOrder)<a href="{{ route('purchase_orders.show', $iss->purchase_order_id) }}">{{ $iss->purchaseOrder->order_no }}</a>@endif</td>
-            <td>{{ $iss->purchaseOrder->vendor->name ?? '' }}</td>
-            <td class="small">{{ $iss->sourceLocation->name ?? '—' }} → {{ $iss->destinationLocation->name ?? ($iss->issue_type === 'greige_processing' ? 'in process' : 'Mill') }}</td>
+            <td>@if($iss->isForCutting() && $iss->job)<a href="{{ route('jobs.show', $iss->job_id) }}">{{ $iss->job->job_no }}</a>@elseif($iss->purchaseOrder)<a href="{{ route('purchase_orders.show', $iss->purchase_order_id) }}">{{ $iss->purchaseOrder->order_no }}</a>@endif</td>
+            <td>{{ $iss->isForCutting() ? ($iss->job->customer->name ?? '') : ($iss->purchaseOrder->vendor->name ?? '') }}</td>
+            <td class="small">{{ $iss->sourceLocation->name ?? '—' }} → {{ $iss->destinationLocation->name ?? ($iss->isForCutting() ? 'Cutting' : ($iss->issue_type === 'greige_processing' ? 'in process' : 'Mill')) }}</td>
             <td class="small">@foreach($iss->items as $it){{ $it->product->name ?? '' }}@if(!$loop->last), @endif @endforeach</td>
-            <td class="text-end">{{ number_format($iss->total_quantity, 3) }}</td>
+            <td class="text-end">{{ number_format($iss->total_quantity, 3) }}@if($iss->isForCutting())<div class="small text-muted">{{ number_format(\App\Models\Issuance::toYards((float) $iss->total_quantity), 2) }} yd</div>@endif</td>
             <td class="text-nowrap">
               <a href="{{ route('issuances.print', $iss->id) }}" target="_blank" class="btn btn-sm btn-outline-success">Print</a>
               @can('issuances.edit')<a href="{{ route('issuances.edit', $iss->id) }}" class="btn btn-sm btn-outline-primary">Edit</a>@endcan

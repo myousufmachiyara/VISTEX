@@ -61,6 +61,8 @@ class ProductionController extends Controller
             'lines.*.put_up_product_id' => $type === 'cutting' ? 'required_with:lines.*.pieces|nullable|integer' : 'nullable',
             'lines.*.leftover_qty' => 'nullable|numeric|min:0',
             'lines.*.rejected_qty' => 'nullable|numeric|min:0',
+            'lines.*.leftover_yd'  => 'nullable|numeric|min:0',
+            'lines.*.rejected_yd'  => 'nullable|numeric|min:0',
             'lines.*.job_item_id'  => 'nullable|integer',
         ]);
         try {

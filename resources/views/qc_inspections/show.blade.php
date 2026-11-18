@@ -4,6 +4,7 @@
 @php
   $editable = $qc->isOpen() && auth()->user()->can('qc_inspections.create');
   $canClose = $editable && auth()->user()->can('qc_inspections.edit');
+  $canReopen = !$qc->isOpen() && auth()->user()->can('qc_inspections.edit');
   $po = $qc->purchaseOrder;
   $fmt = fn($v) => $v === null ? '' : rtrim(rtrim(number_format((float) $v, 3, '.', ''), '0'), '.');
   $old = fn($id, $field, $default) => old("items.$id.$field", $default);
@@ -134,6 +135,20 @@
     @endif
   </section>
   </form>
+
+  @if($canReopen)
+  <section class="card mt-3 border-warning" id="reopen">
+    <div class="card-body py-3">
+      <form method="POST" action="{{ route('qc_inspections.reopen', $qc->id) }}" class="row g-2 align-items-end"
+            onsubmit="return confirm('Reopen {{ $qc->qc_no }} for editing? The regrading, reprocess hold and any shortage claim on the mill will be reversed until you close it again.')">
+        @csrf
+        <div class="col-md-9"><label class="small">Edit closed QC — reason <span class="text-danger">*</span></label>
+          <input name="reason" class="form-control form-control-sm" maxlength="500" required placeholder="Why this QC needs to be changed"></div>
+        <div class="col-md-3"><button class="btn btn-warning btn-sm w-100"><i class="fas fa-pen"></i> Reopen &amp; Edit</button></div>
+      </form>
+    </div>
+  </section>
+  @endif
 </div></div>
 
 <script>

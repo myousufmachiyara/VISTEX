@@ -44,6 +44,31 @@
         <input type="hidden" name="issue_type" value="{{ $type }}">
         <div class="alert alert-light border small">{{ $types[$type]['help'] }}</div>
 
+        @if($type === 'fabric_cutting')
+        @php $selJob = old('job_id', $issuance->job_id ?? null); $selCust = old('customer_id', optional($jobs->firstWhere('id', $selJob))->customer_id); @endphp
+        <div class="row">
+          <div class="col-md-3 mb-3"><label>Customer <span class="text-danger">*</span></label>
+            <select name="customer_id" id="cust_select" class="form-control" {{ $editing ? 'disabled' : '' }} required>
+              <option value="">Select</option>
+              @foreach($customers as $c)<option value="{{ $c->id }}" @selected($selCust == $c->id)>{{ $c->name }}</option>@endforeach
+            </select>
+            @if($editing)<input type="hidden" name="customer_id" value="{{ $selCust }}">@endif
+            @if($customers->isEmpty())<small class="text-muted">No approved customer jobs are open.</small>@endif
+          </div>
+          <div class="col-md-3 mb-3"><label>Customer Job # <span class="text-danger">*</span> <small class="text-muted">(open jobs only)</small></label>
+            <select name="job_id" id="job_select" class="form-control" {{ $editing ? 'disabled' : '' }} required>
+              <option value="">Select the customer first</option>
+              @foreach($jobs as $j)<option value="{{ $j->id }}" data-customer="{{ $j->customer_id }}" @selected($selJob == $j->id)>{{ $j->job_no }}{{ $j->customer_po_number ? ' — PO ' . $j->customer_po_number : '' }}</option>@endforeach
+            </select>
+            @if($editing)<input type="hidden" name="job_id" value="{{ $selJob }}">@endif
+          </div>
+          <div class="col-md-3 mb-3"><label>Issue From (Warehouse) <span class="text-danger">*</span></label>
+            <select name="source_location_id" id="source_select" class="form-control" required>
+              @foreach($warehouses as $w)<option value="{{ $w->id }}" @selected(old('source_location_id', $issuance->source_location_id ?? null) == $w->id)>{{ $w->name }}</option>@endforeach
+            </select></div>
+          <div class="col-md-2 mb-3"><label>Issue Date</label><input type="date" name="issue_date" class="form-control" value="{{ old('issue_date', $issuance?->issue_date?->format('Y-m-d') ?? date('Y-m-d')) }}" required></div>
+        </div>
+        @else
         <div class="row">
           <div class="col-md-5 mb-3">
             <label>{{ $types[$type]['against'] }} <span class="text-danger">*</span></label>
@@ -73,6 +98,7 @@
           </div>
           <div class="col-md-2 mb-3"><label>Issue Date</label><input type="date" name="issue_date" class="form-control" value="{{ old('issue_date', $issuance?->issue_date?->format('Y-m-d') ?? date('Y-m-d')) }}" required></div>
         </div>
+        @endif
         @if($type === 'greige_processing')<div class="alert alert-info py-2 small" id="millInfo" style="display:none"></div>@endif
 
         <div id="linesWrap" style="display:none">
@@ -83,6 +109,10 @@
           @if($type === 'greige_processing')
             <button type="button" class="btn btn-sm btn-outline-primary mb-3" id="addGreigeRow">Add Greige</button>
           @endif
+          @if($type === 'fabric_cutting')
+            <div class="small text-muted mb-3">Quantities are in <strong>yards</strong> (1 yd = 0.9144 m; stock is kept in meters).
+              % = required ÷ issued × 100. Use <strong>+</strong> to issue a job line from more than one lot. ★ = fabric matching the job line's pattern.</div>
+          @endif
         </div>
 
         @include('challans._transport', ['challan' => $issuance ?? null])
@@ -91,7 +121,7 @@
             <input type="text" class="form-control" id="bagsTotal" readonly value="0"></div>
           <div class="col-md-4 mb-3"><label>Prepared By</label>
             <input type="text" name="prepared_by_name" class="form-control" maxlength="100" value="{{ old('prepared_by_name', $issuance->prepared_by_name ?? auth()->user()->name) }}"></div>
-          <div class="col-md-4 mb-3"><label>Received By <small class="text-muted">(mill representative)</small></label>
+          <div class="col-md-4 mb-3"><label>Received By <small class="text-muted">({{ $type === 'fabric_cutting' ? 'cutting department' : 'mill representative' }})</small></label>
             <input type="text" name="received_by_name" class="form-control" maxlength="100" value="{{ old('received_by_name', $issuance->received_by_name ?? '') }}"></div>
         </div>
         <div class="row">
@@ -109,7 +139,7 @@
 @if($type)
 @php
   $existingItems = $editing
-      ? $issuance->items->map(fn($i) => ['product_id' => $i->product_id, 'quantity' => (float) $i->quantity, 'bags' => $i->bags !== null ? (float) $i->bags : null, 'lot_no' => $i->lot_no, 'purchase_order_item_id' => $i->purchase_order_item_id])->values()
+      ? $issuance->items->map(fn($i) => ['product_id' => $i->product_id, 'quantity' => (float) $i->quantity, 'quantity_yd' => $i->quantity_yd, 'bags' => $i->bags !== null ? (float) $i->bags : null, 'lot_no' => $i->lot_no, 'grade' => $i->grade, 'job_item_id' => $i->job_item_id, 'purchase_order_item_id' => $i->purchase_order_item_id])->values()
       : [];
 @endphp
 <script>
@@ -196,6 +226,107 @@ $(function () {
   }
   $(document).on('input', '#linesTable .bags', bagsTotal);
   $(document).on('click', '.g-remove', () => setTimeout(bagsTotal));
+
+  // ── Processed fabric for cutting (against a customer job, in yards) ──
+  let cut = null;
+  const r3 = v => Math.round(v * 1000) / 1000, num = v => parseFloat(v) || 0;
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const stockKey = s => `${s.product_id}|${s.lot_no ?? ''}|${s.grade ?? ''}`;
+
+  function filterJobs() {
+    const c = $('#cust_select').val();
+    $('#job_select option[data-customer]').each(function () { const ok = !c || this.dataset.customer === c; $(this).toggle(ok).prop('disabled', !ok); });
+    const cur = $('#job_select option:selected');
+    if (cur.data('customer') && String(cur.data('customer')) !== c) $('#job_select').val('');
+    $('#job_select option:first').text(c ? 'Select job' : 'Select the customer first');
+  }
+
+  function fabricOptions(line, pre) {
+    const pat = String(line.pattern_code || '').toLowerCase();
+    const isMatch = s => !!pat && String(s.pattern || '').toLowerCase() === pat;
+    const list = cut.stock.filter(s => !s.qc_pending).sort((a, b) => isMatch(b) - isMatch(a));
+    const sel = pre && pre.product_id ? `${pre.product_id}|${pre.lot_no ?? ''}|${pre.grade ?? ''}` : '';
+    return '<option value="">Select fabric</option>' + list.map(s =>
+      `<option value="${esc(stockKey(s))}" ${stockKey(s) === sel ? 'selected' : ''}>${isMatch(s) ? '★ ' : ''}${esc(s.product)} · lot ${esc(s.lot_no ?? '—')} · ${esc(s.grade ?? '—')} — ${s.qty_yd.toFixed(2)} yd</option>`).join('');
+  }
+
+  function addCutRow(line, pre = {}, after = null) {
+    const i = rowIdx++;
+    const tr = $(`<tr data-line="${line.id}">
+      <td>${esc(line.collection ?? '—')}</td><td>${esc(line.design ?? '—')}</td><td>${esc(line.color ?? '—')}</td>
+      <td class="text-end">${line.required_yd.toFixed(2)}</td><td class="text-end">${line.issued_yd.toFixed(2)}</td>
+      <td><select class="form-control form-control-sm c-fab">${fabricOptions(line, pre)}</select>
+        <input type="hidden" name="items[${i}][job_item_id]" value="${line.id}">
+        <input type="hidden" name="items[${i}][product_id]" class="c-pid"><input type="hidden" name="items[${i}][lot_no]" class="c-lot"><input type="hidden" name="items[${i}][grade]" class="c-grade"></td>
+      <td><input type="number" name="items[${i}][quantity_yd]" class="form-control form-control-sm text-end c-yd" step="any" min="0" value="${pre.quantity_yd ?? ''}"><div class="small text-muted text-end c-m"></div></td>
+      <td class="text-end c-pct"></td>
+      <td><input type="number" name="items[${i}][bags]" class="form-control form-control-sm bags" step="any" min="0" value="${pre.bags ?? ''}"></td>
+      <td class="text-nowrap"><button type="button" class="btn btn-sm btn-outline-secondary c-split" title="Issue this job line from another lot too">+</button>
+        ${after ? '<button type="button" class="btn btn-sm btn-outline-danger c-del">&times;</button>' : ''}</td>
+    </tr>`);
+    tr[0].line = line;
+    after ? $(after).after(tr) : $('#linesTable tbody').append(tr);
+    syncFabric(tr);
+  }
+
+  function syncFabric(tr) {
+    const key = tr.find('.c-fab').val() || '';
+    const s = cut.stock.find(x => stockKey(x) === key);
+    tr.find('.c-pid').val(s ? s.product_id : ''); tr.find('.c-lot').val(s ? (s.lot_no ?? '') : ''); tr.find('.c-grade').val(s ? (s.grade ?? '') : '');
+    refreshCut();
+  }
+
+  // Per job line: % = required ÷ (issued before + issuing now) × 100. Per stock bucket: flag over-issue.
+  function refreshCut() {
+    const byLine = {}, byStock = {};
+    $('#linesTable tbody tr[data-line]').each(function () {
+      const yd = num($(this).find('.c-yd').val()), key = $(this).find('.c-fab').val();
+      byLine[this.dataset.line] = (byLine[this.dataset.line] || 0) + yd;
+      if (key) byStock[key] = (byStock[key] || 0) + yd;
+      $(this).find('.c-m').text(yd ? (yd * 0.9144).toFixed(2) + ' m' : '');
+    });
+    $('#linesTable tbody tr[data-line]').each(function () {
+      const line = this.line, total = line.issued_yd + (byLine[line.id] || 0);
+      const pct = total > 0 ? (line.required_yd / total * 100) : null;
+      $(this).find('.c-pct').html(pct === null ? '—' : `<strong class="${pct > 100.05 ? 'text-warning' : 'text-success'}">${pct.toFixed(1)}%</strong>`)
+        .attr('title', `Required ${line.required_yd.toFixed(2)} yd ÷ issued ${total.toFixed(2)} yd × 100`);
+      const key = $(this).find('.c-fab').val(), s = cut.stock.find(x => stockKey(x) === key);
+      $(this).find('.c-yd').toggleClass('is-invalid', !!s && (byStock[key] || 0) > s.qty_yd + 0.001)
+        .attr('title', s ? `In stock ${s.qty_yd.toFixed(2)} yd` : '');
+    });
+  }
+
+  function loadJob() {
+    const job = $('#job_select').val();
+    if (!job) { $('#linesWrap').hide(); return; }
+    const q = new URLSearchParams({ source_location_id: $('#source_select').val() || '' }); if (EXCLUDE) q.set('exclude', EXCLUDE);
+    fetch(`{{ url('issuances/job-details') }}/${job}?` + q, { headers: { Accept: 'application/json' } }).then(r => r.json()).then(d => {
+      cut = d; rowIdx = 0;
+      const prefill = OLD.length ? OLD : EXISTING;
+      $('#linesHead').html('<tr><th>Collection</th><th>Design</th><th>Color</th><th class="text-end">Required (yd)</th><th class="text-end">Issued before (yd)</th><th width="30%">Processed Fabric · Lot · Grade</th><th width="11%">Issuing (yd)</th><th class="text-end">%</th><th width="8%">Bags</th><th></th></tr>');
+      $('#linesTable tbody').empty();
+      d.lines.forEach(line => {
+        const mine = prefill.filter(p => +p.job_item_id === +line.id);
+        if (!mine.length) addCutRow(line);
+        mine.forEach((p, k) => addCutRow(line, p, k ? $('#linesTable tbody tr[data-line="' + line.id + '"]').last() : null));
+      });
+      if (!d.lines.length) $('#linesTable tbody').append('<tr><td colspan="10" class="text-muted">This job has no lines.</td></tr>');
+      if (!d.stock.filter(s => !s.qc_pending).length) $('#linesTable tbody').append('<tr><td colspan="10" class="text-danger">No QC-passed processed fabric in this warehouse.</td></tr>');
+      $('#linesWrap').show(); refreshCut(); bagsTotal();
+    });
+  }
+
+  if (TYPE === 'fabric_cutting') {
+    $('#cust_select').on('change', () => { filterJobs(); loadJob(); });
+    $('#job_select, #source_select').on('change', loadJob);
+    $(document).on('change', '#linesTable .c-fab', function () { syncFabric($(this).closest('tr')); });
+    $(document).on('input', '#linesTable .c-yd', refreshCut);
+    $(document).on('click', '#linesTable .c-split', function () { const tr = $(this).closest('tr'); addCutRow(tr[0].line, {}, tr); });
+    $(document).on('click', '#linesTable .c-del', function () { $(this).closest('tr').remove(); refreshCut(); bagsTotal(); });
+    filterJobs();
+    if ($('#job_select').val()) loadJob();
+    return;
+  }
 
   $('#po_select, #source_select').on('change', load);
   $(document).on('click', '#addGreigeRow', () => addGreigeRow());
