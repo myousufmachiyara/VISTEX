@@ -11,6 +11,12 @@ class IssuanceController extends Controller
 {
     public function __construct(private IssuanceService $service) {}
 
+    private const MESSAGES = [
+        'items.required' => 'No lines were sent. Select the job / PO and wait for its lines to load, then enter the quantities.',
+        'job_id.required' => 'Select the customer job.',
+        'customer_id.required' => 'Select the customer.',
+    ];
+
     public function index(Request $request)
     {
         $issuances = Issuance::with('purchaseOrder.vendor', 'job.customer', 'sourceLocation', 'destinationLocation', 'items.product')
@@ -223,7 +229,7 @@ class IssuanceController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate(array_merge($this->rules($request->issue_type), ['issue_type' => 'required|in:' . implode(',', array_keys(Issuance::TYPES))]));
+        $request->validate(array_merge($this->rules($request->issue_type), ['issue_type' => 'required|in:' . implode(',', array_keys(Issuance::TYPES))]), self::MESSAGES);
         try {
             $this->assertMillInCharge($request, $request->issue_type);
             $issuance = $this->service->create(
@@ -241,7 +247,7 @@ class IssuanceController extends Controller
     public function update(Request $request, $id)
     {
         $issuance = Issuance::with('items.product', 'purchaseOrder', 'job')->findOrFail($id);
-        $request->validate($this->rules($issuance->issue_type));
+        $request->validate($this->rules($issuance->issue_type), self::MESSAGES);
         try {
             $this->assertMillInCharge($request, $issuance->issue_type);
             $this->service->update($issuance,

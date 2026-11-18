@@ -100,6 +100,7 @@
         </div>
         @endif
         @if($type === 'greige_processing')<div class="alert alert-info py-2 small" id="millInfo" style="display:none"></div>@endif
+        @if($type === 'fabric_cutting')<div class="alert alert-danger py-2 small" id="jobError" style="display:none"></div>@endif
 
         <div id="linesWrap" style="display:none">
           <table class="table table-bordered align-middle" id="linesTable">
@@ -309,7 +310,10 @@ $(function () {
     const job = $('#job_select').val();
     if (!job) { $('#linesWrap').hide(); return; }
     const q = new URLSearchParams({ source_location_id: $('#source_select').val() || '' }); if (EXCLUDE) q.set('exclude', EXCLUDE);
-    fetch(`{{ url('issuances/job-details') }}/${job}?` + q, { headers: { Accept: 'application/json' } }).then(r => r.json()).then(d => {
+    $('#jobError').hide();
+    fetch(`{{ url('issuances/job-details') }}/${job}?` + q, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(d => {
       cut = d; rowIdx = 0;
       const prefill = OLD.length ? OLD : EXISTING;
       $('#linesHead').html('<tr><th>Collection</th><th>Design</th><th>Color</th><th class="text-end">Required (yd)</th><th class="text-end">Issued before (yd)</th><th width="30%">Processed Fabric · Lot · Grade</th><th width="11%">Issuing (yd)</th><th class="text-end">%</th><th></th></tr>');
@@ -322,14 +326,30 @@ $(function () {
       if (!d.lines.length) $('#linesTable tbody').append('<tr><td colspan="9" class="text-muted">This job has no lines.</td></tr>');
       if (!d.stock.filter(s => !s.qc_pending).length) $('#linesTable tbody').append('<tr><td colspan="9" class="text-danger">No QC-passed processed fabric in this warehouse.</td></tr>');
       $('#linesWrap').show(); refreshCut(); bagsTotal();
+    })
+    .catch(e => {
+      $('#linesWrap').hide();
+      $('#jobError').show().text('Could not load the job lines (' + e.message + '). '
+        + (e.message === 'HTTP 404' ? 'Clear the route cache on the server (php artisan optimize:clear) and reload this page.' : 'Reload the page and try again.'));
     });
   }
 
   if (TYPE === 'fabric_cutting') {
+    // Nothing to post until the job lines are loaded and at least one has yards
+    $('#issForm').on('submit', function (e) {
+      if (!$('#linesTable tbody tr[data-line]').length) {
+        e.preventDefault(); $('#jobError').show().text('Select the customer job and wait for its lines to load before posting.'); return;
+      }
+      const filled = $('#linesTable tbody tr[data-line]').filter(function () { return num($(this).find('.c-yd').val()) > 0; });
+      if (!filled.length) { e.preventDefault(); $('#jobError').show().text('Enter the yards issued for at least one job line.'); return; }
+      const noFabric = filled.filter(function () { return !$(this).find('.c-fab').val(); });
+      if (noFabric.length) { e.preventDefault(); $('#jobError').show().text('Select the processed fabric (lot / grade) for every line you are issuing.'); }
+    });
     $('#cust_select').on('change', () => { filterJobs(); loadJob(); });
     $('#job_select, #source_select').on('change', loadJob);
     $(document).on('change', '#linesTable .c-fab', function () { syncFabric($(this).closest('tr')); });
     $(document).on('input', '#linesTable .c-yd', refreshCut);
+    $(document).on('input change', '#linesTable .c-yd, #linesTable .c-fab', () => $('#jobError').hide());
     $(document).on('click', '#linesTable .c-split', function () { const tr = $(this).closest('tr'); addCutRow(tr[0].line, {}, tr); });
     $(document).on('click', '#linesTable .c-del', function () { $(this).closest('tr').remove(); refreshCut(); bagsTotal(); });
     filterJobs();
