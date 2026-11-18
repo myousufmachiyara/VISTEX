@@ -332,7 +332,7 @@ class IssuanceService
 
             IssuanceItem::create([
                 'issuance_id' => $issuance->id, 'product_id' => $product->id, 'lot_no' => $lot, 'grade' => $grade,
-                'job_item_id' => $ji->id, 'quantity' => $m, 'bags' => self::addBags(null, $i['bags'] ?? null), 'rate' => $rate, 'amount' => $amount,
+                'job_item_id' => $ji->id, 'quantity' => $m, 'bags' => null, 'rate' => $rate, 'amount' => $amount,
             ]);
 
             $row = ['doc_no' => $issuance->issue_no, 'location_id' => $sourceId, 'product_id' => $product->id, 'lot_no' => $lot, 'grade' => $grade,
@@ -449,6 +449,11 @@ class IssuanceService
     private static function extraFields(array $data): array
     {
         $str = fn($k) => isset($data[$k]) && trim((string) $data[$k]) !== '' ? trim((string) $data[$k]) : null;
+        // Fabric for cutting is a handover inside the factory: only who issued and who received
+        if (($data['issue_type'] ?? null) === 'fabric_cutting') {
+            return ['vehicle_no' => null, 'driver_name' => null, 'driver_contact' => null,
+                    'prepared_by_name' => $str('prepared_by_name'), 'received_by_name' => $str('received_by_name')];
+        }
         return [
             'vehicle_no'       => $str('vehicle_no') ? strtoupper($str('vehicle_no')) : null,
             'driver_name'      => $str('driver_name'),

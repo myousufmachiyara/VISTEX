@@ -305,10 +305,11 @@ class IssuanceController extends Controller
                 <td width="20%"><b>Against</b></td><td width="30%">' . e($issuance->against_no ?? '-') . '</td></tr>
             <tr><td><b>From</b></td><td>' . e($issuance->sourceLocation->name ?? '-') . '</td>
                 <td><b>To</b></td><td>' . e($issuance->destinationLocation->name ?? ($cutting ? 'Cutting department' : ($issuance->purchaseOrder->vendor->name ?? '-'))) . '</td></tr>
+' . ($cutting ? '' : '
             <tr><td><b>Vehicle No.</b></td><td>' . e($issuance->vehicle_no ?: '-') . '</td>
                 <td><b>Total Bags</b></td><td>' . ($issuance->no_of_bags !== null ? rtrim(rtrim(number_format((float) $issuance->no_of_bags, 2), '0'), '.') : '-') . '</td></tr>
             <tr><td><b>Driver</b></td><td>' . e($issuance->driver_name ?: '-') . '</td>
-                <td><b>Driver Contact</b></td><td>' . e($issuance->driver_contact ?: '-') . '</td></tr>
+                <td><b>Driver Contact</b></td><td>' . e($issuance->driver_contact ?: '-') . '</td></tr>') . '
         </table>';
         $pdf->SetFont('helvetica', '', 10);
         $pdf->writeHTML($info, true, false, false, false, '');
@@ -352,7 +353,7 @@ class IssuanceController extends Controller
             . 'Signature: ______________________________<br><br>'
             . 'Date: ____________________</td>';
         $pdf->writeHTML('<table cellpadding="6" width="100%" style="font-size:10px;"><tr>'
-            . $sigBox('PREPARED BY', $issuance->prepared_by_name)
+            . $sigBox($cutting ? 'ISSUED BY (WAREHOUSE)' : 'PREPARED BY', $issuance->prepared_by_name)
             . '<td width="6%"></td>'
             . $sigBox($cutting ? 'RECEIVED BY (CUTTING)' : 'RECEIVED BY (MILL)', $issuance->received_by_name)
             . '</tr></table>', true, false, false, false, '');

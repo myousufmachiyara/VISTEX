@@ -60,6 +60,12 @@
         <tfoot><tr class="fw-bold"><td colspan="2" class="text-end">Total</td><td class="text-end">{{ number_format($issuance->total_quantity, 3) }}</td><td></td><td class="text-end">{{ $issuance->no_of_bags !== null ? $issuance->no_of_bags + 0 : '' }}</td><td></td><td class="text-end">{{ number_format($issuance->total_amount, 2) }}</td></tr></tfoot>
       </table>
       @endif
+      @if($issuance->isForCutting())
+      <div class="row mb-2 small">
+        <div class="col-md-3"><strong>Issued By:</strong> {{ $issuance->prepared_by_name ?: '—' }}</div>
+        <div class="col-md-3"><strong>Received By (cutting):</strong> {{ $issuance->received_by_name ?: '—' }}</div>
+      </div>
+      @else
       <div class="row mb-2 small">
         <div class="col-md-3"><strong>Vehicle:</strong> {{ $issuance->vehicle_no ?: '—' }}</div>
         <div class="col-md-3"><strong>Driver:</strong> {{ $issuance->driver_name ?: '—' }} {{ $issuance->driver_contact ? '(' . $issuance->driver_contact . ')' : '' }}</div>
@@ -67,6 +73,7 @@
         <div class="col-md-2"><strong>Prepared By:</strong> {{ $issuance->prepared_by_name ?: '—' }}</div>
         <div class="col-md-2"><strong>Received By:</strong> {{ $issuance->received_by_name ?: '—' }}</div>
       </div>
+      @endif
       @if($issuance->remarks)<p><strong>Remarks:</strong> {{ $issuance->remarks }}</p>@endif
       @if($issuance->attachments)
         <p><strong>Attachments:</strong> @foreach($issuance->attachments as $a)<a href="{{ Storage::url($a) }}" target="_blank" class="me-2">File {{ $loop->iteration }}</a>@endforeach</p>

@@ -115,15 +115,25 @@
           @endif
         </div>
 
+        @if($type === 'fabric_cutting')
+        {{-- Internal handover to the cutting department in the same factory: no vehicle, driver or bags --}}
+        <div class="row">
+          <div class="col-md-4 mb-3"><label>Issued By <small class="text-muted">(warehouse)</small></label>
+            <input type="text" name="prepared_by_name" class="form-control" maxlength="100" value="{{ old('prepared_by_name', $issuance->prepared_by_name ?? auth()->user()->name) }}"></div>
+          <div class="col-md-4 mb-3"><label>Received By <small class="text-muted">(cutting department)</small></label>
+            <input type="text" name="received_by_name" class="form-control" maxlength="100" value="{{ old('received_by_name', $issuance->received_by_name ?? '') }}"></div>
+        </div>
+        @else
         @include('challans._transport', ['challan' => $issuance ?? null])
         <div class="row">
           <div class="col-md-4 mb-3"><label>Total Bags <small class="text-muted">(sum of the lines)</small></label>
             <input type="text" class="form-control" id="bagsTotal" readonly value="0"></div>
           <div class="col-md-4 mb-3"><label>Prepared By</label>
             <input type="text" name="prepared_by_name" class="form-control" maxlength="100" value="{{ old('prepared_by_name', $issuance->prepared_by_name ?? auth()->user()->name) }}"></div>
-          <div class="col-md-4 mb-3"><label>Received By <small class="text-muted">({{ $type === 'fabric_cutting' ? 'cutting department' : 'mill representative' }})</small></label>
+          <div class="col-md-4 mb-3"><label>Received By <small class="text-muted">(mill representative)</small></label>
             <input type="text" name="received_by_name" class="form-control" maxlength="100" value="{{ old('received_by_name', $issuance->received_by_name ?? '') }}"></div>
         </div>
+        @endif
         <div class="row">
           <div class="col-md-8 mb-3"><label>Remarks</label><textarea name="remarks" class="form-control" rows="1">{{ old('remarks', $issuance->remarks ?? '') }}</textarea></div>
           <div class="col-md-4 mb-3"><label>Attachments</label><input type="file" name="attachments[]" class="form-control" multiple></div>
@@ -260,7 +270,6 @@ $(function () {
         <input type="hidden" name="items[${i}][product_id]" class="c-pid"><input type="hidden" name="items[${i}][lot_no]" class="c-lot"><input type="hidden" name="items[${i}][grade]" class="c-grade"></td>
       <td><input type="number" name="items[${i}][quantity_yd]" class="form-control form-control-sm text-end c-yd" step="any" min="0" value="${pre.quantity_yd ?? ''}"><div class="small text-muted text-end c-m"></div></td>
       <td class="text-end c-pct"></td>
-      <td><input type="number" name="items[${i}][bags]" class="form-control form-control-sm bags" step="any" min="0" value="${pre.bags ?? ''}"></td>
       <td class="text-nowrap"><button type="button" class="btn btn-sm btn-outline-secondary c-split" title="Issue this job line from another lot too">+</button>
         ${after ? '<button type="button" class="btn btn-sm btn-outline-danger c-del">&times;</button>' : ''}</td>
     </tr>`);
@@ -303,15 +312,15 @@ $(function () {
     fetch(`{{ url('issuances/job-details') }}/${job}?` + q, { headers: { Accept: 'application/json' } }).then(r => r.json()).then(d => {
       cut = d; rowIdx = 0;
       const prefill = OLD.length ? OLD : EXISTING;
-      $('#linesHead').html('<tr><th>Collection</th><th>Design</th><th>Color</th><th class="text-end">Required (yd)</th><th class="text-end">Issued before (yd)</th><th width="30%">Processed Fabric · Lot · Grade</th><th width="11%">Issuing (yd)</th><th class="text-end">%</th><th width="8%">Bags</th><th></th></tr>');
+      $('#linesHead').html('<tr><th>Collection</th><th>Design</th><th>Color</th><th class="text-end">Required (yd)</th><th class="text-end">Issued before (yd)</th><th width="30%">Processed Fabric · Lot · Grade</th><th width="11%">Issuing (yd)</th><th class="text-end">%</th><th></th></tr>');
       $('#linesTable tbody').empty();
       d.lines.forEach(line => {
         const mine = prefill.filter(p => +p.job_item_id === +line.id);
         if (!mine.length) addCutRow(line);
         mine.forEach((p, k) => addCutRow(line, p, k ? $('#linesTable tbody tr[data-line="' + line.id + '"]').last() : null));
       });
-      if (!d.lines.length) $('#linesTable tbody').append('<tr><td colspan="10" class="text-muted">This job has no lines.</td></tr>');
-      if (!d.stock.filter(s => !s.qc_pending).length) $('#linesTable tbody').append('<tr><td colspan="10" class="text-danger">No QC-passed processed fabric in this warehouse.</td></tr>');
+      if (!d.lines.length) $('#linesTable tbody').append('<tr><td colspan="9" class="text-muted">This job has no lines.</td></tr>');
+      if (!d.stock.filter(s => !s.qc_pending).length) $('#linesTable tbody').append('<tr><td colspan="9" class="text-danger">No QC-passed processed fabric in this warehouse.</td></tr>');
       $('#linesWrap').show(); refreshCut(); bagsTotal();
     });
   }
