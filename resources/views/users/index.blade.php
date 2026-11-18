@@ -384,15 +384,17 @@ $(document).on('click', '.modal-with-form', function() {
 });
 
 // ── EDIT USER ────────────────────────────────────────────────────
+var USERS_URL = @json(url('users'));
+
 function openEditModal(id) {
-    fetch('/users/' + id, {
+    fetch(USERS_URL + '/' + id + '/edit', {
         headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
     })
     .then(function(res) { return res.json(); })
     .then(function(res) {
-        if (!res.status) { alert('User not found.'); return; }
+        if (!res.status) { alert(res.message || 'User not found.'); return; }
         var u = res.data;
-        document.getElementById('editUserForm').action       = '/users/' + u.id;
+        document.getElementById('editUserForm').action       = USERS_URL + '/' + u.id;
         document.getElementById('edit_user_label').textContent = '— ' + u.name;
         document.getElementById('edit_name').value           = u.name;
         document.getElementById('edit_username').value       = u.username;
@@ -408,7 +410,7 @@ function openEditModal(id) {
 // the Porto theme to intercept the form submit and POST to
 // "#passwordModal" (the href value) instead of the actual route.
 function openPasswordModal(id) {
-    document.getElementById('passwordForm').action       = '/users/' + id + '/change-password';
+    document.getElementById('passwordForm').action       = USERS_URL + '/' + id + '/change-password';
     document.getElementById('pw_user_label').textContent = '— User #' + id;
     // Clear fields and reset eye icons
     ['pw_new', 'pw_confirm'].forEach(function(fid) {
@@ -425,7 +427,7 @@ function openPasswordModal(id) {
 
 // ── ACTIVATE / DEACTIVATE ────────────────────────────────────────
 function openActivateModal(userId, activate) {
-    document.getElementById('activateForm').action = '/users/' + userId + '/toggle-active';
+    document.getElementById('activateForm').action = USERS_URL + '/' + userId + '/toggle-active';
 
     var title   = document.getElementById('activate_title');
     var message = document.getElementById('activate_message');

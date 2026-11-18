@@ -161,7 +161,7 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('users')->name('users.')->group(function () {
         Route::get('/',                    [UserController::class, 'index'])          ->name('index')  ->middleware('check.permission:users.index');
         Route::post('/',                   [UserController::class, 'store'])          ->name('store')  ->middleware('check.permission:users.create');
-        Route::get('{id}/edit',            [UserController::class, 'edit'])           ->name('edit')   ->middleware('check.permission:users.edit');
+        Route::get('{id}/edit',            [UserController::class, 'show'])           ->name('edit')   ->middleware('check.permission:users.edit');
         Route::put('{id}',                 [UserController::class, 'update'])         ->name('update') ->middleware('check.permission:users.edit');
         Route::delete('{id}',              [UserController::class, 'destroy'])        ->name('destroy')->middleware('check.permission:users.delete');
         Route::put('{id}/change-password', [UserController::class, 'changePassword']) ->name('changePassword');
