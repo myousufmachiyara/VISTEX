@@ -105,18 +105,38 @@ class IssuanceController extends Controller
                 : collect();
             $products = Product::whereIn('id', $stock->pluck('product_id')->unique())->get()->keyBy('id');
 
-            $rows = $stock->map(function ($r) use ($production, $products) {
+            $rows = $stock->map(function ($r) use ($production, $products, $sourceId) {
                 $p = $products[$r->product_id] ?? null;
                 $attrs = $p?->getAttribute('attributes');
                 if (is_string($attrs)) $attrs = json_decode($attrs, true);
                 $attrs = is_array($attrs) ? $attrs : [];
+                // Only meters from GRNs still in QC are held back
+                $held = $production->qcHeldQty($sourceId, (int) $r->product_id, $r->lot_no, $r->grade);
+                $free = max(0, (float) $r->qty - $held);
                 return [
                     'product_id' => (int) $r->product_id, 'product' => $p->name ?? '', 'lot_no' => $r->lot_no, 'grade' => $r->grade,
                     'pattern' => $attrs['design_code'] ?? null, 'color' => $attrs['color'] ?? null,
-                    'qty_m' => round((float) $r->qty, 3), 'qty_yd' => Issuance::toYards((float) $r->qty),
-                    'qc_pending' => $production->qcPending($r->lot_no),
+                    'qty_m' => round($free, 3), 'qty_yd' => Issuance::toYards($free), 'held_m' => round($held, 3),
+                    'qc_pending' => $free <= 0.0005,
                 ];
             })->sortBy(fn($r) => [$r['product'], (string) $r['lot_no'], (string) $r['grade']])->values();
+
+            // Why nothing can be issued (shown on the form)
+            $hint = null;
+            if ($rows->where('qc_pending', false)->isEmpty()) {
+                $loc = Location::find($sourceId);
+                if ($rows->isNotEmpty()) {
+                    $grns = $rows->pluck('lot_no')->unique()->filter()
+                        ->flatMap(fn($lot) => $production->qcOpenReceivings($lot)->map(fn($g) => "{$g->receiving_no} (lot {$lot}, QC {$g->qc_status})"))->unique();
+                    $hint = 'Processed fabric at ' . ($loc->name ?? 'this warehouse') . ' is still waiting for QC: ' . $grns->implode(', ') . '. Close QC on those GRNs first.';
+                } else {
+                    $elsewhere = LocationStockLedger::where('status', 'fresh')->whereIn('product_id', $productIds)
+                        ->groupBy('location_id')->havingRaw('SUM(quantity) > 0.0005')->pluck('location_id');
+                    $names = Location::whereIn('id', $elsewhere)->pluck('name');
+                    $hint = 'No processed fabric in stock at ' . ($loc->name ?? 'this warehouse') . '.'
+                        . ($names->isNotEmpty() ? ' Processed fabric is at: ' . $names->implode(', ') . ' — choose that warehouse or move it here.' : ' None is in stock at any warehouse — check that the fabric product is in the "Processed Fabric" category.');
+                }
+            }
 
             return response()->json([
                 'customer' => $job->customer->name ?? '',
@@ -127,6 +147,7 @@ class IssuanceController extends Controller
                     'required_yd' => $req[$i->id]['required_yd'] ?? 0, 'issued_yd' => $req[$i->id]['issued_yd'] ?? 0,
                 ])->values(),
                 'stock' => $rows,
+                'hint' => $hint,
             ]);
         } catch (\Throwable $e) {
             Log::error('[Issuance] job-details failed', ['job' => $jobId, 'message' => $e->getMessage(), 'at' => $e->getFile() . ':' . $e->getLine()]);

@@ -27,7 +27,7 @@ class ProductionService
     public function cuttable(int $locationId): array
     {
         return $this->stockOf($locationId, 'processed', 'for_cutting')
-            ->map(fn($r) => $r + ['qty_yd' => Issuance::toYards($r['qty']), 'qc_pending' => $this->qcPending($r['lot_no'])])->values()->all();
+            ->map(fn($r) => $r + ['qty_yd' => Issuance::toYards($r['qty']), 'qc_pending' => false])->values()->all(); // QC checked when issued
     }
 
     /** Cut pieces waiting to be packed at a location. */
@@ -104,7 +104,6 @@ class ProductionService
                 $mpu = (float) $this->attr($putUp, 'meters_per_unit');
                 if ($mpu <= 0) throw new \Exception("{$putUp->name} is not a put-up (no meters per piece).");
                 $lot = $l['lot_no'] ?? null; $grade = ($l['grade'] ?? '') ?: null;
-                if ($lot && $this->qcPending($lot)) throw new \Exception("Lot {$lot} has QC still open — close QC before cutting.");
 
                 $pieces = round((float) $l['pieces'], 3);
                 // Cutting floor enters yards; stock is in meters
@@ -222,6 +221,29 @@ class ProductionService
     public static function packedFor(int $jobItemId): float
     {
         return (float) ProductionOrderLine::where('job_item_id', $jobItemId)->whereHas('order', fn($q) => $q->where('type', 'packing'))->sum('output_qty');
+    }
+
+    /** GRNs of a lot that are approved but still waiting for QC (Pending / InProgress). */
+    public function qcOpenReceivings(?string $lot)
+    {
+        if (!$lot) return collect();
+        return PurchaseReceiving::whereIn('qc_status', ['Pending', 'InProgress'])->where('status', 'Approved')
+            ->whereHas('purchaseOrder', fn($q) => $q->where(fn($w) => $w->where('order_no', $lot)->orWhere('reprocess_lot_no', $lot)))
+            ->get(['id', 'receiving_no', 'qc_status']);
+    }
+
+    /**
+     * Meters of a product / lot / grade at a location that came in on GRNs still waiting for QC.
+     * Only these are held back — fabric from GRNs whose QC is closed can be used even if
+     * another GRN of the same lot is still in QC.
+     */
+    public function qcHeldQty(int $locationId, int $productId, ?string $lot, ?string $grade): float
+    {
+        $ids = $this->qcOpenReceivings($lot)->pluck('id');
+        if ($ids->isEmpty()) return 0.0;
+        return max(0, (float) LocationStockLedger::where('location_id', $locationId)->where('product_id', $productId)
+            ->where('status', 'fresh')->where('lot_no', $lot)->when($grade, fn($q) => $q->where('grade', $grade))
+            ->where('reference_type', 'PurchaseReceiving')->whereIn('reference_id', $ids)->sum('quantity'));
     }
 
     public function qcPending(?string $lot): bool

@@ -313,17 +313,19 @@ class IssuanceService
             if (($product->category->code ?? '') !== 'processed') throw new \Exception("{$product->name} is not processed fabric.");
             $lot = trim((string) ($i['lot_no'] ?? '')) ?: null;
             $grade = trim((string) ($i['grade'] ?? '')) ?: null;
-            if ($lot && $production->qcPending($lot)) throw new \Exception("Lot {$lot} still has QC open — close QC before issuing it for cutting.");
+            // Fabric from GRNs still waiting for QC can't be issued; the rest of the lot can
 
             $yd = round((float) $i['quantity_yd'], 3);
             $m = Issuance::toMeters($yd);
 
             $k = "{$product->id}|{$lot}|{$grade}";
             $need[$k] = ($need[$k] ?? 0) + $m;
-            $have = LocationStockLedger::balance($sourceId, $product->id, 'fresh', $lot, $grade);
+            $held = $production->qcHeldQty($sourceId, $product->id, $lot, $grade);
+            $have = LocationStockLedger::balance($sourceId, $product->id, 'fresh', $lot, $grade) - $held;
             if ($need[$k] > $have + 0.001) {
                 $where = ($lot ? " lot {$lot}" : '') . ($grade ? " grade {$grade}" : '');
-                throw new \Exception("Not enough {$product->name}{$where} for {$label}: in stock " . Issuance::toYards($have) . ' yd, issuing ' . Issuance::toYards($need[$k]) . ' yd.');
+                throw new \Exception("Not enough QC-passed {$product->name}{$where} for {$label}: available " . Issuance::toYards(max(0, $have)) . ' yd'
+                    . ($held > 0 ? ' (' . Issuance::toYards($held) . ' yd still waiting for QC)' : '') . ', issuing ' . Issuance::toYards($need[$k]) . ' yd.');
             }
 
             $rate = LocationStockLedger::lotRate($sourceId, $product->id, $lot, $product->weightedAverageCost($sourceId), 'fresh', $grade);

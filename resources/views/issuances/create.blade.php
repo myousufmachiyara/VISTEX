@@ -258,7 +258,7 @@ $(function () {
     const list = cut.stock.filter(s => !s.qc_pending).sort((a, b) => isMatch(b) - isMatch(a));
     const sel = pre && pre.product_id ? `${pre.product_id}|${pre.lot_no ?? ''}|${pre.grade ?? ''}` : '';
     return '<option value="">Select fabric</option>' + list.map(s =>
-      `<option value="${esc(stockKey(s))}" ${stockKey(s) === sel ? 'selected' : ''}>${isMatch(s) ? '★ ' : ''}${esc(s.product)} · lot ${esc(s.lot_no ?? '—')} · ${esc(s.grade ?? '—')} — ${s.qty_yd.toFixed(2)} yd</option>`).join('');
+      `<option value="${esc(stockKey(s))}" ${stockKey(s) === sel ? 'selected' : ''}>${isMatch(s) ? '★ ' : ''}${esc(s.product)} · lot ${esc(s.lot_no ?? '—')} · ${esc(s.grade ?? '—')} — ${s.qty_yd.toFixed(2)} yd${s.held_m > 0 ? ' (+' + (s.held_m / 0.9144).toFixed(2) + ' yd in QC)' : ''}</option>`).join('');
   }
 
   function addCutRow(line, pre = {}, after = null) {
@@ -328,7 +328,7 @@ $(function () {
         mine.forEach((p, k) => addCutRow(line, p, k ? $('#linesTable tbody tr[data-line="' + line.id + '"]').last() : null));
       });
       if (!d.lines.length) $('#linesTable tbody').append('<tr><td colspan="9" class="text-muted">This job has no lines.</td></tr>');
-      if (!d.stock.filter(s => !s.qc_pending).length) $('#linesTable tbody').append('<tr><td colspan="9" class="text-danger">No QC-passed processed fabric in this warehouse.</td></tr>');
+      if (!d.stock.filter(s => !s.qc_pending).length) $('#linesTable tbody').append(`<tr><td colspan="9" class="text-danger">${esc(d.hint || 'No QC-passed processed fabric in this warehouse.')}</td></tr>`);
       $('#linesWrap').show(); refreshCut(); bagsTotal();
     })
     .catch(e => {
