@@ -312,7 +312,11 @@ $(function () {
     const q = new URLSearchParams({ source_location_id: $('#source_select').val() || '' }); if (EXCLUDE) q.set('exclude', EXCLUDE);
     $('#jobError').hide();
     fetch(`{{ url('issuances/job-details') }}/${job}?` + q, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
-    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(async r => {
+      if (r.ok) return r.json();
+      let msg = ''; try { msg = (await r.json()).message || ''; } catch (_) {}
+      throw new Error('HTTP ' + r.status + (msg ? ': ' + msg : ''));
+    })
     .then(d => {
       cut = d; rowIdx = 0;
       const prefill = OLD.length ? OLD : EXISTING;
@@ -330,7 +334,7 @@ $(function () {
     .catch(e => {
       $('#linesWrap').hide();
       $('#jobError').show().text('Could not load the job lines (' + e.message + '). '
-        + (e.message === 'HTTP 404' ? 'Clear the route cache on the server (php artisan optimize:clear) and reload this page.' : 'Reload the page and try again.'));
+        + (e.message.startsWith('HTTP 404') ? 'Clear the route cache on the server (php artisan optimize:clear) and reload this page.' : 'Send this message to support if it keeps happening.'));
     });
   }
 

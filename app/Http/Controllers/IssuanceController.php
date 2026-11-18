@@ -84,36 +84,54 @@ class IssuanceController extends Controller
     // AJAX: job lines (required / issued in yards) + QC-passed processed fabric in this warehouse
     public function jobDetails(Request $request, $jobId)
     {
-        $job = Job::with('items', 'customer')->findOrFail($jobId);
-        $sourceId = $request->integer('source_location_id') ?: Location::defaultId();
-        $req = $this->service->jobRequirement($job, $request->integer('exclude') ?: null);
-        $production = app(\App\Services\ProductionService::class);
+        try {
+            // The cutting issuance needs the 2026_11_18 migration (issuance_items.job_item_id / grade)
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('issuance_items', 'job_item_id')) {
+                return response()->json(['message' => 'Database is not updated — run "php artisan migrate" on the server.'], 500);
+            }
 
-        $catId = ProductCategory::where('code', 'processed')->value('id');
-        $stock = $sourceId ? LocationStockLedger::query()->join('products as p', 'p.id', '=', 'location_stock_ledger.product_id')
-            ->where('location_stock_ledger.location_id', $sourceId)->where('location_stock_ledger.status', 'fresh')->where('p.category_id', $catId)
-            ->groupBy('location_stock_ledger.product_id', 'p.name', 'p.attributes', 'location_stock_ledger.lot_no', 'location_stock_ledger.grade')
-            ->selectRaw('location_stock_ledger.product_id, p.name, p.attributes, location_stock_ledger.lot_no, location_stock_ledger.grade, SUM(location_stock_ledger.quantity) AS qty')
-            ->havingRaw('SUM(location_stock_ledger.quantity) > 0.0005')->orderBy('p.name')->orderBy('location_stock_ledger.lot_no')->get() : collect();
+            $job = Job::with('items', 'customer')->findOrFail($jobId);
+            $sourceId = $request->integer('source_location_id') ?: Location::defaultId();
+            $req = $this->service->jobRequirement($job, $request->integer('exclude') ?: null);
+            $production = app(\App\Services\ProductionService::class);
 
-        return response()->json([
-            'customer' => $job->customer->name ?? '',
-            'customer_id' => $job->customer_id,
-            'lines' => $job->items->map(fn($i) => [
-                'id' => $i->id, 'collection' => $i->collection, 'design' => $i->design, 'color' => $i->color_scheme,
-                'pattern_code' => $i->pattern_code,
-                'required_yd' => $req[$i->id]['required_yd'] ?? 0, 'issued_yd' => $req[$i->id]['issued_yd'] ?? 0,
-            ])->values(),
-            'stock' => $stock->map(function ($r) use ($production) {
-                $attrs = json_decode((string) $r->attributes, true) ?: [];
+            // Processed fabric in this warehouse by product / lot / grade (grouped on plain columns only)
+            $productIds = Product::where('category_id', ProductCategory::where('code', 'processed')->value('id'))->pluck('id');
+            $stock = $sourceId && $productIds->isNotEmpty()
+                ? LocationStockLedger::where('location_id', $sourceId)->where('status', 'fresh')->whereIn('product_id', $productIds)
+                    ->groupBy('product_id', 'lot_no', 'grade')
+                    ->selectRaw('product_id, lot_no, grade, SUM(quantity) AS qty')
+                    ->havingRaw('SUM(quantity) > 0.0005')->get()
+                : collect();
+            $products = Product::whereIn('id', $stock->pluck('product_id')->unique())->get()->keyBy('id');
+
+            $rows = $stock->map(function ($r) use ($production, $products) {
+                $p = $products[$r->product_id] ?? null;
+                $attrs = $p?->getAttribute('attributes');
+                if (is_string($attrs)) $attrs = json_decode($attrs, true);
+                $attrs = is_array($attrs) ? $attrs : [];
                 return [
-                    'product_id' => (int) $r->product_id, 'product' => $r->name, 'lot_no' => $r->lot_no, 'grade' => $r->grade,
+                    'product_id' => (int) $r->product_id, 'product' => $p->name ?? '', 'lot_no' => $r->lot_no, 'grade' => $r->grade,
                     'pattern' => $attrs['design_code'] ?? null, 'color' => $attrs['color'] ?? null,
                     'qty_m' => round((float) $r->qty, 3), 'qty_yd' => Issuance::toYards((float) $r->qty),
                     'qc_pending' => $production->qcPending($r->lot_no),
                 ];
-            })->values(),
-        ]);
+            })->sortBy(fn($r) => [$r['product'], (string) $r['lot_no'], (string) $r['grade']])->values();
+
+            return response()->json([
+                'customer' => $job->customer->name ?? '',
+                'customer_id' => $job->customer_id,
+                'lines' => $job->items->map(fn($i) => [
+                    'id' => $i->id, 'collection' => $i->collection, 'design' => $i->design, 'color' => $i->color_scheme,
+                    'pattern_code' => $i->pattern_code,
+                    'required_yd' => $req[$i->id]['required_yd'] ?? 0, 'issued_yd' => $req[$i->id]['issued_yd'] ?? 0,
+                ])->values(),
+                'stock' => $rows,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('[Issuance] job-details failed', ['job' => $jobId, 'message' => $e->getMessage(), 'at' => $e->getFile() . ':' . $e->getLine()]);
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
     }
 
     // AJAX: what may be issued against this PO from this warehouse
